@@ -64,29 +64,29 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Current file context | Include active file content + cursor position in prompts | 1 |
 | :white_check_mark: | Selection context | Include selected text in prompts | 1 |
 | :white_check_mark: | Open editors context | Include open tab file paths + languages | 1 |
-| :construction: | Diagnostics context | Include current file errors/warnings in prompts | 3 |
-| :construction: | Definition resolution | Resolve symbol definitions via `executeDefinitionProvider` | 3 |
-| :construction: | Type definition resolution | Resolve type signatures via `executeTypeDefinitionProvider` | 3 |
-| :construction: | Hover info | Get type info + docs via `executeHoverProvider` | 3 |
-| :construction: | Reference lookup | Find symbol usages via `executeReferenceProvider` | 3 |
-| :construction: | Document symbols | Get file structure via `executeDocumentSymbolProvider` | 3 |
-| :construction: | Context caching | Brief TTL cache (~5s) to avoid redundant language service calls | 3 |
-| :construction: | Graceful fallback | Omit context types not supported by the current language | 3 |
+| :white_check_mark: | Diagnostics context | Include current file errors/warnings in prompts | 3 |
+| :white_check_mark: | Definition resolution | Resolve symbol definitions via `executeDefinitionProvider` | 3 |
+| :white_check_mark: | Type definition resolution | Resolve type signatures via `executeTypeDefinitionProvider` | 3 |
+| :white_check_mark: | Hover info | Get type info + docs via `executeHoverProvider` | 3 |
+| :white_check_mark: | Reference lookup | Find symbol usages via `executeReferenceProvider` | 3 |
+| :white_check_mark: | Document symbols | Get file structure via `executeDocumentSymbolProvider` | 3 |
+| :white_check_mark: | Context caching | Brief TTL cache (~5s) to avoid redundant language service calls | 3 |
+| :white_check_mark: | Graceful fallback | Omit context types not supported by the current language | 3 |
 
 ## Editor Capability Hints
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :construction: | Capability detection | Probe which language providers are available for the current file | 3 |
-| :construction: | Dynamic system prompt | Inject available editor capabilities into the LLM system prompt | 3 |
-| :construction: | Tool-use: rename symbol | LLM can trigger project-wide rename via tool call | 3 |
-| :construction: | Tool-use: apply code action | LLM can apply quick fixes / refactorings | 3 |
-| :construction: | Tool-use: format document | LLM can trigger document formatting | 3 |
-| :construction: | Tool-use: insert code | LLM can insert code at a specific position | 3 |
-| :construction: | Tool-use: replace range | LLM can replace a code range | 3 |
+| :white_check_mark: | Capability detection | Probe which language providers are available for the current file | 3 |
+| :white_check_mark: | Dynamic system prompt | Inject available editor capabilities into the LLM system prompt | 3 |
+| :white_check_mark: | Tool-use: rename symbol | LLM can trigger project-wide rename via tool call | 3 |
+| :white_check_mark: | Tool-use: apply code action | LLM can apply quick fixes / refactorings | 3 |
+| :white_check_mark: | Tool-use: format document | LLM can trigger document formatting | 3 |
+| :white_check_mark: | Tool-use: insert code | LLM can insert code at a specific position | 3 |
+| :white_check_mark: | Tool-use: replace range | LLM can replace a code range | 3 |
 | :construction: | Contextual code actions | Include available quick fixes at cursor in the prompt | 3 |
 | :construction: | Diff preview | Show diff preview for user approval before destructive changes | 3 |
-| :construction: | Language-aware advertising | Only advertise capabilities the current language actually supports | 3 |
+| :white_check_mark: | Language-aware advertising | Only advertise capabilities the current language actually supports | 3 |
 
 ## Settings & Configuration
 
@@ -94,11 +94,11 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | Typed settings wrapper | Type-safe access to extension configuration | 1 |
 | :white_check_mark: | Preferred chat model | Default model for chat conversations | 1 |
-| :construction: | Preferred completions model | Default model for inline completions | 2 |
+| :white_check_mark: | Preferred completions model | Default model for inline completions | 2 |
 | :white_check_mark: | Temperature setting | Configurable temperature for responses | 1 |
 | :white_check_mark: | Max tokens setting | Configurable max tokens for responses | 1 |
-| :construction: | Trigger mode setting | Auto / manual inline completion trigger | 2 |
-| :construction: | Debounce delay setting | Configurable debounce for auto-trigger | 2 |
+| :white_check_mark: | Trigger mode setting | Auto / manual inline completion trigger | 2 |
+| :white_check_mark: | Debounce delay setting | Configurable debounce for auto-trigger | 2 |
 
 ## Polish & UX
 
@@ -115,6 +115,6 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 46 tests across 6 test files (Settings, Auth, Client, Context, Markdown, MessageHandler) | 1 |
+| :white_check_mark: | Unit tests | 85 tests across 12 test files covering all modules | 1-3 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
