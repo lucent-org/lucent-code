@@ -10,7 +10,16 @@ let api: VsCodeApi | undefined;
 
 export function getVsCodeApi(): VsCodeApi {
   if (!api) {
-    api = acquireVsCodeApi();
+    if (typeof acquireVsCodeApi === 'function') {
+      api = acquireVsCodeApi();
+    } else {
+      // Dev fallback for standalone browser testing
+      api = {
+        postMessage: (msg: unknown) => console.log('[vscode-mock] postMessage:', msg),
+        getState: () => undefined,
+        setState: () => {},
+      };
+    }
   }
   return api;
 }
