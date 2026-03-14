@@ -78,7 +78,11 @@ export type ExtensionMessage =
   | { type: 'streamError'; error: string }
   | { type: 'modelsLoaded'; models: OpenRouterModel[] }
   | { type: 'modelChanged'; modelId: string }
-  | { type: 'contextUpdate'; context: CodeContext };
+  | { type: 'contextUpdate'; context: CodeContext }
+  | { type: 'conversationList'; conversations: ConversationSummary[] }
+  | { type: 'conversationLoaded'; conversation: Conversation }
+  | { type: 'conversationSaved'; id: string; title: string }
+  | { type: 'conversationTitled'; id: string; title: string };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; model: string }
@@ -86,7 +90,11 @@ export type WebviewMessage =
   | { type: 'getModels' }
   | { type: 'setModel'; modelId: string }
   | { type: 'newChat' }
-  | { type: 'ready' };
+  | { type: 'ready' }
+  | { type: 'listConversations' }
+  | { type: 'loadConversation'; id: string }
+  | { type: 'deleteConversation'; id: string }
+  | { type: 'exportConversation'; id: string; format: 'json' | 'markdown' };
 
 // ---- Code context ----
 
@@ -112,4 +120,23 @@ export interface CodeContext {
     severity: string;
     range: { startLine: number; endLine: number };
   }>;
+}
+
+// ---- Conversations ----
+
+export interface Conversation {
+  id: string;
+  title: string;
+  model: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  model: string;
+  messageCount: number;
+  updatedAt: string;
 }
