@@ -4,6 +4,16 @@
   "description": "Chat with any AI model via OpenRouter — Copilot-like experience with chat panel and inline completions",
   "version": "0.1.0",
   "publisher": "openrouter-chat",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openrouter-chat/vscode"
+  },
+  "keywords": ["ai", "chat", "openrouter", "copilot", "completions", "code-intelligence"],
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
