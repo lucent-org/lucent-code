@@ -5,6 +5,7 @@ import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS } from '../lsp/editor-tools';
 import { ConversationHistory } from './history';
+import { NotificationService } from '../core/notifications';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -123,6 +124,7 @@ export class MessageHandler {
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         postMessage({ type: 'streamError', error: errorMessage });
+        new NotificationService().handleError(errorMessage);
       }
     } finally {
       this.abortController = undefined;
@@ -140,6 +142,7 @@ export class MessageHandler {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';
       postMessage({ type: 'streamError', error: errorMessage });
+      new NotificationService().handleError(errorMessage);
     }
   }
 

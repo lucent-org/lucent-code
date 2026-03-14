@@ -12,6 +12,12 @@ vi.mock('vscode', () => ({
   },
   window: {
     showTextDocument: vi.fn().mockResolvedValue(undefined),
+    showErrorMessage: vi.fn().mockResolvedValue(undefined),
+    showWarningMessage: vi.fn().mockResolvedValue(undefined),
+    showInformationMessage: vi.fn().mockResolvedValue(undefined),
+  },
+  commands: {
+    executeCommand: vi.fn(),
   },
   ConfigurationTarget: { Global: 1 },
 }));
