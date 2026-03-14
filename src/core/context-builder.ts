@@ -1,7 +1,18 @@
 import * as vscode from 'vscode';
 import type { CodeContext } from '../shared/types';
+import { CodeIntelligence } from '../lsp/code-intelligence';
+import { CapabilityDetector, type EditorCapabilities } from '../lsp/capability-detector';
 
 export class ContextBuilder {
+  private codeIntelligence?: CodeIntelligence;
+  private capabilityDetector?: CapabilityDetector;
+  private cachedCapabilities?: EditorCapabilities;
+
+  setCodeIntelligence(ci: CodeIntelligence, cd: CapabilityDetector): void {
+    this.codeIntelligence = ci;
+    this.capabilityDetector = cd;
+  }
+
   buildContext(): CodeContext {
     const editor = vscode.window.activeTextEditor;
     const context: CodeContext = {};
@@ -67,5 +78,59 @@ export class ContextBuilder {
     }
 
     return parts.join('\n');
+  }
+
+  async buildEnrichedContext(): Promise<CodeContext> {
+    const context = this.buildContext();
+
+    if (!this.codeIntelligence || !context.activeFile) {
+      return context;
+    }
+
+    const uri = context.activeFile.uri;
+    const line = context.activeFile.cursorLine ?? 0;
+    const char = context.activeFile.cursorCharacter ?? 0;
+
+    const lspContext = await this.codeIntelligence.resolveContext(uri, line, char);
+
+    context.diagnostics = lspContext.diagnostics.map((d) => ({
+      message: d.message,
+      severity: d.severity,
+      range: { startLine: d.startLine, endLine: d.endLine },
+    }));
+
+    return context;
+  }
+
+  formatEnrichedPrompt(context: CodeContext, capabilities?: EditorCapabilities): string {
+    let prompt = this.formatForPrompt(context);
+
+    if (context.diagnostics && context.diagnostics.length > 0) {
+      prompt += '\n\n## Diagnostics:\n';
+      for (const d of context.diagnostics) {
+        prompt += `- [${d.severity}] Line ${d.range.startLine + 1}: ${d.message}\n`;
+      }
+    }
+
+    if (capabilities && this.capabilityDetector) {
+      prompt += this.capabilityDetector.formatForPrompt(capabilities);
+    }
+
+    return prompt;
+  }
+
+  async detectCapabilities(): Promise<EditorCapabilities | undefined> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || !this.capabilityDetector) return undefined;
+
+    this.cachedCapabilities = await this.capabilityDetector.detect(
+      editor.document.uri.toString(),
+      editor.document.languageId
+    );
+    return this.cachedCapabilities;
+  }
+
+  getCapabilities(): EditorCapabilities | undefined {
+    return this.cachedCapabilities;
   }
 }

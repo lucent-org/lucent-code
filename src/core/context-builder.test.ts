@@ -167,4 +167,43 @@ describe('ContextBuilder', () => {
       expect(result).toBe('');
     });
   });
+
+  describe('formatEnrichedPrompt', () => {
+    it('should include diagnostics in prompt', () => {
+      const builder = new ContextBuilder();
+      const context: CodeContext = {
+        activeFile: {
+          uri: 'file:///test.ts',
+          languageId: 'typescript',
+          content: 'const x = 1;',
+          cursorLine: 0,
+          cursorCharacter: 0,
+        },
+        diagnostics: [
+          { message: 'Type error', severity: 'Error', range: { startLine: 0, endLine: 0 } },
+        ],
+      };
+
+      const prompt = builder.formatEnrichedPrompt(context);
+      expect(prompt).toContain('Diagnostics');
+      expect(prompt).toContain('Type error');
+      expect(prompt).toContain('[Error]');
+    });
+
+    it('should not include diagnostics section when none exist', () => {
+      const builder = new ContextBuilder();
+      const context: CodeContext = {
+        activeFile: {
+          uri: 'file:///test.ts',
+          languageId: 'typescript',
+          content: 'const x = 1;',
+          cursorLine: 0,
+          cursorCharacter: 0,
+        },
+      };
+
+      const prompt = builder.formatEnrichedPrompt(context);
+      expect(prompt).not.toContain('Diagnostics');
+    });
+  });
 });
