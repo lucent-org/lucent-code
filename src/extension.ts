@@ -6,6 +6,7 @@ import { ContextBuilder } from './core/context-builder';
 import { ChatViewProvider } from './chat/chat-provider';
 import { MessageHandler } from './chat/message-handler';
 import type { WebviewMessage } from './shared/types';
+import { InlineCompletionProvider } from './completions/inline-provider';
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
@@ -45,6 +46,22 @@ export function activate(context: vscode.ExtensionContext) {
     setupWebviewMessaging();
   };
 
+  // Register inline completion provider
+  const completionProvider = new InlineCompletionProvider(client, settings);
+  context.subscriptions.push(
+    vscode.languages.registerInlineCompletionItemProvider(
+      { pattern: '**' },
+      completionProvider
+    )
+  );
+
+  // Register manual trigger command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.triggerCompletion', () => {
+      vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
+    })
+  );
+
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand('openRouterChat.setApiKey', () => {
@@ -76,7 +93,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Cleanup
   context.subscriptions.push({
-    dispose: () => auth.dispose(),
+    dispose: () => {
+      auth.dispose();
+      completionProvider.dispose();
+    },
   });
 }
 
