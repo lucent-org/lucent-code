@@ -2,7 +2,7 @@
 
 Complete feature list for the OpenRouter Chat VSCode extension. Features are grouped by module and tagged with the phase in which they are planned for delivery.
 
-**Legend:** :white_check_mark: = Implemented | :construction: = Planned
+**Legend:** :white_check_mark: = Implemented | :construction: = Planned | :warning: = Needs Fix
 
 ---
 
@@ -53,7 +53,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | API key auth | Store API key in VSCode SecretStorage (encrypted) | 1 |
 | :white_check_mark: | Auth prompt on activation | Prompt for credentials if none found on startup | 1 |
-| :white_check_mark: | OAuth flow | Browser-based login via OpenRouter OAuth (PKCE structure) | 4 |
+| :warning: | OAuth flow | PKCE is incomplete — needs SHA-256 challenge, callback handler, state persistence | 4 |
 | :construction: | Token management | Secure token storage, refresh, and revocation | 4 |
 | :white_check_mark: | Auth state events | EventEmitter for login/logout so modules can react | 1 |
 
@@ -79,7 +79,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | Capability detection | Probe which language providers are available for the current file | 3 |
 | :white_check_mark: | Dynamic system prompt | Inject available editor capabilities into the LLM system prompt | 3 |
-| :white_check_mark: | Tool-use: rename symbol | LLM can trigger project-wide rename via tool call | 3 |
+| :warning: | Tool-use: rename symbol | Opens rename dialog instead of programmatically renaming — needs `executeDocumentRenameProvider` | 3 |
 | :white_check_mark: | Tool-use: apply code action | LLM can apply quick fixes / refactorings | 3 |
 | :white_check_mark: | Tool-use: format document | LLM can trigger document formatting | 3 |
 | :white_check_mark: | Tool-use: insert code | LLM can insert code at a specific position | 3 |
@@ -118,3 +118,38 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Unit tests | 105 tests across 14 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
+
+## Backlog — Code Review Findings
+
+### Critical (Security)
+
+| Status | Issue | Description | Source |
+|--------|-------|-------------|--------|
+| :warning: | XSS via innerHTML | ChatMessage.tsx uses hand-rolled regex + `innerHTML`, bypassing Solid's XSS protections — use DOMPurify or `marked` with sanitize | Review |
+| :warning: | OAuth PKCE broken | Sends raw verifier as challenge instead of SHA-256 hash, no callback handler registered | Review |
+| :warning: | Path traversal in history | Conversation ID used in file path without validating it stays within `conversationsDir` | Review |
+
+### Important
+
+| Status | Issue | Description | Source |
+|--------|-------|-------------|--------|
+| :construction: | Tool-use not wired | TOOL_DEFINITIONS exist but are never passed to the API request, tool_calls never processed | Review |
+| :construction: | Monkey-patched resolveWebviewView | Extension.ts overwrites class method at runtime — use event emitter or callback | Review |
+| :construction: | Sync fs in async history | `fs.readFileSync`/`writeFileSync` block the extension host — use `fs.promises` | Review |
+| :construction: | Unbounded LSP cache | CodeIntelligence cache grows without limit — add LRU or periodic sweep | Review |
+| :construction: | NotificationService per-error | Instantiated on each error instead of injected via constructor | Review |
+| :construction: | CSS filename mismatch | `chat-provider.ts` references `style.css` but Vite may output `index.css` — verify | Review |
+| :construction: | rename_symbol broken | Opens rename dialog instead of programmatically applying rename with `newName` | Review |
+
+### Suggestions
+
+| Status | Issue | Description | Source |
+|--------|-------|-------------|--------|
+| :construction: | Retry with backoff | Design doc specifies exponential backoff for 429/5xx — not implemented | Review |
+| :construction: | inlineSuggest kill switch | Inline provider should check `editor.inlineSuggest.enabled` before API calls | Review |
+| :construction: | Enriched context on ready | `ready` handler sends basic `buildContext()` instead of `buildEnrichedContext()` | Review |
+| :construction: | Type duplication | ChatMessage, ConversationSummary, Model defined in both extension and webview | Review |
+| :construction: | Idiomatic scroll-to-bottom | Use Solid.js `createEffect` watching messages instead of imperative calls | Review |
+| :construction: | deactivate cleanup | Empty `deactivate()` — should abort in-flight requests and clean up | Review |
+| :construction: | Apply to file | Code block "Apply to file" action not yet implemented | Phase 1 |
+| :construction: | Import conversations | Import conversations from JSON file | Phase 4 |
