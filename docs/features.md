@@ -53,7 +53,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | API key auth | Store API key in VSCode SecretStorage (encrypted) | 1 |
 | :white_check_mark: | Auth prompt on activation | Prompt for credentials if none found on startup | 1 |
-| :warning: | OAuth flow | PKCE is incomplete — needs SHA-256 challenge, callback handler, state persistence | 4 |
+| :white_check_mark: | OAuth flow | Browser-based login via OpenRouter OAuth with proper PKCE (SHA-256) | 4 |
 | :construction: | Token management | Secure token storage, refresh, and revocation | 4 |
 | :white_check_mark: | Auth state events | EventEmitter for login/logout so modules can react | 1 |
 
@@ -115,7 +115,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 105 tests across 14 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 111 tests across 14 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -125,9 +125,9 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Issue | Description | Source |
 |--------|-------|-------------|--------|
-| :warning: | XSS via innerHTML | ChatMessage.tsx uses hand-rolled regex + `innerHTML`, bypassing Solid's XSS protections — use DOMPurify or `marked` with sanitize | Review |
-| :warning: | OAuth PKCE broken | Sends raw verifier as challenge instead of SHA-256 hash, no callback handler registered | Review |
-| :warning: | Path traversal in history | Conversation ID used in file path without validating it stays within `conversationsDir` | Review |
+| :white_check_mark: | ~~XSS via innerHTML~~ | Fixed — DOMPurify sanitizes all innerHTML with strict tag allowlist | Review |
+| :white_check_mark: | ~~OAuth PKCE broken~~ | Fixed — proper SHA-256 challenge, state persistence, callback handler | Review |
+| :white_check_mark: | ~~Path traversal in history~~ | Fixed — ID sanitization + resolved path validation | Review |
 
 ### Important
 
