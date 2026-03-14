@@ -289,6 +289,111 @@ body {
   border-color: var(--accent);
 }
 
+/* History Button */
+.history-button {
+  background: none;
+  color: var(--fg-secondary);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+/* Conversation List */
+.conversation-list {
+  border-bottom: 1px solid var(--border);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.conversation-list-header {
+  padding: 8px;
+  font-weight: bold;
+  font-size: 0.9em;
+  color: var(--fg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.conversation-list-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--fg-secondary);
+  font-size: 0.9em;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.conversation-item.active {
+  background: var(--bg-secondary);
+}
+
+.conversation-item-main {
+  flex: 1;
+  padding: 8px;
+  background: none;
+  color: var(--fg-primary);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: inherit;
+}
+
+.conversation-item-main:hover {
+  background: var(--bg-secondary);
+}
+
+.conversation-title {
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.conversation-meta {
+  font-size: 0.8em;
+  color: var(--fg-secondary);
+  margin-top: 2px;
+}
+
+.conversation-actions {
+  display: flex;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.conversation-actions button {
+  background: none;
+  color: var(--fg-secondary);
+  border: none;
+  cursor: pointer;
+  font-size: 0.75em;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.conversation-actions button:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.conversation-actions .delete-btn:hover {
+  background: var(--vscode-errorForeground, #f44);
+  color: white;
+}
+
 .chat-input-container {
   padding: 8px;
   border-top: 1px solid var(--border);

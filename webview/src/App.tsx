@@ -3,6 +3,7 @@ import { chatStore } from './stores/chat';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ModelSelector from './components/ModelSelector';
+import ConversationList from './components/ConversationList';
 import { getVsCodeApi } from './utils/vscode-api';
 
 const App: Component = () => {
@@ -30,6 +31,19 @@ const App: Component = () => {
         case 'modelChanged':
           chatStore.selectModel(message.modelId);
           break;
+        case 'conversationList':
+          chatStore.handleConversationList(message.conversations);
+          break;
+        case 'conversationLoaded':
+          chatStore.handleConversationLoaded(message.conversation);
+          scrollToBottom();
+          break;
+        case 'conversationSaved':
+          chatStore.handleConversationSaved(message.id);
+          break;
+        case 'conversationTitled':
+          chatStore.handleConversationTitled(message.id, message.title);
+          break;
       }
     });
 
@@ -55,10 +69,27 @@ const App: Component = () => {
           selectedModel={chatStore.selectedModel()}
           onSelect={chatStore.selectModel}
         />
+        <button
+          class={`history-button ${chatStore.showConversationList() ? 'active' : ''}`}
+          onClick={chatStore.toggleConversationList}
+          title="Conversation History"
+        >
+          ☰
+        </button>
         <button class="new-chat-button" onClick={chatStore.newChat} title="New Chat">
           +
         </button>
       </div>
+
+      <Show when={chatStore.showConversationList()}>
+        <ConversationList
+          conversations={chatStore.conversations()}
+          currentId={chatStore.currentConversationId()}
+          onLoad={chatStore.loadConversation}
+          onDelete={chatStore.deleteConversation}
+          onExport={chatStore.exportConversation}
+        />
+      </Show>
 
       <div class="messages">
         <Show when={chatStore.messages().length > 0} fallback={

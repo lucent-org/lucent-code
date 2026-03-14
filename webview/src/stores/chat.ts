@@ -14,11 +14,22 @@ export interface Model {
   pricing: { prompt: string; completion: string };
 }
 
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  model: string;
+  messageCount: number;
+  updatedAt: string;
+}
+
 function createChatStore() {
   const [messages, setMessages] = createSignal<ChatMessage[]>([]);
   const [models, setModels] = createSignal<Model[]>([]);
   const [selectedModel, setSelectedModel] = createSignal<string>('');
   const [isStreaming, setIsStreaming] = createSignal(false);
+  const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
+  const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
+  const [showConversationList, setShowConversationList] = createSignal(false);
 
   const vscode = getVsCodeApi();
 
@@ -41,6 +52,8 @@ function createChatStore() {
 
   function newChat() {
     setMessages([]);
+    setCurrentConversationId('');
+    setShowConversationList(false);
     vscode.postMessage({ type: 'newChat' });
   }
 
@@ -95,6 +108,46 @@ function createChatStore() {
     vscode.postMessage({ type: 'setModel', modelId });
   }
 
+  function handleConversationList(list: ConversationSummary[]) {
+    setConversations(list);
+  }
+
+  function handleConversationLoaded(conversation: { id: string; title: string; messages: Array<{ role: string; content: string }> }) {
+    setCurrentConversationId(conversation.id);
+    setMessages(conversation.messages.map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    })));
+    setShowConversationList(false);
+  }
+
+  function handleConversationSaved(id: string) {
+    setCurrentConversationId(id);
+  }
+
+  function handleConversationTitled(id: string, title: string) {
+    setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title } : c));
+  }
+
+  function loadConversation(id: string) {
+    vscode.postMessage({ type: 'loadConversation', id });
+  }
+
+  function deleteConversation(id: string) {
+    vscode.postMessage({ type: 'deleteConversation', id });
+  }
+
+  function exportConversation(id: string, format: 'json' | 'markdown') {
+    vscode.postMessage({ type: 'exportConversation', id, format });
+  }
+
+  function toggleConversationList() {
+    if (!showConversationList()) {
+      vscode.postMessage({ type: 'listConversations' });
+    }
+    setShowConversationList(!showConversationList());
+  }
+
   return {
     messages,
     models,
@@ -108,6 +161,17 @@ function createChatStore() {
     handleStreamEnd,
     handleStreamError,
     handleModelsLoaded,
+    conversations,
+    currentConversationId,
+    showConversationList,
+    handleConversationList,
+    handleConversationLoaded,
+    handleConversationSaved,
+    handleConversationTitled,
+    loadConversation,
+    deleteConversation,
+    exportConversation,
+    toggleConversationList,
   };
 }
 
