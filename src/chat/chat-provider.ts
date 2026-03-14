@@ -28,7 +28,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private getHtmlForWebview(webview: vscode.Webview): string {
     const distUri = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(distUri, 'index.js'));
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(distUri, 'styles.css'));
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(distUri, 'index.css'));
 
     const nonce = getNonce();
 
