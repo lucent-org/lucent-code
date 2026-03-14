@@ -4,7 +4,7 @@
   <!-- Chat bubble -->
   <path d="M24 32h80c5.5 0 10 4.5 10 10v44c0 5.5-4.5 10-10 10H76l-16 16V96H24c-5.5 0-10-4.5-10-10V42c0-5.5 4.5-10 10-10z" fill="#0e639c"/>
   <!-- OpenRouter logo (smaller, centered in bubble) -->
-  <g transform="translate(30, 42) scale(0.13)">
+  <g transform="translate(30, 38) scale(0.13)">
     <path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945"
       stroke="#ffffff" stroke-width="80" stroke-linecap="round" fill="none"/>
     <path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z" fill="#ffffff"/>
