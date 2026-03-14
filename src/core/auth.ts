@@ -5,6 +5,7 @@ const SECRET_KEY = 'openRouterChat.apiKey';
 export class AuthManager {
   private readonly onDidChangeAuthEmitter = new vscode.EventEmitter<boolean>();
   public readonly onDidChangeAuth = this.onDidChangeAuthEmitter.event;
+  private pendingOAuth?: { state: string; codeVerifier: string };
 
   constructor(private readonly secretStorage: vscode.SecretStorage) {}
 
@@ -46,18 +47,84 @@ export class AuthManager {
     return this.promptForApiKey();
   }
 
-  async startOAuth(): Promise<string | undefined> {
+  async startOAuth(): Promise<void> {
+    const codeVerifier = this.generateCodeVerifier();
+    const codeChallenge = await this.generateCodeChallenge(codeVerifier);
+    const state = this.generateState();
+
+    // Persist for callback verification
+    this.pendingOAuth = { state, codeVerifier };
+
     const callbackUri = await vscode.env.asExternalUri(
       vscode.Uri.parse('vscode://openrouter-chat/oauth-callback')
     );
 
-    const codeVerifier = this.generateCodeVerifier();
-    const state = this.generateState();
+    const params = new URLSearchParams({
+      callback_url: callbackUri.toString(),
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      state,
+    });
 
-    const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUri.toString())}&code_challenge=${codeVerifier}&state=${state}`;
-
+    const authUrl = `https://openrouter.ai/auth?${params.toString()}`;
     await vscode.env.openExternal(vscode.Uri.parse(authUrl));
-    return state;
+  }
+
+  async handleOAuthCallback(uri: vscode.Uri): Promise<void> {
+    const params = new URLSearchParams(uri.query);
+    const code = params.get('code');
+    const state = params.get('state');
+
+    if (!this.pendingOAuth || state !== this.pendingOAuth.state) {
+      vscode.window.showErrorMessage('OpenRouter: OAuth state mismatch. Please try again.');
+      this.pendingOAuth = undefined;
+      return;
+    }
+
+    if (!code) {
+      vscode.window.showErrorMessage('OpenRouter: No authorization code received.');
+      this.pendingOAuth = undefined;
+      return;
+    }
+
+    try {
+      // Exchange code for API key
+      const response = await fetch('https://openrouter.ai/api/v1/auth/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          code_verifier: this.pendingOAuth.codeVerifier,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Token exchange failed (${response.status})`);
+      }
+
+      const data = (await response.json()) as { key?: string };
+      const apiKey = data.key;
+
+      if (apiKey) {
+        await this.setApiKey(apiKey);
+        vscode.window.showInformationMessage('OpenRouter: Signed in successfully.');
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      vscode.window.showErrorMessage(`OpenRouter: OAuth failed — ${msg}`);
+    } finally {
+      this.pendingOAuth = undefined;
+    }
+  }
+
+  private async generateCodeChallenge(verifier: string): Promise<string> {
+    // Use Web Crypto API (available in Node 18+)
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await globalThis.crypto.subtle.digest('SHA-256', data);
+    // Base64URL encode
+    const base64 = Buffer.from(hash).toString('base64');
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   private generateCodeVerifier(): string {

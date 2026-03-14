@@ -15,6 +15,25 @@ const { mockSecretStorage, mockWindow } = vi.hoisted(() => ({
   },
 }));
 
+// Ensure crypto.subtle is available for PKCE code challenge generation
+if (!globalThis.crypto?.subtle) {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: {
+      subtle: {
+        digest: vi.fn(async (_algo: string, data: ArrayBuffer) => {
+          // Simple mock - just return a hash-like buffer derived from input
+          const view = new Uint8Array(data);
+          const result = new Uint8Array(32);
+          for (let i = 0; i < view.length; i++) {
+            result[i % 32] ^= view[i];
+          }
+          return result.buffer;
+        }),
+      },
+    },
+  });
+}
+
 vi.mock('vscode', () => ({
   window: mockWindow,
   env: {
@@ -94,5 +113,32 @@ describe('AuthManager', () => {
     expect(state1.length).toBeGreaterThan(0);
     // Two generated states should be different (probabilistically)
     // Skip this assertion since it could rarely fail
+  });
+
+  it('should generate a proper code challenge from verifier', async () => {
+    const challenge = await (auth as any).generateCodeChallenge('test-verifier-string');
+    expect(typeof challenge).toBe('string');
+    expect(challenge.length).toBeGreaterThan(0);
+    // Should be base64url (no +, /, or =)
+    expect(/^[A-Za-z0-9\-_]+$/.test(challenge)).toBe(true);
+  });
+
+  it('should generate different challenges for different verifiers', async () => {
+    const challenge1 = await (auth as any).generateCodeChallenge('verifier-one');
+    const challenge2 = await (auth as any).generateCodeChallenge('verifier-two');
+    expect(challenge1).not.toBe(challenge2);
+  });
+
+  it('should reject OAuth callback with mismatched state', async () => {
+    // Set up pending OAuth with known state
+    (auth as any).pendingOAuth = { state: 'correct-state', codeVerifier: 'test' };
+
+    const uri = { query: 'code=test-code&state=wrong-state' };
+    await auth.handleOAuthCallback(uri as any);
+
+    // Should show error
+    expect(mockWindow.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining('state mismatch')
+    );
   });
 });
