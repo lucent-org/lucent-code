@@ -1,0 +1,85 @@
+{
+  "name": "openrouter-chat",
+  "displayName": "OpenRouter Chat",
+  "description": "Chat with any AI model via OpenRouter — Copilot-like experience with chat panel and inline completions",
+  "version": "0.1.0",
+  "publisher": "openrouter-chat",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["AI", "Chat"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "openrouter-chat",
+          "title": "OpenRouter Chat",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "openrouter-chat": [
+        {
+          "type": "webview",
+          "id": "openRouterChat.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "openRouterChat.setApiKey",
+        "title": "OpenRouter Chat: Set API Key"
+      },
+      {
+        "command": "openRouterChat.newChat",
+        "title": "OpenRouter Chat: New Chat"
+      }
+    ],
+    "configuration": {
+      "title": "OpenRouter Chat",
+      "properties": {
+        "openRouterChat.chat.model": {
+          "type": "string",
+          "default": "",
+          "description": "Default model ID for chat (e.g., 'anthropic/claude-sonnet-4'). Leave empty to select manually."
+        },
+        "openRouterChat.chat.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Temperature for chat responses"
+        },
+        "openRouterChat.chat.maxTokens": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 1,
+          "description": "Maximum tokens for chat responses"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:ext && npm run build:webview",
+    "build:ext": "node esbuild.config.mjs",
+    "build:webview": "cd webview && npx vite build",
+    "watch:ext": "node esbuild.config.mjs --watch",
+    "watch:webview": "cd webview && npx vite build --watch",
+    "dev": "concurrently \"npm run watch:ext\" \"npm run watch:webview\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "concurrently": "^8.2.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  }
+}
