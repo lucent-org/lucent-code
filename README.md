@@ -16,6 +16,9 @@ A side panel chat interface in the activity bar, similar to GitHub Copilot Chat 
 - **Code intelligence** — Enriches prompts with hover info, definitions, references, and document symbols from VSCode's language services.
 - **Editor capability hints** — Tells the LLM what editor actions are available (rename, format, code actions) so it can suggest them.
 - **Tool-use** — Models that support tool-use can invoke editor actions directly: rename symbols, apply code actions, format documents, insert or replace code.
+- **Conversation history** — Conversations are saved locally and persist across restarts. Browse, load, and delete past conversations.
+- **Auto-titling** — Conversations are automatically titled after the first exchange using a lightweight LLM call.
+- **Export** — Export any conversation as JSON or Markdown.
 - **Cancel generation** — Stop button to abort in-flight responses.
 
 ### Inline Completions
@@ -104,7 +107,8 @@ src/
 │   └── context-builder.ts      # Gathers editor context for prompts
 ├── chat/
 │   ├── chat-provider.ts        # WebviewViewProvider for the side panel
-│   └── message-handler.ts      # Extension ↔ webview message protocol
+│   ├── message-handler.ts      # Extension ↔ webview message protocol
+│   └── history.ts              # Conversation persistence (save/load/export)
 ├── completions/
 │   ├── inline-provider.ts      # InlineCompletionItemProvider
 │   ├── prompt-builder.ts       # Builds completion prompts with windowed context
@@ -147,7 +151,7 @@ npm run test:watch     # Watch mode for tests
 
 ## Testing
 
-85 tests across 12 test files covering all modules:
+100 tests across 13 test files covering all modules:
 
 ```bash
 npm test
@@ -156,11 +160,12 @@ npm test
 | Module | Tests | What's covered |
 |--------|-------|----------------|
 | Settings | 7 | All config accessors (chat + completions) |
-| Auth | 5 | Key storage, prompting, cancellation |
+| Auth | 8 | Key storage, prompting, cancellation, OAuth PKCE |
 | OpenRouter Client | 10 | Model listing, chat, streaming, SSE parsing, errors |
 | Context Builder | 10 | Editor context, selection, formatting, enriched prompts, diagnostics |
 | Markdown Utils | 10 | HTML escaping, markdown rendering, XSS prevention |
-| Message Handler | 10 | All message types, streaming, cancellation, history |
+| Message Handler | 14 | All message types, streaming, cancellation, history, persistence |
+| Conversation History | 8 | Create, save, load, list, delete, export JSON/Markdown |
 | Trigger Config | 5 | Debounce, manual mode, abort signals |
 | Prompt Builder | 6 | Context windowing, cursor splitting, message building |
 | Inline Provider | 4 | Completions, model selection, error handling |
@@ -177,7 +182,7 @@ See [docs/features.md](docs/features.md) for the full feature inventory with imp
 | Phase 1 — MVP | Done | Chat panel, streaming, auth, code context, model selection |
 | Phase 2 — Inline Completions | Done | Ghost text, auto/manual triggers, debounce |
 | Phase 3 — Code Intelligence | Done | LSP integration, editor capability hints, tool-use |
-| Phase 4 — Auth & Persistence | Planned | OAuth, conversation history, export/import |
+| Phase 4 — Auth & Persistence | Done | OAuth structure, conversation history, auto-titling, export |
 | Phase 5 — Polish | Planned | Keyboard shortcuts, error UX, marketplace packaging |
 
 ## License

@@ -20,9 +20,9 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Cancel generation | Stop button to abort in-flight streaming responses | 1 |
 | :white_check_mark: | Multi-line input | Shift+Enter for newlines, Enter to submit | 1 |
 | :white_check_mark: | Empty state guidance | Welcome screen with API key hint or quick-start suggestions | 1 |
-| :construction: | Conversation history | Persist conversations locally, restore on reopen | 4 |
-| :construction: | Auto-title conversations | Generate conversation titles via a lightweight LLM call | 4 |
-| :construction: | Export conversations | Export as JSON or Markdown | 4 |
+| :white_check_mark: | Conversation history | Persist conversations locally, restore on reopen | 4 |
+| :white_check_mark: | Auto-title conversations | Generate conversation titles via a lightweight LLM call | 4 |
+| :white_check_mark: | Export conversations | Export as JSON or Markdown | 4 |
 | :construction: | Import conversations | Import conversations from JSON | 4 |
 
 ## Model Selection
@@ -32,19 +32,19 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Full model catalog | Fetch and display all available models from OpenRouter API | 1 |
 | :white_check_mark: | Model selector dropdown | Choose model from dropdown with search, shows name + provider | 1 |
 | :white_check_mark: | Separate chat model setting | Configurable default model for chat | 1 |
-| :construction: | Separate completions model setting | Configurable default model for inline completions | 2 |
+| :white_check_mark: | Separate completions model setting | Configurable default model for inline completions | 2 |
 
 ## Inline Completions
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :construction: | Ghost text suggestions | Inline completion items rendered as ghost text | 2 |
-| :construction: | Automatic trigger mode | Suggestions appear after a debounce while typing | 2 |
-| :construction: | Manual trigger mode | Suggestions only on keybinding (default: `Alt+\`) | 2 |
-| :construction: | Configurable trigger mode | Setting to switch between auto and manual | 2 |
-| :construction: | Configurable debounce | Setting to adjust auto-trigger delay (default 300ms) | 2 |
-| :construction: | Request cancellation | Cancel in-flight completions when user keeps typing | 2 |
-| :construction: | Windowed file context | Send code before/after cursor within token limits | 2 |
+| :white_check_mark: | Ghost text suggestions | Inline completion items rendered as ghost text | 2 |
+| :white_check_mark: | Automatic trigger mode | Suggestions appear after a debounce while typing | 2 |
+| :white_check_mark: | Manual trigger mode | Suggestions only on keybinding (default: `Alt+\`) | 2 |
+| :white_check_mark: | Configurable trigger mode | Setting to switch between auto and manual | 2 |
+| :white_check_mark: | Configurable debounce | Setting to adjust auto-trigger delay (default 300ms) | 2 |
+| :white_check_mark: | Request cancellation | Cancel in-flight completions when user keeps typing | 2 |
+| :white_check_mark: | Windowed file context | Send code before/after cursor within token limits | 2 |
 | :construction: | Global kill switch | Respects `editor.inlineSuggest.enabled` | 2 |
 
 ## Authentication
@@ -53,7 +53,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | API key auth | Store API key in VSCode SecretStorage (encrypted) | 1 |
 | :white_check_mark: | Auth prompt on activation | Prompt for credentials if none found on startup | 1 |
-| :construction: | OAuth flow | Browser-based login via OpenRouter OAuth | 4 |
+| :white_check_mark: | OAuth flow | Browser-based login via OpenRouter OAuth (PKCE structure) | 4 |
 | :construction: | Token management | Secure token storage, refresh, and revocation | 4 |
 | :white_check_mark: | Auth state events | EventEmitter for login/logout so modules can react | 1 |
 
@@ -115,6 +115,6 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 85 tests across 12 test files covering all modules | 1-3 |
+| :white_check_mark: | Unit tests | 100 tests across 13 test files covering all modules | 1-4 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
