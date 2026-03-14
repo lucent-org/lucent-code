@@ -154,33 +154,48 @@ export class MessageHandler {
 
   private async handleLoadConversation(id: string, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     if (!this.history) return;
-    const conversation = await this.history.load(id);
-    if (conversation) {
-      this.currentConversation = conversation;
-      this.conversationMessages = [...conversation.messages];
-      postMessage({ type: 'conversationLoaded', conversation });
+    try {
+      const conversation = await this.history.load(id);
+      if (conversation) {
+        this.currentConversation = conversation;
+        this.conversationMessages = [...conversation.messages];
+        postMessage({ type: 'conversationLoaded', conversation });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load conversation';
+      postMessage({ type: 'streamError', error: errorMessage });
     }
   }
 
   private async handleDeleteConversation(id: string, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     if (!this.history) return;
-    await this.history.delete(id);
-    if (this.currentConversation?.id === id) {
-      this.currentConversation = undefined;
-      this.conversationMessages = [];
+    try {
+      await this.history.delete(id);
+      if (this.currentConversation?.id === id) {
+        this.currentConversation = undefined;
+        this.conversationMessages = [];
+      }
+      await this.handleListConversations(postMessage);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete conversation';
+      postMessage({ type: 'streamError', error: errorMessage });
     }
-    await this.handleListConversations(postMessage);
   }
 
   private async handleExportConversation(id: string, format: 'json' | 'markdown', _postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     if (!this.history) return;
-    const content = format === 'json'
-      ? await this.history.exportAsJson(id)
-      : await this.history.exportAsMarkdown(id);
+    try {
+      const content = format === 'json'
+        ? await this.history.exportAsJson(id)
+        : await this.history.exportAsMarkdown(id);
 
-    if (content) {
-      const doc = await vscode.workspace.openTextDocument({ content, language: format === 'json' ? 'json' : 'markdown' });
-      await vscode.window.showTextDocument(doc);
+      if (content) {
+        const doc = await vscode.workspace.openTextDocument({ content, language: format === 'json' ? 'json' : 'markdown' });
+        await vscode.window.showTextDocument(doc);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export conversation';
+      _postMessage({ type: 'streamError', error: errorMessage });
     }
   }
 

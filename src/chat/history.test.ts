@@ -107,4 +107,19 @@ describe('ConversationHistory', () => {
     const list = await history.list();
     expect(list[0].id).toBe(conv2.id);
   });
+
+  it('should reject path traversal in conversation ID', async () => {
+    await expect(history.load('../../etc/passwd')).rejects.toThrow('Invalid conversation ID');
+  });
+
+  it('should reject conversation IDs with special characters', async () => {
+    await expect(history.load('../test')).rejects.toThrow('Invalid conversation ID');
+    await expect(history.load('test/../../etc')).rejects.toThrow('Invalid conversation ID');
+    await expect(history.load('test..test')).rejects.toThrow('Invalid conversation ID');
+  });
+
+  it('should accept valid conversation IDs', async () => {
+    const result = await history.load('conv-1234567890-abc123');
+    expect(result).toBeUndefined();
+  });
 });

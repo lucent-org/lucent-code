@@ -88,7 +88,19 @@ export class ConversationHistory {
   }
 
   private getFilePath(id: string): string {
-    return path.join(this.conversationsDir, `${id}.json`);
+    // Sanitize: only allow alphanumeric, hyphens, and underscores
+    const sanitized = id.replace(/[^a-zA-Z0-9\-_]/g, '');
+    if (!sanitized || sanitized !== id) {
+      throw new Error('Invalid conversation ID');
+    }
+    const filePath = path.join(this.conversationsDir, `${sanitized}.json`);
+    // Double-check the resolved path is within the conversations directory
+    const resolved = path.resolve(filePath);
+    const resolvedDir = path.resolve(this.conversationsDir);
+    if (!resolved.startsWith(resolvedDir + path.sep) && resolved !== resolvedDir) {
+      throw new Error('Invalid conversation ID');
+    }
+    return filePath;
   }
 
   private generateId(): string {
