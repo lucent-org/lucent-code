@@ -131,8 +131,18 @@ export class EditorToolExecutor {
   private async renameSymbol(args: Record<string, unknown>): Promise<ToolResult> {
     const uri = vscode.Uri.parse(args.uri as string);
     const position = new vscode.Position(args.line as number, args.character as number);
-    await vscode.commands.executeCommand('editor.action.rename', [uri, position]);
-    return { success: true, message: `Renamed symbol to "${args.newName}"` };
+    const newName = args.newName as string;
+
+    const edit = await vscode.commands.executeCommand<vscode.WorkspaceEdit>(
+      'vscode.executeDocumentRenameProvider', uri, position, newName
+    );
+
+    if (!edit) {
+      return { success: false, error: 'No rename edit returned — symbol may not be renameable at this position' };
+    }
+
+    await vscode.workspace.applyEdit(edit);
+    return { success: true, message: `Renamed symbol to "${newName}"` };
   }
 
   private async applyCodeAction(args: Record<string, unknown>): Promise<ToolResult> {

@@ -88,4 +88,40 @@ describe('EditorToolExecutor', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('format failed');
   });
+
+  describe('rename_symbol', () => {
+    it('should apply a WorkspaceEdit returned by executeDocumentRenameProvider', async () => {
+      const mockEdit = { size: 1 };
+      mockExecuteCommand.mockResolvedValue(mockEdit);
+      mockApplyEdit.mockResolvedValue(true);
+
+      const result = await executor.execute('rename_symbol', {
+        uri: 'file:///test.ts',
+        line: 5,
+        character: 10,
+        newName: 'renamedFoo',
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockExecuteCommand).toHaveBeenCalledWith(
+        'vscode.executeDocumentRenameProvider',
+        expect.anything(),
+        expect.anything(),
+        'renamedFoo'
+      );
+      expect(mockApplyEdit).toHaveBeenCalledWith(mockEdit);
+    });
+
+    it('should return error if no edit returned', async () => {
+      mockExecuteCommand.mockResolvedValue(undefined);
+      const result = await executor.execute('rename_symbol', {
+        uri: 'file:///test.ts',
+        line: 5,
+        character: 10,
+        newName: 'renamedFoo',
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/no rename/i);
+    });
+  });
 });
