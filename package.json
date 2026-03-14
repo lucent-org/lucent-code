@@ -37,6 +37,10 @@
       {
         "command": "openRouterChat.newChat",
         "title": "OpenRouter Chat: New Chat"
+      },
+      {
+        "command": "openRouterChat.triggerCompletion",
+        "title": "OpenRouter Chat: Trigger Inline Completion"
       }
     ],
     "configuration": {
@@ -59,9 +63,41 @@
           "default": 4096,
           "minimum": 1,
           "description": "Maximum tokens for chat responses"
+        },
+        "openRouterChat.completions.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID for inline completions (e.g., 'anthropic/claude-haiku-4-5-20251001'). Leave empty to use the chat model."
+        },
+        "openRouterChat.completions.triggerMode": {
+          "type": "string",
+          "enum": ["auto", "manual"],
+          "default": "auto",
+          "description": "Trigger mode for inline completions: 'auto' (suggest while typing) or 'manual' (only via keyboard shortcut)"
+        },
+        "openRouterChat.completions.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 100,
+          "maximum": 2000,
+          "description": "Debounce delay in milliseconds for auto-trigger mode"
+        },
+        "openRouterChat.completions.maxContextLines": {
+          "type": "number",
+          "default": 100,
+          "minimum": 10,
+          "maximum": 500,
+          "description": "Maximum number of lines before/after cursor to include as context"
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "openRouterChat.triggerCompletion",
+        "key": "alt+\\",
+        "when": "editorTextFocus"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

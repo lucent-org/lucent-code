@@ -6,6 +6,10 @@ vi.mock('vscode', () => {
     'chat.model': '',
     'chat.temperature': 0.7,
     'chat.maxTokens': 4096,
+    'completions.model': '',
+    'completions.triggerMode': 'auto',
+    'completions.debounceMs': 300,
+    'completions.maxContextLines': 100,
   };
 
   return {
@@ -39,5 +43,21 @@ describe('Settings', () => {
 
   it('should return default max tokens', () => {
     expect(settings.maxTokens).toBe(4096);
+  });
+
+  it('should return default completions model as empty string', () => {
+    expect(settings.completionsModel).toBe('');
+  });
+
+  it('should return default trigger mode as auto', () => {
+    expect(settings.completionsTriggerMode).toBe('auto');
+  });
+
+  it('should return default debounce as 300', () => {
+    expect(settings.completionsDebounceMs).toBe(300);
+  });
+
+  it('should return default max context lines as 100', () => {
+    expect(settings.completionsMaxContextLines).toBe(100);
   });
 });
