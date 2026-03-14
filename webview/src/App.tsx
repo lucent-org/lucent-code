@@ -1,4 +1,4 @@
-import { Component, For, onMount } from 'solid-js';
+import { Component, For, Show, onMount } from 'solid-js';
 import { chatStore } from './stores/chat';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
@@ -61,9 +61,28 @@ const App: Component = () => {
       </div>
 
       <div class="messages">
-        <For each={chatStore.messages()}>
-          {(message) => <ChatMessage message={message} />}
-        </For>
+        <Show when={chatStore.messages().length > 0} fallback={
+          <div class="empty-state">
+            <div class="empty-state-icon">&#x1F4AC;</div>
+            <div class="empty-state-title">OpenRouter Chat</div>
+            <div class="empty-state-hint">
+              <Show when={chatStore.models().length > 0} fallback={
+                <span>Set your API key to get started.<br/>Use the command palette: <code>OpenRouter Chat: Set API Key</code></span>
+              }>
+                <span>Ask a question about your code, or try one of these:</span>
+                <div class="empty-state-suggestions">
+                  <button class="suggestion" onClick={() => handleSend('Explain this code')}>Explain this code</button>
+                  <button class="suggestion" onClick={() => handleSend('Find bugs in the selected code')}>Find bugs</button>
+                  <button class="suggestion" onClick={() => handleSend('Suggest improvements')}>Suggest improvements</button>
+                </div>
+              </Show>
+            </div>
+          </div>
+        }>
+          <For each={chatStore.messages()}>
+            {(message) => <ChatMessage message={message} />}
+          </For>
+        </Show>
         <div ref={messagesEndRef} />
       </div>
 
