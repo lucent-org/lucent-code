@@ -19,12 +19,31 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  tools?: ToolDefinition[];
 }
 
 export interface ChatResponseChunk {
@@ -41,7 +60,7 @@ export interface ChatResponseChunk {
 export interface ChatResponse {
   id: string;
   choices: Array<{
-    message: ChatMessage;
+    message: ChatMessage & { tool_calls?: ToolCall[] };
     finish_reason: string;
   }>;
   usage?: {

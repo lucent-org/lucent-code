@@ -34,6 +34,9 @@ describe('MessageHandler', () => {
   let mockContextBuilder: {
     buildContext: ReturnType<typeof vi.fn>;
     formatForPrompt: ReturnType<typeof vi.fn>;
+    buildEnrichedContext: ReturnType<typeof vi.fn>;
+    formatEnrichedPrompt: ReturnType<typeof vi.fn>;
+    getCapabilities: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     setChatModel: ReturnType<typeof vi.fn>;
@@ -74,6 +77,9 @@ describe('MessageHandler', () => {
     mockContextBuilder = {
       buildContext: vi.fn().mockReturnValue(mockContext),
       formatForPrompt: vi.fn().mockReturnValue('formatted context'),
+      buildEnrichedContext: vi.fn(() => Promise.resolve(mockContext)),
+      formatEnrichedPrompt: vi.fn(() => 'formatted context'),
+      getCapabilities: vi.fn(() => undefined),
     };
 
     mockSettings = {
@@ -198,8 +204,8 @@ describe('MessageHandler', () => {
         postMessage
       );
 
-      expect(mockContextBuilder.buildContext).toHaveBeenCalled();
-      expect(mockContextBuilder.formatForPrompt).toHaveBeenCalledWith(mockContext);
+      expect(mockContextBuilder.buildEnrichedContext).toHaveBeenCalled();
+      expect(mockContextBuilder.formatEnrichedPrompt).toHaveBeenCalled();
       expect(mockClient.chatStream).toHaveBeenCalledWith(
         expect.objectContaining({
           model: 'test-model',

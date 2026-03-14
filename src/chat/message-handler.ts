@@ -3,6 +3,7 @@ import type { ExtensionMessage, WebviewMessage, ChatMessage } from '../shared/ty
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
+import { EditorToolExecutor, TOOL_DEFINITIONS } from '../lsp/editor-tools';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -11,7 +12,8 @@ export class MessageHandler {
   constructor(
     private readonly client: OpenRouterClient,
     private readonly contextBuilder: ContextBuilder,
-    private readonly settings: Settings
+    private readonly settings: Settings,
+    private readonly toolExecutor?: EditorToolExecutor
   ) {}
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -45,8 +47,10 @@ export class MessageHandler {
     model: string,
     postMessage: (msg: ExtensionMessage) => void
   ): Promise<void> {
-    const context = this.contextBuilder.buildContext();
-    const contextPrompt = this.contextBuilder.formatForPrompt(context);
+    // Build enriched context
+    const context = await this.contextBuilder.buildEnrichedContext();
+    const capabilities = this.contextBuilder.getCapabilities();
+    const contextPrompt = this.contextBuilder.formatEnrichedPrompt(context, capabilities);
 
     const systemMessage: ChatMessage = {
       role: 'system',
