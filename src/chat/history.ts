@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import { promises as fsp } from 'fs';
 import * as path from 'path';
 import type { Conversation, ConversationSummary, ChatMessage } from '../shared/types';
 
@@ -29,14 +30,13 @@ export class ConversationHistory {
   async save(conversation: Conversation): Promise<void> {
     conversation.updatedAt = new Date().toISOString();
     const filePath = this.getFilePath(conversation.id);
-    fs.writeFileSync(filePath, JSON.stringify(conversation, null, 2), 'utf-8');
+    await fsp.writeFile(filePath, JSON.stringify(conversation, null, 2), 'utf-8');
   }
 
   async load(id: string): Promise<Conversation | undefined> {
     const filePath = this.getFilePath(id);
-    if (!fs.existsSync(filePath)) return undefined;
     try {
-      const data = fs.readFileSync(filePath, 'utf-8');
+      const data = await fsp.readFile(filePath, 'utf-8');
       return JSON.parse(data) as Conversation;
     } catch {
       return undefined;
@@ -44,12 +44,16 @@ export class ConversationHistory {
   }
 
   async list(): Promise<ConversationSummary[]> {
-    if (!fs.existsSync(this.conversationsDir)) return [];
-    const files = fs.readdirSync(this.conversationsDir).filter((f) => f.endsWith('.json'));
+    let files: string[];
+    try {
+      files = (await fsp.readdir(this.conversationsDir)).filter((f) => f.endsWith('.json'));
+    } catch {
+      return [];
+    }
     const summaries: ConversationSummary[] = [];
     for (const file of files) {
       try {
-        const data = fs.readFileSync(path.join(this.conversationsDir, file), 'utf-8');
+        const data = await fsp.readFile(path.join(this.conversationsDir, file), 'utf-8');
         const conv = JSON.parse(data) as Conversation;
         summaries.push({
           id: conv.id,
@@ -65,7 +69,9 @@ export class ConversationHistory {
 
   async delete(id: string): Promise<void> {
     const filePath = this.getFilePath(id);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    try {
+      await fsp.unlink(filePath);
+    } catch { /* ignore ENOENT */ }
   }
 
   async exportAsJson(id: string): Promise<string | undefined> {
