@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -21,5 +23,8 @@ export function renderMarkdown(text: string): string {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   html = html.replace(/\n/g, '<br>');
 
-  return html;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['pre', 'code', 'strong', 'em', 'br'],
+    ALLOWED_ATTR: ['class'],
+  });
 }

@@ -1,4 +1,5 @@
 import { Component, Show, For, createMemo } from 'solid-js';
+import DOMPurify from 'dompurify';
 import type { ChatMessage as ChatMessageType } from '../stores/chat';
 import CodeBlock from './CodeBlock';
 
@@ -59,7 +60,7 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
 };
 
 function formatText(text: string): string {
-  return text
+  let html = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -67,6 +68,11 @@ function formatText(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
+
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['code', 'strong', 'em', 'br'],
+    ALLOWED_ATTR: [],
+  });
 }
 
 export default ChatMessage;
