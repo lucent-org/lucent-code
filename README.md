@@ -12,7 +12,10 @@ A side panel chat interface in the activity bar, similar to GitHub Copilot Chat 
 - **Streaming responses** — Real-time token-by-token rendering.
 - **Code blocks** — Syntax-highlighted code blocks with Copy and Insert at Cursor buttons.
 - **Markdown** — Bold, italic, inline code, and code fences rendered in assistant messages.
-- **Code context** — Automatically includes your active file, cursor position, and selection in prompts.
+- **Code context** — Automatically includes your active file, cursor position, selection, and diagnostics in prompts.
+- **Code intelligence** — Enriches prompts with hover info, definitions, references, and document symbols from VSCode's language services.
+- **Editor capability hints** — Tells the LLM what editor actions are available (rename, format, code actions) so it can suggest them.
+- **Tool-use** — Models that support tool-use can invoke editor actions directly: rename symbols, apply code actions, format documents, insert or replace code.
 - **Cancel generation** — Stop button to abort in-flight responses.
 
 ### Inline Completions
@@ -106,6 +109,10 @@ src/
 │   ├── inline-provider.ts      # InlineCompletionItemProvider
 │   ├── prompt-builder.ts       # Builds completion prompts with windowed context
 │   └── trigger-config.ts       # Debounce and trigger mode logic
+├── lsp/
+│   ├── code-intelligence.ts    # VSCode language service wrappers (hover, definition, refs, symbols)
+│   ├── capability-detector.ts  # Probes available language providers per file
+│   └── editor-tools.ts         # Tool executor + OpenAI-compatible tool definitions
 └── shared/
     └── types.ts                # Shared TypeScript interfaces
 
@@ -140,7 +147,7 @@ npm run test:watch     # Watch mode for tests
 
 ## Testing
 
-65 tests across 9 test files covering all modules:
+85 tests across 12 test files covering all modules:
 
 ```bash
 npm test
@@ -151,12 +158,15 @@ npm test
 | Settings | 7 | All config accessors (chat + completions) |
 | Auth | 5 | Key storage, prompting, cancellation |
 | OpenRouter Client | 10 | Model listing, chat, streaming, SSE parsing, errors |
-| Context Builder | 8 | Editor context, selection, formatting |
+| Context Builder | 10 | Editor context, selection, formatting, enriched prompts, diagnostics |
 | Markdown Utils | 10 | HTML escaping, markdown rendering, XSS prevention |
 | Message Handler | 10 | All message types, streaming, cancellation, history |
 | Trigger Config | 5 | Debounce, manual mode, abort signals |
 | Prompt Builder | 6 | Context windowing, cursor splitting, message building |
 | Inline Provider | 4 | Completions, model selection, error handling |
+| Code Intelligence | 8 | Hover, definition, diagnostics, symbols, caching |
+| Capability Detector | 4 | Provider probing, prompt formatting, fallbacks |
+| Editor Tools | 6 | All 5 tools, unknown tool handling, error propagation |
 
 ## Roadmap
 
@@ -166,7 +176,7 @@ See [docs/features.md](docs/features.md) for the full feature inventory with imp
 |-------|--------|-------------|
 | Phase 1 — MVP | Done | Chat panel, streaming, auth, code context, model selection |
 | Phase 2 — Inline Completions | Done | Ghost text, auto/manual triggers, debounce |
-| Phase 3 — Code Intelligence | Planned | LSP integration, editor capability hints, tool-use |
+| Phase 3 — Code Intelligence | Done | LSP integration, editor capability hints, tool-use |
 | Phase 4 — Auth & Persistence | Planned | OAuth, conversation history, export/import |
 | Phase 5 — Polish | Planned | Keyboard shortcuts, error UX, marketplace packaging |
 
