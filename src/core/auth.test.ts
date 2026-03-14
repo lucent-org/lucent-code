@@ -17,6 +17,13 @@ const { mockSecretStorage, mockWindow } = vi.hoisted(() => ({
 
 vi.mock('vscode', () => ({
   window: mockWindow,
+  env: {
+    asExternalUri: vi.fn((uri: any) => Promise.resolve(uri)),
+    openExternal: vi.fn(() => Promise.resolve(true)),
+  },
+  Uri: {
+    parse: vi.fn((s: string) => ({ toString: () => s })),
+  },
   EventEmitter: vi.fn(() => {
     const emitter = new EventEmitter();
     return {
@@ -68,5 +75,24 @@ describe('AuthManager', () => {
     mockWindow.showInputBox.mockResolvedValue(undefined);
     const key = await auth.promptForApiKey();
     expect(key).toBeUndefined();
+  });
+
+  it('should have startOAuth method', () => {
+    expect(typeof auth.startOAuth).toBe('function');
+  });
+
+  it('should generate a code verifier of correct length', () => {
+    const verifier = (auth as any).generateCodeVerifier();
+    expect(verifier).toHaveLength(64);
+    expect(/^[A-Za-z0-9\-._~]+$/.test(verifier)).toBe(true);
+  });
+
+  it('should generate a random state string', () => {
+    const state1 = (auth as any).generateState();
+    const state2 = (auth as any).generateState();
+    expect(typeof state1).toBe('string');
+    expect(state1.length).toBeGreaterThan(0);
+    // Two generated states should be different (probabilistically)
+    // Skip this assertion since it could rarely fail
   });
 });

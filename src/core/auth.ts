@@ -46,6 +46,33 @@ export class AuthManager {
     return this.promptForApiKey();
   }
 
+  async startOAuth(): Promise<string | undefined> {
+    const callbackUri = await vscode.env.asExternalUri(
+      vscode.Uri.parse('vscode://openrouter-chat/oauth-callback')
+    );
+
+    const codeVerifier = this.generateCodeVerifier();
+    const state = this.generateState();
+
+    const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUri.toString())}&code_challenge=${codeVerifier}&state=${state}`;
+
+    await vscode.env.openExternal(vscode.Uri.parse(authUrl));
+    return state;
+  }
+
+  private generateCodeVerifier(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let result = '';
+    for (let i = 0; i < 64; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  private generateState(): string {
+    return Math.random().toString(36).substring(2, 15);
+  }
+
   dispose(): void {
     this.onDidChangeAuthEmitter.dispose();
   }
