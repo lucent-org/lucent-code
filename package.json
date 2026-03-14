@@ -41,6 +41,10 @@
       {
         "command": "openRouterChat.triggerCompletion",
         "title": "OpenRouter Chat: Trigger Inline Completion"
+      },
+      {
+        "command": "openRouterChat.focusChat",
+        "title": "OpenRouter Chat: Focus Chat Panel"
       }
     ],
     "configuration": {
@@ -96,6 +100,17 @@
         "command": "openRouterChat.triggerCompletion",
         "key": "alt+\\",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "openRouterChat.newChat",
+        "key": "ctrl+shift+n",
+        "mac": "cmd+shift+n",
+        "when": "openRouterChat.chatView.visible"
+      },
+      {
+        "command": "openRouterChat.focusChat",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l"
       }
     ]
   },

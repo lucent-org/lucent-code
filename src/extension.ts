@@ -88,6 +88,12 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.focusChat', () => {
+      vscode.commands.executeCommand('openRouterChat.chatView.focus');
+    })
+  );
+
   // Prompt for API key on first activation if not set
   auth.getApiKey().then((key) => {
     if (!key) {
