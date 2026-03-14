@@ -31,14 +31,6 @@ export function activate(context: vscode.ExtensionContext) {
   const notifications = new NotificationService();
   const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
 
-  // Register chat webview
-  const chatProvider = new ChatViewProvider(context.extensionUri);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
-      webviewOptions: { retainContextWhenHidden: true },
-    })
-  );
-
   // Set up webview message handling
   const setupWebviewMessaging = () => {
     const webview = chatProvider.getWebview();
@@ -50,16 +42,14 @@ export function activate(context: vscode.ExtensionContext) {
     });
   };
 
-  // Re-setup messaging when webview becomes available
-  const originalResolve = chatProvider.resolveWebviewView.bind(chatProvider);
-  chatProvider.resolveWebviewView = function (
-    webviewView: vscode.WebviewView,
-    resolveContext: vscode.WebviewViewResolveContext,
-    token: vscode.CancellationToken
-  ) {
-    originalResolve(webviewView, resolveContext, token);
-    setupWebviewMessaging();
-  };
+  // Register chat webview
+  const chatProvider = new ChatViewProvider(context.extensionUri);
+  chatProvider.onResolve = setupWebviewMessaging;
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
+  );
 
   // Register inline completion provider
   const completionProvider = new InlineCompletionProvider(client, settings);

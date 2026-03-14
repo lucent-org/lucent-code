@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'openRouterChat.chatView';
   private webviewView?: vscode.WebviewView;
+  public onResolve?: () => void;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -19,6 +20,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
+    this.onResolve?.();
   }
 
   public getWebview(): vscode.Webview | undefined {
