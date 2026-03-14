@@ -10,6 +10,7 @@ import { InlineCompletionProvider } from './completions/inline-provider';
 import { CodeIntelligence } from './lsp/code-intelligence';
 import { CapabilityDetector } from './lsp/capability-detector';
 import { EditorToolExecutor } from './lsp/editor-tools';
+import { ConversationHistory } from './chat/history';
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
@@ -24,7 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
   const toolExecutor = new EditorToolExecutor();
   contextBuilder.setCodeIntelligence(codeIntelligence, capabilityDetector);
 
-  const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor);
+  const history = new ConversationHistory(context.globalStorageUri);
+
+  const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history);
 
   // Register chat webview
   const chatProvider = new ChatViewProvider(context.extensionUri);
