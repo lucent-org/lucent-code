@@ -28,12 +28,52 @@ import type { ContextBuilder } from '../core/context-builder';
 import type { Settings } from '../core/settings';
 import type { ExtensionMessage, CodeContext, OpenRouterModel, Conversation, ConversationSummary } from '../shared/types';
 import type { ConversationHistory } from './history';
+import type { EditorToolExecutor } from '../lsp/editor-tools';
+import type { NotificationService } from '../core/notifications';
 
 // Helper to create an async generator from chunks
 async function* createMockStream(chunks: Array<{ choices: Array<{ delta: { content?: string }; finish_reason: string | null }> }>) {
   for (const chunk of chunks) {
     yield chunk;
   }
+}
+
+async function* createToolCallStream(
+  toolCalls: Array<{ id: string; name: string; arguments: string }>
+) {
+  // Chunk with tool_call metadata
+  yield {
+    choices: [{
+      delta: {
+        tool_calls: toolCalls.map((tc, i) => ({
+          index: i,
+          id: tc.id,
+          type: 'function',
+          function: { name: tc.name, arguments: '' },
+        })),
+      },
+      finish_reason: null,
+    }],
+  };
+  // Chunk with arguments
+  yield {
+    choices: [{
+      delta: {
+        tool_calls: toolCalls.map((tc, i) => ({
+          index: i,
+          function: { arguments: tc.arguments },
+        })),
+      },
+      finish_reason: null,
+    }],
+  };
+  // Final chunk
+  yield {
+    choices: [{
+      delta: {},
+      finish_reason: 'tool_calls',
+    }],
+  };
 }
 
 describe('MessageHandler', () => {
@@ -490,6 +530,74 @@ describe('MessageHandler', () => {
       expect(secondCallArgs.messages[1]).toEqual({ role: 'user', content: 'Question 1' });
       expect(secondCallArgs.messages[2]).toEqual({ role: 'assistant', content: 'Response 1' });
       expect(secondCallArgs.messages[3]).toEqual({ role: 'user', content: 'Question 2' });
+    });
+  });
+
+  describe('tool-use agentic loop', () => {
+    let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
+    let mockNotifications: { handleError: ReturnType<typeof vi.fn> };
+    let toolHandler: MessageHandler;
+
+    beforeEach(() => {
+      mockToolExecutor = { execute: vi.fn().mockResolvedValue({ success: true, message: 'formatted' }) };
+      mockNotifications = { handleError: vi.fn() };
+      toolHandler = new MessageHandler(
+        mockClient as unknown as OpenRouterClient,
+        mockContextBuilder as unknown as ContextBuilder,
+        mockSettings as unknown as Settings,
+        mockToolExecutor as unknown as EditorToolExecutor,
+        undefined,
+        mockNotifications as unknown as NotificationService
+      );
+    });
+
+    it('should execute tool_calls and continue the conversation', async () => {
+      mockClient.chatStream
+        .mockReturnValueOnce(
+          createToolCallStream([{ id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' }])
+        )
+        .mockReturnValueOnce(
+          createMockStream([
+            { choices: [{ delta: { content: 'Done! I formatted the file.' }, finish_reason: null }] },
+            { choices: [{ delta: {}, finish_reason: 'stop' }] },
+          ])
+        );
+
+      await toolHandler.handleMessage(
+        { type: 'sendMessage', content: 'format this file', model: 'test-model' },
+        postMessage
+      );
+
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith(
+        'format_document',
+        { uri: 'file:///test.ts' }
+      );
+
+      const chunks = postMessage.mock.calls
+        .filter((c: any[]) => c[0].type === 'streamChunk')
+        .map((c: any[]) => c[0].content);
+      expect(chunks.join('')).toBe('Done! I formatted the file.');
+
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'streamEnd' }));
+      expect(mockClient.chatStream).toHaveBeenCalledTimes(2);
+    });
+
+    it('should pass TOOL_DEFINITIONS in the API request when toolExecutor is provided', async () => {
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'answer' }, finish_reason: null }] },
+          { choices: [{ delta: {}, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await toolHandler.handleMessage(
+        { type: 'sendMessage', content: 'hello', model: 'test-model' },
+        postMessage
+      );
+
+      const firstCall = mockClient.chatStream.mock.calls[0][0];
+      expect(firstCall.tools).toBeDefined();
+      expect(firstCall.tools.length).toBeGreaterThan(0);
     });
   });
 });

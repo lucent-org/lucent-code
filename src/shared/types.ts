@@ -15,8 +15,10 @@ export interface OpenRouterModel {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
 }
 
 export interface ToolDefinition {
@@ -52,6 +54,15 @@ export interface ChatResponseChunk {
     delta: {
       content?: string;
       role?: string;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        type?: string;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }>;
     };
     finish_reason: string | null;
   }>;

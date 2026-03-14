@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation } from '../shared/types';
+import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall } from '../shared/types';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
@@ -65,7 +65,6 @@ export class MessageHandler {
     model: string,
     postMessage: (msg: ExtensionMessage) => void
   ): Promise<void> {
-    // Build enriched context
     const context = await this.contextBuilder.buildEnrichedContext();
     const capabilities = this.contextBuilder.getCapabilities();
     const contextPrompt = this.contextBuilder.formatEnrichedPrompt(context, capabilities);
@@ -76,44 +75,91 @@ export class MessageHandler {
     };
 
     this.conversationMessages.push({ role: 'user', content });
-
     this.abortController = new AbortController();
 
+    const tools = this.toolExecutor ? TOOL_DEFINITIONS : undefined;
+
     try {
-      const stream = this.client.chatStream(
-        {
-          model,
-          messages: [systemMessage, ...this.conversationMessages],
-          temperature: this.settings.temperature,
-          max_tokens: this.settings.maxTokens,
-          stream: true,
-        },
-        this.abortController.signal
-      );
+      const MAX_TOOL_ITERATIONS = 5;
 
-      let fullContent = '';
+      for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+        let fullContent = '';
+        const toolCallAccumulator = new Map<number, { id: string; name: string; arguments: string }>();
+        let finishReason: string | null = null;
 
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          fullContent += delta;
-          postMessage({ type: 'streamChunk', content: delta });
+        const stream = this.client.chatStream(
+          {
+            model,
+            messages: [systemMessage, ...this.conversationMessages],
+            temperature: this.settings.temperature,
+            max_tokens: this.settings.maxTokens,
+            stream: true,
+            tools,
+          },
+          this.abortController.signal
+        );
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) {
+            fullContent += delta.content;
+            postMessage({ type: 'streamChunk', content: delta.content });
+          }
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              if (!toolCallAccumulator.has(tc.index)) {
+                toolCallAccumulator.set(tc.index, { id: tc.id ?? '', name: tc.function?.name ?? '', arguments: '' });
+              }
+              const acc = toolCallAccumulator.get(tc.index)!;
+              if (tc.id) acc.id = tc.id;
+              if (tc.function?.name) acc.name = tc.function.name;
+              if (tc.function?.arguments) acc.arguments += tc.function.arguments;
+            }
+          }
+          finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
         }
+
+        if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && this.toolExecutor) {
+          const toolCalls: ToolCall[] = Array.from(toolCallAccumulator.values()).map((tc, i) => ({
+            id: tc.id || `call_${i}`,
+            type: 'function' as const,
+            function: { name: tc.name, arguments: tc.arguments },
+          }));
+
+          this.conversationMessages.push({ role: 'assistant', content: fullContent, tool_calls: toolCalls });
+
+          for (const tc of toolCalls) {
+            let args: Record<string, unknown> = {};
+            try { args = JSON.parse(tc.function.arguments); } catch { /* malformed args */ }
+            const result = await this.toolExecutor.execute(tc.function.name, args);
+            this.conversationMessages.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: result.success ? (result.message ?? 'Done') : `Error: ${result.error}`,
+            });
+          }
+          continue;
+        }
+
+        // finish_reason === 'stop' — final response
+        this.conversationMessages.push({ role: 'assistant', content: fullContent });
+        break;
       }
 
-      this.conversationMessages.push({ role: 'assistant', content: fullContent });
-
-      // Persist conversation
+      // Persist — save only user/assistant messages (filter out tool messages)
       if (this.history) {
+        const savable = this.conversationMessages
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({ role: m.role, content: m.content })) as ChatMessage[];
+
         if (!this.currentConversation) {
           this.currentConversation = await this.history.create(model);
         }
-        this.currentConversation.messages = [...this.conversationMessages];
+        this.currentConversation.messages = savable;
         await this.history.save(this.currentConversation);
         postMessage({ type: 'conversationSaved', id: this.currentConversation.id, title: this.currentConversation.title });
 
-        // Auto-title after first exchange (2 messages = 1 user + 1 assistant)
-        if (this.conversationMessages.length === 2) {
+        if (savable.filter(m => m.role === 'user' || m.role === 'assistant').length === 2) {
           this.autoTitle(this.currentConversation, postMessage);
         }
       }
