@@ -7,6 +7,9 @@ import { ChatViewProvider } from './chat/chat-provider';
 import { MessageHandler } from './chat/message-handler';
 import type { WebviewMessage } from './shared/types';
 import { InlineCompletionProvider } from './completions/inline-provider';
+import { CodeIntelligence } from './lsp/code-intelligence';
+import { CapabilityDetector } from './lsp/capability-detector';
+import { EditorToolExecutor } from './lsp/editor-tools';
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
@@ -14,7 +17,14 @@ export function activate(context: vscode.ExtensionContext) {
   const settings = new Settings();
   const client = new OpenRouterClient(() => auth.getApiKey());
   const contextBuilder = new ContextBuilder();
-  const messageHandler = new MessageHandler(client, contextBuilder, settings);
+
+  // Set up code intelligence
+  const codeIntelligence = new CodeIntelligence();
+  const capabilityDetector = new CapabilityDetector();
+  const toolExecutor = new EditorToolExecutor();
+  contextBuilder.setCodeIntelligence(codeIntelligence, capabilityDetector);
+
+  const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor);
 
   // Register chat webview
   const chatProvider = new ChatViewProvider(context.extensionUri);
@@ -90,6 +100,16 @@ export function activate(context: vscode.ExtensionContext) {
         });
     }
   });
+
+  // Detect capabilities when active editor changes
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      contextBuilder.detectCapabilities();
+    })
+  );
+
+  // Initial capability detection
+  contextBuilder.detectCapabilities();
 
   // Cleanup
   context.subscriptions.push({
