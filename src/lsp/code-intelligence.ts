@@ -40,6 +40,10 @@ export class CodeIntelligence {
   }
 
   private setCache<T>(key: string, value: T): void {
+    if (this.cache.size >= 100) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) this.cache.delete(oldestKey);
+    }
     this.cache.set(key, { value, timestamp: Date.now() });
   }
 

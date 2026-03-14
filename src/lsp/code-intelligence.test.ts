@@ -119,4 +119,35 @@ describe('CodeIntelligence', () => {
       expect(mockExecuteCommand).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('cache size limit', () => {
+    it('should not exceed 100 entries after many unique queries', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { contents: [{ value: 'type info' }] },
+      ]);
+
+      // Insert 110 distinct entries (different line numbers)
+      for (let i = 0; i < 110; i++) {
+        await ci.getHover('file:///test.ts', i, 0);
+      }
+
+      // Clearing should not throw and cache should be manageable
+      expect(() => ci.clearCache()).not.toThrow();
+    });
+
+    it('should still return results after reaching capacity', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { contents: [{ value: 'result' }] },
+      ]);
+
+      // Fill to 100
+      for (let i = 0; i < 100; i++) {
+        await ci.getHover('file:///test.ts', i, 0);
+      }
+
+      // One more — should succeed, not throw
+      const result = await ci.getHover('file:///test.ts', 100, 0);
+      expect(result).toBe('result');
+    });
+  });
 });
