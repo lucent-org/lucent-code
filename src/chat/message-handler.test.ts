@@ -8,6 +8,10 @@ vi.mock('vscode', () => ({
       update: vi.fn(),
     })),
     onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+    openTextDocument: vi.fn().mockResolvedValue({}),
+  },
+  window: {
+    showTextDocument: vi.fn().mockResolvedValue(undefined),
   },
   ConfigurationTarget: { Global: 1 },
 }));
@@ -16,7 +20,8 @@ import { MessageHandler } from './message-handler';
 import type { OpenRouterClient } from '../core/openrouter-client';
 import type { ContextBuilder } from '../core/context-builder';
 import type { Settings } from '../core/settings';
-import type { ExtensionMessage, CodeContext, OpenRouterModel } from '../shared/types';
+import type { ExtensionMessage, CodeContext, OpenRouterModel, Conversation, ConversationSummary } from '../shared/types';
+import type { ConversationHistory } from './history';
 
 // Helper to create an async generator from chunks
 async function* createMockStream(chunks: Array<{ choices: Array<{ delta: { content?: string }; finish_reason: string | null }> }>) {
@@ -306,6 +311,144 @@ describe('MessageHandler', () => {
         (call: [ExtensionMessage]) => call[0].type === 'streamError'
       );
       expect(errorMessages).toHaveLength(0);
+    });
+  });
+
+  describe('conversation persistence', () => {
+    let mockHistory: {
+      create: ReturnType<typeof vi.fn>;
+      save: ReturnType<typeof vi.fn>;
+      load: ReturnType<typeof vi.fn>;
+      list: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+      exportAsJson: ReturnType<typeof vi.fn>;
+      exportAsMarkdown: ReturnType<typeof vi.fn>;
+    };
+    let handlerWithHistory: MessageHandler;
+    let mockConversation: Conversation;
+    let mockSummaries: ConversationSummary[];
+
+    beforeEach(() => {
+      mockConversation = {
+        id: 'conv-123',
+        title: 'New conversation',
+        model: 'test-model',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi there' },
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+
+      mockSummaries = [
+        {
+          id: 'conv-123',
+          title: 'New conversation',
+          model: 'test-model',
+          messageCount: 2,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ];
+
+      mockHistory = {
+        create: vi.fn().mockResolvedValue({ ...mockConversation, messages: [] }),
+        save: vi.fn().mockResolvedValue(undefined),
+        load: vi.fn().mockResolvedValue(mockConversation),
+        list: vi.fn().mockResolvedValue(mockSummaries),
+        delete: vi.fn().mockResolvedValue(undefined),
+        exportAsJson: vi.fn().mockResolvedValue('{"id":"conv-123"}'),
+        exportAsMarkdown: vi.fn().mockResolvedValue('# New conversation'),
+      };
+
+      handlerWithHistory = new MessageHandler(
+        mockClient as unknown as OpenRouterClient,
+        mockContextBuilder as unknown as ContextBuilder,
+        mockSettings as unknown as Settings,
+        undefined,
+        mockHistory as unknown as ConversationHistory
+      );
+    });
+
+    it('listConversations should post conversationList', async () => {
+      await handlerWithHistory.handleMessage({ type: 'listConversations' }, postMessage);
+
+      expect(mockHistory.list).toHaveBeenCalledOnce();
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'conversationList',
+        conversations: mockSummaries,
+      });
+    });
+
+    it('loadConversation should restore messages and post conversationLoaded', async () => {
+      await handlerWithHistory.handleMessage({ type: 'loadConversation', id: 'conv-123' }, postMessage);
+
+      expect(mockHistory.load).toHaveBeenCalledWith('conv-123');
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'conversationLoaded',
+        conversation: mockConversation,
+      });
+
+      // After loading, sending a message should include loaded history
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'Response' }, finish_reason: 'stop' }] },
+        ])
+      );
+      await handlerWithHistory.handleMessage(
+        { type: 'sendMessage', content: 'Follow up', model: 'test-model' },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      // system + loaded user + loaded assistant + new user = 4
+      expect(callArgs.messages).toHaveLength(4);
+      expect(callArgs.messages[1]).toEqual({ role: 'user', content: 'Hello' });
+      expect(callArgs.messages[2]).toEqual({ role: 'assistant', content: 'Hi there' });
+      expect(callArgs.messages[3]).toEqual({ role: 'user', content: 'Follow up' });
+    });
+
+    it('deleteConversation should delete and refresh list', async () => {
+      // First load a conversation to set currentConversation
+      await handlerWithHistory.handleMessage({ type: 'loadConversation', id: 'conv-123' }, postMessage);
+      postMessage.mockClear();
+
+      // Delete the loaded conversation
+      mockHistory.list.mockResolvedValue([]);
+      await handlerWithHistory.handleMessage({ type: 'deleteConversation', id: 'conv-123' }, postMessage);
+
+      expect(mockHistory.delete).toHaveBeenCalledWith('conv-123');
+      expect(mockHistory.list).toHaveBeenCalled();
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'conversationList',
+        conversations: [],
+      });
+    });
+
+    it('newChat should clear currentConversation', async () => {
+      // Load a conversation first
+      await handlerWithHistory.handleMessage({ type: 'loadConversation', id: 'conv-123' }, postMessage);
+      postMessage.mockClear();
+
+      // New chat
+      await handlerWithHistory.handleMessage({ type: 'newChat' }, postMessage);
+
+      // Send a message - should create a new conversation, not reuse the old one
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'Fresh' }, finish_reason: 'stop' }] },
+        ])
+      );
+      await handlerWithHistory.handleMessage(
+        { type: 'sendMessage', content: 'New start', model: 'test-model' },
+        postMessage
+      );
+
+      // Should have called create (new conversation)
+      expect(mockHistory.create).toHaveBeenCalledWith('test-model');
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      // system + new user only = 2
+      expect(callArgs.messages).toHaveLength(2);
     });
   });
 

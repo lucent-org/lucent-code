@@ -1,19 +1,22 @@
 import * as vscode from 'vscode';
-import type { ExtensionMessage, WebviewMessage, ChatMessage } from '../shared/types';
+import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation } from '../shared/types';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS } from '../lsp/editor-tools';
+import { ConversationHistory } from './history';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
   private abortController?: AbortController;
+  private currentConversation?: Conversation;
 
   constructor(
     private readonly client: OpenRouterClient,
     private readonly contextBuilder: ContextBuilder,
     private readonly settings: Settings,
-    private readonly toolExecutor?: EditorToolExecutor
+    private readonly toolExecutor?: EditorToolExecutor,
+    private readonly history?: ConversationHistory
   ) {}
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -33,6 +36,19 @@ export class MessageHandler {
         break;
       case 'newChat':
         this.conversationMessages = [];
+        this.currentConversation = undefined;
+        break;
+      case 'listConversations':
+        await this.handleListConversations(postMessage);
+        break;
+      case 'loadConversation':
+        await this.handleLoadConversation(message.id, postMessage);
+        break;
+      case 'deleteConversation':
+        await this.handleDeleteConversation(message.id, postMessage);
+        break;
+      case 'exportConversation':
+        await this.handleExportConversation(message.id, message.format, postMessage);
         break;
       case 'ready':
         await this.handleGetModels(postMessage);
@@ -84,6 +100,22 @@ export class MessageHandler {
       }
 
       this.conversationMessages.push({ role: 'assistant', content: fullContent });
+
+      // Persist conversation
+      if (this.history) {
+        if (!this.currentConversation) {
+          this.currentConversation = await this.history.create(model);
+        }
+        this.currentConversation.messages = [...this.conversationMessages];
+        await this.history.save(this.currentConversation);
+        postMessage({ type: 'conversationSaved', id: this.currentConversation.id, title: this.currentConversation.title });
+
+        // Auto-title after first exchange (2 messages = 1 user + 1 assistant)
+        if (this.conversationMessages.length === 2) {
+          this.autoTitle(this.currentConversation, postMessage);
+        }
+      }
+
       postMessage({ type: 'streamEnd' });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
@@ -108,6 +140,67 @@ export class MessageHandler {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';
       postMessage({ type: 'streamError', error: errorMessage });
+    }
+  }
+
+  private async handleListConversations(postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    if (!this.history) return;
+    const conversations = await this.history.list();
+    postMessage({ type: 'conversationList', conversations });
+  }
+
+  private async handleLoadConversation(id: string, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    if (!this.history) return;
+    const conversation = await this.history.load(id);
+    if (conversation) {
+      this.currentConversation = conversation;
+      this.conversationMessages = [...conversation.messages];
+      postMessage({ type: 'conversationLoaded', conversation });
+    }
+  }
+
+  private async handleDeleteConversation(id: string, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    if (!this.history) return;
+    await this.history.delete(id);
+    if (this.currentConversation?.id === id) {
+      this.currentConversation = undefined;
+      this.conversationMessages = [];
+    }
+    await this.handleListConversations(postMessage);
+  }
+
+  private async handleExportConversation(id: string, format: 'json' | 'markdown', _postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    if (!this.history) return;
+    const content = format === 'json'
+      ? await this.history.exportAsJson(id)
+      : await this.history.exportAsMarkdown(id);
+
+    if (content) {
+      const doc = await vscode.workspace.openTextDocument({ content, language: format === 'json' ? 'json' : 'markdown' });
+      await vscode.window.showTextDocument(doc);
+    }
+  }
+
+  private async autoTitle(conversation: Conversation, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    try {
+      const response = await this.client.chat({
+        model: conversation.model,
+        messages: [
+          { role: 'system', content: 'Generate a short title (3-6 words) for this conversation. Output only the title, nothing else.' },
+          ...conversation.messages.slice(0, 2),
+        ],
+        temperature: 0.3,
+        max_tokens: 20,
+      });
+
+      const title = response.choices[0]?.message?.content?.trim();
+      if (title && this.history) {
+        conversation.title = title;
+        await this.history.save(conversation);
+        postMessage({ type: 'conversationTitled', id: conversation.id, title });
+      }
+    } catch {
+      // Silently fail — title stays as default
     }
   }
 }
