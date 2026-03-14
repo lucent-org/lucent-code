@@ -11,6 +11,7 @@ import { CodeIntelligence } from './lsp/code-intelligence';
 import { CapabilityDetector } from './lsp/capability-detector';
 import { EditorToolExecutor } from './lsp/editor-tools';
 import { ConversationHistory } from './chat/history';
+import { NotificationService } from './core/notifications';
 
 export function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
@@ -27,7 +28,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   const history = new ConversationHistory(context.globalStorageUri);
 
-  const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history);
+  const notifications = new NotificationService();
+  const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
 
   // Register chat webview
   const chatProvider = new ChatViewProvider(context.extensionUri);

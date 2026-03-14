@@ -17,7 +17,8 @@ export class MessageHandler {
     private readonly contextBuilder: ContextBuilder,
     private readonly settings: Settings,
     private readonly toolExecutor?: EditorToolExecutor,
-    private readonly history?: ConversationHistory
+    private readonly history?: ConversationHistory,
+    private readonly notifications: NotificationService = new NotificationService()
   ) {}
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -124,7 +125,7 @@ export class MessageHandler {
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         postMessage({ type: 'streamError', error: errorMessage });
-        new NotificationService().handleError(errorMessage);
+        this.notifications.handleError(errorMessage);
       }
     } finally {
       this.abortController = undefined;
@@ -142,7 +143,7 @@ export class MessageHandler {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';
       postMessage({ type: 'streamError', error: errorMessage });
-      new NotificationService().handleError(errorMessage);
+      this.notifications.handleError(errorMessage);
     }
   }
 
