@@ -1,0 +1,122 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockExecuteCommand, mockGetDiagnostics } = vi.hoisted(() => ({
+  mockExecuteCommand: vi.fn(),
+  mockGetDiagnostics: vi.fn(() => []),
+}));
+
+vi.mock('vscode', () => ({
+  commands: {
+    executeCommand: mockExecuteCommand,
+  },
+  languages: {
+    getDiagnostics: mockGetDiagnostics,
+  },
+  Uri: {
+    parse: (s: string) => ({ toString: () => s, fsPath: s }),
+  },
+  Position: class {
+    constructor(public line: number, public character: number) {}
+  },
+  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+}));
+
+import { CodeIntelligence } from './code-intelligence';
+
+describe('CodeIntelligence', () => {
+  let ci: CodeIntelligence;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ci = new CodeIntelligence();
+  });
+
+  describe('getHover', () => {
+    it('should return hover contents', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { contents: [{ value: 'function greet(name: string): void' }] },
+      ]);
+      const result = await ci.getHover('file:///test.ts', 0, 10);
+      expect(result).toContain('function greet');
+      expect(mockExecuteCommand).toHaveBeenCalledWith(
+        'vscode.executeHoverProvider',
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it('should return undefined when no hover info', async () => {
+      mockExecuteCommand.mockResolvedValue([]);
+      const result = await ci.getHover('file:///test.ts', 0, 10);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined on error', async () => {
+      mockExecuteCommand.mockRejectedValue(new Error('no provider'));
+      const result = await ci.getHover('file:///test.ts', 0, 10);
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('getDiagnostics', () => {
+    it('should return formatted diagnostics for a URI', () => {
+      mockGetDiagnostics.mockReturnValue([
+        [
+          { toString: () => 'file:///test.ts' },
+          [
+            {
+              message: 'Type error',
+              severity: 0,
+              range: { start: { line: 5, character: 0 }, end: { line: 5, character: 10 } },
+            },
+          ],
+        ],
+      ]);
+      const result = ci.getDiagnostics('file:///test.ts');
+      expect(result).toHaveLength(1);
+      expect(result[0].message).toBe('Type error');
+      expect(result[0].severity).toBe('Error');
+    });
+
+    it('should return empty array when no diagnostics', () => {
+      mockGetDiagnostics.mockReturnValue([]);
+      const result = ci.getDiagnostics('file:///test.ts');
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getDefinition', () => {
+    it('should return definition location', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { uri: { toString: () => 'file:///other.ts' }, range: { start: { line: 10, character: 0 } } },
+      ]);
+      const result = await ci.getDefinition('file:///test.ts', 5, 15);
+      expect(result).toBeDefined();
+      expect(result!.uri).toBe('file:///other.ts');
+      expect(result!.line).toBe(10);
+    });
+  });
+
+  describe('getSymbols', () => {
+    it('should return document symbols', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { name: 'greet', kind: 12, range: { start: { line: 0 }, end: { line: 3 } } },
+        { name: 'main', kind: 12, range: { start: { line: 5 }, end: { line: 10 } } },
+      ]);
+      const result = await ci.getSymbols('file:///test.ts');
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('greet');
+    });
+  });
+
+  describe('caching', () => {
+    it('should cache hover results within TTL', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { contents: [{ value: 'cached result' }] },
+      ]);
+      await ci.getHover('file:///test.ts', 0, 10);
+      await ci.getHover('file:///test.ts', 0, 10);
+      expect(mockExecuteCommand).toHaveBeenCalledTimes(1);
+    });
+  });
+});
