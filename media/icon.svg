@@ -1,19 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <rect width="128" height="128" rx="24" fill="#1a1a2e"/>
-  <!-- Chat bubble -->
-  <path d="M32 40h64c4.4 0 8 3.6 8 8v32c0 4.4-3.6 8-8 8H72l-16 16V88H32c-4.4 0-8-3.6-8-8V48c0-4.4 3.6-8 8-8z" fill="#0e639c"/>
-  <!-- OpenRouter logo: diamond with connected nodes -->
-  <path d="M64 48 L80 64 L64 80 L48 64 Z" stroke="#fff" stroke-width="2.5" fill="none"/>
-  <!-- Center node -->
-  <circle cx="64" cy="64" r="4" fill="#fff"/>
-  <!-- Corner nodes -->
-  <circle cx="64" cy="48" r="3" fill="#fff"/>
-  <circle cx="80" cy="64" r="3" fill="#fff"/>
-  <circle cx="64" cy="80" r="3" fill="#fff"/>
-  <circle cx="48" cy="64" r="3" fill="#fff"/>
-  <!-- Connection lines from center to corners -->
-  <line x1="64" y1="52" x2="64" y2="60" stroke="#fff" stroke-width="1.5"/>
-  <line x1="68" y1="64" x2="76" y2="64" stroke="#fff" stroke-width="1.5"/>
-  <line x1="64" y1="68" x2="64" y2="76" stroke="#fff" stroke-width="1.5"/>
-  <line x1="52" y1="64" x2="60" y2="64" stroke="#fff" stroke-width="1.5"/>
+  <g transform="translate(12, 24) scale(0.203125)">
+    <!-- Upper curve -->
+    <path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945"
+      stroke="#ffffff" stroke-width="70" stroke-linecap="round" fill="none"/>
+    <!-- Upper arrow -->
+    <path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z" fill="#ffffff"/>
+    <!-- Lower curve -->
+    <path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377"
+      stroke="#ffffff" stroke-width="70" stroke-linecap="round" fill="none"/>
+    <!-- Lower arrow -->
+    <path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z" fill="#ffffff"/>
+  </g>
 </svg>
