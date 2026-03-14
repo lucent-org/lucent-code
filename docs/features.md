@@ -104,10 +104,10 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :construction: | Keyboard shortcuts | Configurable keybindings for common actions | 5 |
+| :white_check_mark: | Keyboard shortcuts | Ctrl+Shift+N (new chat), Ctrl+Shift+L (focus chat), Alt+\ (completion) | 5 |
 | :white_check_mark: | Command palette commands | Set API Key and New Chat accessible via command palette | 1 |
-| :construction: | Error notifications | User-facing error messages and recovery hints | 5 |
-| :construction: | Marketplace packaging | `.vsix` packaging, marketplace listing, README | 5 |
+| :white_check_mark: | Error notifications | Contextual errors with recovery actions (Set API Key, Retry) | 5 |
+| :white_check_mark: | Marketplace packaging | Icon, CHANGELOG, marketplace metadata, README | 5 |
 | :white_check_mark: | CSP enforcement | Content Security Policy on webview | 1 |
 | :white_check_mark: | Activity bar icon | Custom icon for the chat side panel | 1 |
 
@@ -115,6 +115,6 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 100 tests across 13 test files covering all modules | 1-4 |
+| :white_check_mark: | Unit tests | 105 tests across 14 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |

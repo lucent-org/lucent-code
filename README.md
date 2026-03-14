@@ -151,7 +151,7 @@ npm run test:watch     # Watch mode for tests
 
 ## Testing
 
-100 tests across 13 test files covering all modules:
+105 tests across 14 test files covering all modules:
 
 ```bash
 npm test
@@ -161,6 +161,7 @@ npm test
 |--------|-------|----------------|
 | Settings | 7 | All config accessors (chat + completions) |
 | Auth | 8 | Key storage, prompting, cancellation, OAuth PKCE |
+| Notifications | 5 | API key, rate limit, auth, network, generic errors |
 | OpenRouter Client | 10 | Model listing, chat, streaming, SSE parsing, errors |
 | Context Builder | 10 | Editor context, selection, formatting, enriched prompts, diagnostics |
 | Markdown Utils | 10 | HTML escaping, markdown rendering, XSS prevention |
@@ -183,7 +184,7 @@ See [docs/features.md](docs/features.md) for the full feature inventory with imp
 | Phase 2 — Inline Completions | Done | Ghost text, auto/manual triggers, debounce |
 | Phase 3 — Code Intelligence | Done | LSP integration, editor capability hints, tool-use |
 | Phase 4 — Auth & Persistence | Done | OAuth structure, conversation history, auto-titling, export |
-| Phase 5 — Polish | Planned | Keyboard shortcuts, error UX, marketplace packaging |
+| Phase 5 — Polish | Done | Keyboard shortcuts, error notifications, icon, CHANGELOG |
 
 ## License
 
