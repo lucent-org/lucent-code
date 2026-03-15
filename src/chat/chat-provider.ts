@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
+import type { ExtensionMessage } from '../shared/types';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'openRouterChat.chatView';
   private webviewView?: vscode.WebviewView;
+  private pendingMessages: ExtensionMessage[] = [];
   public onResolve?: () => void;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
@@ -21,14 +23,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
     this.onResolve?.();
+
+    // Flush any messages queued before the panel was first opened
+    for (const msg of this.pendingMessages) {
+      this.webviewView.webview.postMessage(msg);
+    }
+    this.pendingMessages = [];
   }
 
   public getWebview(): vscode.Webview | undefined {
     return this.webviewView?.webview;
   }
 
-  public postMessageToWebview(message: unknown): void {
-    this.webviewView?.webview.postMessage(message);
+  public postMessageToWebview(message: ExtensionMessage): void {
+    if (this.webviewView) {
+      this.webviewView.webview.postMessage(message);
+    } else {
+      this.pendingMessages.push(message);
+    }
   }
 
   private getHtmlForWebview(webview: vscode.Webview): string {
