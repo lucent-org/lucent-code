@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall } from '../shared/types';
+import * as Diff from 'diff';
+import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
@@ -11,6 +12,7 @@ export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
   private abortController?: AbortController;
   private currentConversation?: Conversation;
+  private pendingApply = new Map<string, string>(); // fileUri string → proposed code
 
   constructor(
     private readonly client: OpenRouterClient,
@@ -56,6 +58,12 @@ export class MessageHandler {
         await this.handleGetModels(postMessage);
         const context = this.contextBuilder.buildContext();
         postMessage({ type: 'contextUpdate', context });
+        break;
+      case 'applyToFile':
+        await this.handleApplyToFile(message.code, message.language, message.filename, postMessage);
+        break;
+      case 'confirmApply':
+        await this.handleConfirmApply(message.fileUri);
         break;
     }
   }
@@ -288,5 +296,123 @@ export class MessageHandler {
     } catch {
       // Silently fail — title stays as default
     }
+  }
+
+  private async handleApplyToFile(
+    code: string,
+    language: string,
+    filename: string | undefined,
+    postMessage: (msg: ExtensionMessage) => void
+  ): Promise<void> {
+    let fileUri: vscode.Uri | undefined;
+
+    if (filename) {
+      const folders = vscode.workspace.workspaceFolders;
+      if (folders && folders.length > 0) {
+        const candidate = vscode.Uri.joinPath(folders[0].uri, filename);
+        try {
+          await vscode.workspace.fs.stat(candidate);
+          fileUri = candidate;
+        } catch {
+          // file not found — fall through to picker
+        }
+      }
+    }
+
+    if (!fileUri) {
+      const picked = await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: 'Apply to this file' });
+      if (!picked || picked.length === 0) return;
+      fileUri = picked[0];
+    }
+
+    let originalContent = '';
+    try {
+      const bytes = await vscode.workspace.fs.readFile(fileUri);
+      originalContent = new TextDecoder().decode(bytes);
+    } catch { /* new file */ }
+
+    const hunks = this.countHunks(originalContent, code);
+    const uriStr = fileUri.toString();
+
+    if (hunks <= 1) {
+      const lines = this.computeDiffLines(originalContent, code);
+      this.pendingApply.set(uriStr, code);
+      postMessage({ type: 'showDiff', lines, filename: fileUri.fsPath, fileUri: uriStr });
+    } else {
+      await this.showNativeDiff(fileUri, originalContent, code, language);
+    }
+  }
+
+  private countHunks(original: string, proposed: string): number {
+    if (!original.trim()) return 0;
+    const changes = Diff.diffLines(original, proposed);
+    let hunks = 0;
+    let inHunk = false;
+    for (const part of changes) {
+      if (part.added || part.removed) {
+        if (!inHunk) { hunks++; inHunk = true; }
+      } else {
+        inHunk = false;
+      }
+    }
+    return hunks;
+  }
+
+  private computeDiffLines(original: string, proposed: string): DiffLine[] {
+    const changes = Diff.diffLines(original, proposed);
+    const lines: DiffLine[] = [];
+    for (const part of changes) {
+      const type = part.added ? 'added' : part.removed ? 'removed' : 'context';
+      const partLines = part.value.split('\n');
+      if (partLines[partLines.length - 1] === '') partLines.pop();
+      for (const line of partLines) {
+        lines.push({ type, content: line });
+      }
+    }
+    return lines;
+  }
+
+  private async showNativeDiff(
+    fileUri: vscode.Uri,
+    _originalContent: string,
+    code: string,
+    language: string
+  ): Promise<void> {
+    const proposedDoc = await vscode.workspace.openTextDocument({ content: code, language });
+    const filename = fileUri.path.split('/').pop() ?? fileUri.fsPath;
+    await vscode.commands.executeCommand('vscode.diff', fileUri, proposedDoc.uri, `Review changes: ${filename}`);
+    const choice = await vscode.window.showInformationMessage(
+      `Apply changes to ${filename}?`,
+      'Apply',
+      'Discard'
+    );
+    if (choice === 'Apply') {
+      await this.applyEdit(fileUri, code);
+    }
+  }
+
+  private async handleConfirmApply(fileUri: string): Promise<void> {
+    const code = this.pendingApply.get(fileUri);
+    if (!code) return;
+    this.pendingApply.delete(fileUri);
+    await this.applyEdit(vscode.Uri.parse(fileUri), code);
+  }
+
+  private async applyEdit(fileUri: vscode.Uri, code: string): Promise<void> {
+    const edit = new vscode.WorkspaceEdit();
+    try {
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      const fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(doc.lineCount, 0)
+      );
+      edit.replace(fileUri, fullRange, code);
+    } catch {
+      edit.createFile(fileUri, { overwrite: true });
+      edit.insert(fileUri, new vscode.Position(0, 0), code);
+    }
+    await vscode.workspace.applyEdit(edit);
+    const doc = await vscode.workspace.openTextDocument(fileUri);
+    await vscode.window.showTextDocument(doc);
   }
 }

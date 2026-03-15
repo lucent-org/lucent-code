@@ -8,20 +8,46 @@ vi.mock('vscode', () => ({
       update: vi.fn(),
     })),
     onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
-    openTextDocument: vi.fn().mockResolvedValue({}),
+    openTextDocument: vi.fn().mockResolvedValue({
+      lineCount: 10,
+      uri: { toString: () => 'file:///workspace/src/foo.ts', fsPath: '/workspace/src/foo.ts' },
+    }),
+    workspaceFolders: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace', path: '/workspace' } }],
+    applyEdit: vi.fn().mockResolvedValue(true),
+    fs: {
+      readFile: vi.fn(),
+      stat: vi.fn(),
+    },
   },
   window: {
     showTextDocument: vi.fn().mockResolvedValue(undefined),
     showErrorMessage: vi.fn().mockResolvedValue(undefined),
     showWarningMessage: vi.fn().mockResolvedValue(undefined),
     showInformationMessage: vi.fn().mockResolvedValue(undefined),
+    showOpenDialog: vi.fn(),
   },
   commands: {
     executeCommand: vi.fn(),
   },
   ConfigurationTarget: { Global: 1 },
+  WorkspaceEdit: class {
+    replace = vi.fn();
+    createFile = vi.fn();
+    insert = vi.fn();
+  },
+  Position: class { constructor(public line: number, public character: number) {} },
+  Range: class { constructor(public start: any, public end: any) {} },
+  Uri: {
+    parse: (s: string) => ({ toString: () => s, fsPath: s, path: s }),
+    joinPath: (base: any, ...p: string[]) => ({
+      toString: () => base.toString() + '/' + p.join('/'),
+      fsPath: base.fsPath + '/' + p.join('/'),
+      path: base.path + '/' + p.join('/'),
+    }),
+  },
 }));
 
+import * as vscode from 'vscode';
 import { MessageHandler } from './message-handler';
 import type { OpenRouterClient } from '../core/openrouter-client';
 import type { ContextBuilder } from '../core/context-builder';
@@ -551,6 +577,73 @@ describe('MessageHandler', () => {
       expect(secondCallArgs.messages[1]).toEqual({ role: 'user', content: 'Question 1' });
       expect(secondCallArgs.messages[2]).toEqual({ role: 'assistant', content: 'Response 1' });
       expect(secondCallArgs.messages[3]).toEqual({ role: 'user', content: 'Question 2' });
+    });
+  });
+
+  describe('applyToFile', () => {
+    let applyHandler: MessageHandler;
+    let postMessage: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      postMessage = vi.fn();
+      applyHandler = new MessageHandler(
+        mockClient as unknown as OpenRouterClient,
+        mockContextBuilder as unknown as ContextBuilder,
+        mockSettings as unknown as Settings,
+      );
+      (vscode.workspace.fs.readFile as any).mockResolvedValue(
+        new TextEncoder().encode('const x = 1;\n')
+      );
+      (vscode.workspace.fs.stat as any).mockResolvedValue({});
+      (vscode.workspace.openTextDocument as any).mockResolvedValue({
+        lineCount: 1,
+        uri: { toString: () => 'file:///workspace/src/foo.ts', fsPath: '/workspace/src/foo.ts' },
+      });
+    });
+
+    it('should post showDiff for a single-hunk change when filename provided', async () => {
+      await applyHandler.handleMessage(
+        { type: 'applyToFile', code: 'const x = 2;\n', language: 'ts', filename: 'src/foo.ts' },
+        postMessage
+      );
+
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'showDiff' })
+      );
+      const call = postMessage.mock.calls.find((c: any[]) => c[0].type === 'showDiff');
+      expect(call[0].lines).toBeInstanceOf(Array);
+      expect(call[0].filename).toContain('foo.ts');
+      expect(call[0].fileUri).toBeDefined();
+    });
+
+    it('should open file picker when no filename is provided', async () => {
+      (vscode.window.showOpenDialog as any).mockResolvedValue(undefined);
+
+      await applyHandler.handleMessage(
+        { type: 'applyToFile', code: 'const x = 2;', language: 'ts' },
+        postMessage
+      );
+
+      expect(vscode.window.showOpenDialog).toHaveBeenCalled();
+    });
+
+    it('should apply file on confirmApply', async () => {
+      // First trigger apply to put code in pendingApply
+      await applyHandler.handleMessage(
+        { type: 'applyToFile', code: 'const x = 2;\n', language: 'ts', filename: 'src/foo.ts' },
+        postMessage
+      );
+
+      const diffMsg = postMessage.mock.calls.find((c: any[]) => c[0].type === 'showDiff');
+      const fileUri = diffMsg[0].fileUri;
+
+      // Then confirm
+      await applyHandler.handleMessage(
+        { type: 'confirmApply', fileUri },
+        postMessage
+      );
+
+      expect(vscode.workspace.applyEdit).toHaveBeenCalled();
     });
   });
 
