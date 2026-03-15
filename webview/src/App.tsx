@@ -44,6 +44,13 @@ const App: Component = () => {
         case 'conversationTitled':
           chatStore.handleConversationTitled(message.id, message.title);
           break;
+        case 'triggerSend':
+          if (message.newChat) {
+            chatStore.newChat();
+          }
+          chatStore.sendMessage(message.content);
+          scrollToBottom();
+          break;
       }
     });
 

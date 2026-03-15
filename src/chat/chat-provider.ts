@@ -27,6 +27,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return this.webviewView?.webview;
   }
 
+  public postMessageToWebview(message: unknown): void {
+    this.webviewView?.webview.postMessage(message);
+  }
+
   private getHtmlForWebview(webview: vscode.Webview): string {
     const distUri = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(distUri, 'index.js'));

@@ -93,6 +93,32 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Context menu actions
+  const makeContextAction = (
+    action: 'explain' | 'fix' | 'improve',
+    newChat: boolean
+  ) => async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.selection.isEmpty) return;
+
+    const selection = editor.document.getText(editor.selection);
+    const lang = editor.document.languageId;
+    const labels = { explain: 'Explain', fix: 'Fix', improve: 'Improve' } as const;
+    const content = `${labels[action]} this code:\n\`\`\`${lang}\n${selection}\n\`\`\``;
+
+    await vscode.commands.executeCommand('openRouterChat.chatView.focus');
+    chatProvider.postMessageToWebview({ type: 'triggerSend', content, newChat });
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.explainCode', makeContextAction('explain', false)),
+    vscode.commands.registerCommand('openRouterChat.explainCodeNew', makeContextAction('explain', true)),
+    vscode.commands.registerCommand('openRouterChat.fixCode', makeContextAction('fix', false)),
+    vscode.commands.registerCommand('openRouterChat.fixCodeNew', makeContextAction('fix', true)),
+    vscode.commands.registerCommand('openRouterChat.improveCode', makeContextAction('improve', false)),
+    vscode.commands.registerCommand('openRouterChat.improveCodeNew', makeContextAction('improve', true)),
+  );
+
   // Prompt for API key on first activation if not set
   auth.getApiKey().then((key) => {
     if (!key) {

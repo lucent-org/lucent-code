@@ -93,7 +93,8 @@ export type ExtensionMessage =
   | { type: 'conversationList'; conversations: ConversationSummary[] }
   | { type: 'conversationLoaded'; conversation: Conversation }
   | { type: 'conversationSaved'; id: string; title: string }
-  | { type: 'conversationTitled'; id: string; title: string };
+  | { type: 'conversationTitled'; id: string; title: string }
+  | { type: 'triggerSend'; content: string; newChat: boolean };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; model: string }
