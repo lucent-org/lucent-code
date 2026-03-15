@@ -133,13 +133,13 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Issue | Description | Source |
 |--------|-------|-------------|--------|
-| :construction: | Tool-use not wired | TOOL_DEFINITIONS exist but are never passed to the API request, tool_calls never processed | Review |
-| :construction: | Monkey-patched resolveWebviewView | Extension.ts overwrites class method at runtime — use event emitter or callback | Review |
-| :construction: | Sync fs in async history | `fs.readFileSync`/`writeFileSync` block the extension host — use `fs.promises` | Review |
-| :construction: | Unbounded LSP cache | CodeIntelligence cache grows without limit — add LRU or periodic sweep | Review |
-| :construction: | NotificationService per-error | Instantiated on each error instead of injected via constructor | Review |
-| :construction: | CSS filename mismatch | `chat-provider.ts` references `style.css` but Vite may output `index.css` — verify | Review |
-| :construction: | rename_symbol broken | Opens rename dialog instead of programmatically applying rename with `newName` | Review |
+| :white_check_mark: | ~~Tool-use not wired~~ | Fixed — agentic loop passes TOOL_DEFINITIONS, accumulates streamed tool_calls, executes tools, feeds results back (5-iteration cap) | Review |
+| :white_check_mark: | ~~Monkey-patched resolveWebviewView~~ | Fixed — `onResolve?: () => void` callback on `ChatViewProvider`, set before registration | Review |
+| :white_check_mark: | ~~Sync fs in async history~~ | Fixed — all method bodies use `fs.promises.*`; constructor `mkdirSync` retained | Review |
+| :white_check_mark: | ~~Unbounded LSP cache~~ | Fixed — capped at 100 entries with LRU eviction (Map insertion-order) | Review |
+| :white_check_mark: | ~~NotificationService per-error~~ | Fixed — injected via `MessageHandler` constructor with singleton in `extension.ts` | Review |
+| :white_check_mark: | ~~CSS filename mismatch~~ | Fixed — `chat-provider.ts` now references `index.css` (actual Vite build output) | Review |
+| :white_check_mark: | ~~rename_symbol broken~~ | Fixed — uses `vscode.executeDocumentRenameProvider` to get a `WorkspaceEdit` and applies it | Review |
 
 ### Suggestions
 
