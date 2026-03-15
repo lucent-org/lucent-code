@@ -1,5 +1,6 @@
 import { createSignal, createRoot } from 'solid-js';
 import { getVsCodeApi } from '../utils/vscode-api';
+import type { DiffLine } from '../components/DiffView';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -23,7 +24,7 @@ export interface ConversationSummary {
 }
 
 interface DiffState {
-  lines: Array<{ type: 'context' | 'added' | 'removed'; content: string }>;
+  lines: DiffLine[];
   filename: string;
   fileUri: string;
 }
