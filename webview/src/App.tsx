@@ -4,6 +4,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ModelSelector from './components/ModelSelector';
 import ConversationList from './components/ConversationList';
+import DiffView from './components/DiffView';
 import { getVsCodeApi } from './utils/vscode-api';
 
 const App: Component = () => {
@@ -50,6 +51,13 @@ const App: Component = () => {
           }
           chatStore.sendMessage(message.content);
           scrollToBottom();
+          break;
+        case 'showDiff':
+          chatStore.setDiffState({
+            lines: message.lines,
+            filename: message.filename,
+            fileUri: message.fileUri,
+          });
           break;
       }
     });
@@ -123,6 +131,17 @@ const App: Component = () => {
         </Show>
         <div ref={messagesEndRef} />
       </div>
+
+      <Show when={chatStore.diffState()}>
+        {(state) => (
+          <DiffView
+            lines={state().lines}
+            filename={state().filename}
+            fileUri={state().fileUri}
+            onDismiss={() => chatStore.setDiffState(null)}
+          />
+        )}
+      </Show>
 
       <ChatInput
         onSend={handleSend}

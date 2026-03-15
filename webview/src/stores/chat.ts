@@ -22,6 +22,12 @@ export interface ConversationSummary {
   updatedAt: string;
 }
 
+interface DiffState {
+  lines: Array<{ type: 'context' | 'added' | 'removed'; content: string }>;
+  filename: string;
+  fileUri: string;
+}
+
 function createChatStore() {
   const [messages, setMessages] = createSignal<ChatMessage[]>([]);
   const [models, setModels] = createSignal<Model[]>([]);
@@ -30,6 +36,7 @@ function createChatStore() {
   const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
   const [showConversationList, setShowConversationList] = createSignal(false);
+  const [diffState, setDiffState] = createSignal<DiffState | null>(null);
 
   const vscode = getVsCodeApi();
 
@@ -172,6 +179,8 @@ function createChatStore() {
     deleteConversation,
     exportConversation,
     toggleConversationList,
+    diffState,
+    setDiffState,
   };
 }
 
