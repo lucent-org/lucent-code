@@ -55,6 +55,7 @@ export class MessageHandler {
         await this.handleExportConversation(message.id, message.format, postMessage);
         break;
       case 'ready':
+        this.pendingApply.clear();
         await this.handleGetModels(postMessage);
         const context = this.contextBuilder.buildContext();
         postMessage({ type: 'contextUpdate', context });
@@ -378,6 +379,7 @@ export class MessageHandler {
     code: string,
     language: string
   ): Promise<void> {
+    vscode.window.setStatusBarMessage('OpenRouter Chat: Opening diff editor...', 3000);
     const proposedDoc = await vscode.workspace.openTextDocument({ content: code, language });
     const filename = fileUri.path.split('/').pop() ?? fileUri.fsPath;
     await vscode.commands.executeCommand('vscode.diff', fileUri, proposedDoc.uri, `Review changes: ${filename}`);

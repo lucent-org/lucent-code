@@ -49,6 +49,7 @@ const App: Component = () => {
           if (message.newChat) {
             chatStore.newChat();
           }
+          chatStore.cancelRequest();
           chatStore.sendMessage(message.content);
           scrollToBottom();
           break;
