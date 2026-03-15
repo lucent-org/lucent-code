@@ -50,6 +50,7 @@ const App: Component = () => {
             chatStore.newChat();
           }
           chatStore.cancelRequest();
+          chatStore.handleStreamEnd(); // reset streaming state so sendMessage proceeds
           chatStore.sendMessage(message.content);
           scrollToBottom();
           break;
