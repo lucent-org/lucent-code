@@ -30,10 +30,17 @@ export class OpenRouterClient {
         return;
       }
 
-      const timer = setTimeout(resolve, ms);
+      let onAbort: (() => void) | undefined;
+
+      const timer = setTimeout(() => {
+        if (signal && onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
+        resolve();
+      }, ms);
 
       if (signal) {
-        const onAbort = () => {
+        onAbort = () => {
           clearTimeout(timer);
           reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
         };
@@ -46,7 +53,7 @@ export class OpenRouterClient {
     fn: () => Promise<Response>,
     signal?: AbortSignal
   ): Promise<Response> {
-    let lastError: Error | undefined;
+    let lastError: Error = new Error('Retry loop exited without a recorded error');
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const response = await fn();
@@ -86,7 +93,7 @@ export class OpenRouterClient {
       await this.sleep(delayMs, signal);
     }
 
-    throw lastError!;
+    throw lastError;
   }
 
   async listModels(): Promise<OpenRouterModel[]> {
