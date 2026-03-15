@@ -52,19 +52,23 @@
     "commands": [
       {
         "command": "openRouterChat.setApiKey",
-        "title": "OpenRouter Chat: Set API Key"
+        "title": "Set API Key",
+        "category": "OpenRouter Chat"
       },
       {
         "command": "openRouterChat.newChat",
-        "title": "OpenRouter Chat: New Chat"
+        "title": "New Chat",
+        "category": "OpenRouter Chat"
       },
       {
         "command": "openRouterChat.triggerCompletion",
-        "title": "OpenRouter Chat: Trigger Inline Completion"
+        "title": "Trigger Inline Completion",
+        "category": "OpenRouter Chat"
       },
       {
         "command": "openRouterChat.focusChat",
-        "title": "OpenRouter Chat: Focus Chat Panel"
+        "title": "Focus Chat Panel",
+        "category": "OpenRouter Chat"
       },
       {
         "command": "openRouterChat.explainCode",
