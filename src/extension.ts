@@ -14,6 +14,8 @@ import { ConversationHistory } from './chat/history';
 import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
 
+let messageHandler: MessageHandler | undefined;
+
 export async function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
   const auth = new AuthManager(context.secrets);
@@ -36,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const history = new ConversationHistory(context.globalStorageUri);
 
   const notifications = new NotificationService();
-  const messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
+  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
 
   // Set up webview message handling
   const setupWebviewMessaging = () => {
@@ -45,7 +47,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       const postMessage = (msg: unknown) => webview.postMessage(msg);
-      await messageHandler.handleMessage(message, postMessage);
+      await messageHandler!.handleMessage(message, postMessage);
     });
   };
 
@@ -83,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('openRouterChat.newChat', () => {
-      messageHandler.handleMessage({ type: 'newChat' }, () => {});
+      messageHandler!.handleMessage({ type: 'newChat' }, () => {});
     })
   );
 
@@ -155,4 +157,6 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 }
 
-export function deactivate() {}
+export function deactivate() {
+  messageHandler?.abort();
+}

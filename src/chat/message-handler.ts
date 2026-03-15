@@ -214,6 +214,10 @@ export class MessageHandler {
     }
   }
 
+  abort(): void {
+    this.abortController?.abort();
+  }
+
   private handleCancel(): void {
     this.abortController?.abort();
   }

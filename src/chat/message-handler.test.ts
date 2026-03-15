@@ -669,6 +669,46 @@ describe('MessageHandler', () => {
     });
   });
 
+  describe('abort', () => {
+    it('should call abortController.abort() when a controller is active', async () => {
+      // Start a stream that hangs so abortController is set
+      let rejectStream!: (err: Error) => void;
+      mockClient.chatStream.mockReturnValue(
+        (async function* () {
+          yield { choices: [{ delta: { content: 'partial' }, finish_reason: null }] };
+          await new Promise<void>((_resolve, reject) => { rejectStream = reject; });
+        })()
+      );
+
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'Hi', model: 'test-model' },
+        postMessage
+      );
+
+      // Wait for stream to start
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Call abort() — should abort the controller
+      handler.abort();
+
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      rejectStream(abortError);
+
+      await sendPromise;
+
+      expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd' });
+      const errorMessages = postMessage.mock.calls.filter(
+        (call: [ExtensionMessage]) => call[0].type === 'streamError'
+      );
+      expect(errorMessages).toHaveLength(0);
+    });
+
+    it('should do nothing when no controller is active', () => {
+      expect(() => handler.abort()).not.toThrow();
+    });
+  });
+
   describe('tool-use agentic loop', () => {
     let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
     let mockNotifications: { handleError: ReturnType<typeof vi.fn> };
