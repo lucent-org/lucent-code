@@ -45,7 +45,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Configurable debounce | Setting to adjust auto-trigger delay (default 300ms) | 2 |
 | :white_check_mark: | Request cancellation | Cancel in-flight completions when user keeps typing | 2 |
 | :white_check_mark: | Windowed file context | Send code before/after cursor within token limits | 2 |
-| :construction: | Global kill switch | Respects `editor.inlineSuggest.enabled` | 2 |
+| :white_check_mark: | Global kill switch | Respects `editor.inlineSuggest.enabled` | 2 |
 
 ## Authentication
 
@@ -115,7 +115,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 132 tests across 15 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 142 tests across 15 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -145,12 +145,12 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Issue | Description | Source |
 |--------|-------|-------------|--------|
-| :construction: | Retry with backoff | Design doc specifies exponential backoff for 429/5xx — not implemented | Review |
-| :construction: | inlineSuggest kill switch | Inline provider should check `editor.inlineSuggest.enabled` before API calls | Review |
-| :construction: | Enriched context on ready | `ready` handler sends basic `buildContext()` instead of `buildEnrichedContext()` | Review |
+| :white_check_mark: | ~~Retry with backoff~~ | Fixed — exponential backoff with ±20% jitter for 429/5xx, Retry-After header support, AbortSignal propagation | Review |
+| :white_check_mark: | ~~inlineSuggest kill switch~~ | Fixed — guard clause checks `editor.inlineSuggest.enabled === false` before any API call | Review |
+| :white_check_mark: | ~~Enriched context on ready~~ | Fixed — `ready` handler calls `buildEnrichedContext()` with fallback to `buildContext()` | Review |
 | :construction: | Type duplication | ChatMessage, ConversationSummary, Model defined in both extension and webview | Review |
 | :construction: | Idiomatic scroll-to-bottom | Use Solid.js `createEffect` watching messages instead of imperative calls | Review |
-| :construction: | deactivate cleanup | Empty `deactivate()` — should abort in-flight requests and clean up | Review |
+| :white_check_mark: | ~~deactivate cleanup~~ | Fixed — `abort()` method on `MessageHandler`, called from `deactivate()` via module-scope reference | Review |
 
 ---
 
@@ -166,10 +166,10 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | :white_check_mark: | ~~Diff preview & approval~~ | Fixed — inline DiffView with Apply/Discard; native diff + notification for multi-hunk changes | S |
 | :white_check_mark: | ~~Context menu actions~~ | Fixed — Explain/Fix/Improve submenus on selected code, append or new chat | S |
 | :white_check_mark: | ~~Custom instructions file~~ | Fixed — loads .openrouter-instructions.md or .cursorrules from workspace root into system prompt | S |
-| :construction: | **Enriched context on `ready`** | One-line fix: `ready` sends `buildContext()` instead of `buildEnrichedContext()` — the rich LSP context is silently dropped on panel open | XS |
-| :construction: | **inlineSuggest kill switch** | Inline provider should respect `editor.inlineSuggest.enabled` — one guard clause | XS |
-| :construction: | **Retry with backoff** | Exponential backoff for 429/5xx — prevents hard failures on transient rate limits | XS |
-| :construction: | **deactivate cleanup** | Abort in-flight requests and dispose resources on extension deactivate | XS |
+| :white_check_mark: | ~~Enriched context on `ready`~~ | Fixed — `ready` calls `buildEnrichedContext()` with fallback to `buildContext()` | XS |
+| :white_check_mark: | ~~inlineSuggest kill switch~~ | Fixed — guard clause respects `editor.inlineSuggest.enabled` | XS |
+| :white_check_mark: | ~~Retry with backoff~~ | Fixed — exponential backoff with jitter, Retry-After, AbortSignal | XS |
+| :white_check_mark: | ~~deactivate cleanup~~ | Fixed — `abort()` on MessageHandler called from `deactivate()` | XS |
 
 ### P2 — Soon (good value, moderate effort)
 
