@@ -213,13 +213,13 @@ describe('ContextBuilder', () => {
     });
 
     it('should return instructions from the loader', () => {
-      const mockLoader = { getInstructions: vi.fn().mockReturnValue('# Custom') } as any;
+      const mockLoader = { getInstructions: vi.fn().mockReturnValue('# Custom') };
       builder.setInstructionsLoader(mockLoader);
       expect(builder.getCustomInstructions()).toBe('# Custom');
     });
 
     it('should return undefined when loader has no instructions', () => {
-      const mockLoader = { getInstructions: vi.fn().mockReturnValue(undefined) } as any;
+      const mockLoader = { getInstructions: vi.fn().mockReturnValue(undefined) };
       builder.setInstructionsLoader(mockLoader);
       expect(builder.getCustomInstructions()).toBeUndefined();
     });

@@ -316,6 +316,25 @@ describe('MessageHandler', () => {
       expect(chunkMessages[0][0]).toEqual({ type: 'streamChunk', content: 'data' });
       expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd' });
     });
+
+    it('should include Project Instructions section in system message when custom instructions are set', async () => {
+      mockContextBuilder.getCustomInstructions.mockReturnValue('# My Rules');
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await handler.handleMessage(
+        { type: 'sendMessage', content: 'Hello', model: 'test-model' },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      const systemMessage = callArgs.messages.find((m: { role: string }) => m.role === 'system');
+      expect(systemMessage).toBeDefined();
+      expect(systemMessage.content).toContain('## Project Instructions:\n# My Rules');
+    });
   });
 
   describe('cancelRequest', () => {

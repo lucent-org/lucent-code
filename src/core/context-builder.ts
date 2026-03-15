@@ -2,15 +2,18 @@ import * as vscode from 'vscode';
 import type { CodeContext } from '../shared/types';
 import { CodeIntelligence } from '../lsp/code-intelligence';
 import { CapabilityDetector, type EditorCapabilities } from '../lsp/capability-detector';
-import { InstructionsLoader } from './instructions-loader';
+
+interface InstructionsProvider {
+  getInstructions(): string | undefined;
+}
 
 export class ContextBuilder {
   private codeIntelligence?: CodeIntelligence;
   private capabilityDetector?: CapabilityDetector;
   private cachedCapabilities?: EditorCapabilities;
-  private instructionsLoader?: InstructionsLoader;
+  private instructionsLoader?: InstructionsProvider;
 
-  setInstructionsLoader(loader: InstructionsLoader): void {
+  setInstructionsLoader(loader: InstructionsProvider): void {
     this.instructionsLoader = loader;
   }
 
