@@ -79,7 +79,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | Capability detection | Probe which language providers are available for the current file | 3 |
 | :white_check_mark: | Dynamic system prompt | Inject available editor capabilities into the LLM system prompt | 3 |
-| :warning: | Tool-use: rename symbol | Opens rename dialog instead of programmatically renaming — needs `executeDocumentRenameProvider` | 3 |
+| :white_check_mark: | Tool-use: rename symbol | Programmatic rename via `executeDocumentRenameProvider` + `applyEdit` | 3 |
 | :white_check_mark: | Tool-use: apply code action | LLM can apply quick fixes / refactorings | 3 |
 | :white_check_mark: | Tool-use: format document | LLM can trigger document formatting | 3 |
 | :white_check_mark: | Tool-use: insert code | LLM can insert code at a specific position | 3 |
@@ -115,7 +115,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 111 tests across 14 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 118 tests across 14 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -141,7 +141,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | ~~CSS filename mismatch~~ | Fixed — `chat-provider.ts` now references `index.css` (actual Vite build output) | Review |
 | :white_check_mark: | ~~rename_symbol broken~~ | Fixed — uses `vscode.executeDocumentRenameProvider` to get a `WorkspaceEdit` and applies it | Review |
 
-### Suggestions
+### Suggestions (resolved with next priorities)
 
 | Status | Issue | Description | Source |
 |--------|-------|-------------|--------|
@@ -151,50 +151,53 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :construction: | Type duplication | ChatMessage, ConversationSummary, Model defined in both extension and webview | Review |
 | :construction: | Idiomatic scroll-to-bottom | Use Solid.js `createEffect` watching messages instead of imperative calls | Review |
 | :construction: | deactivate cleanup | Empty `deactivate()` — should abort in-flight requests and clean up | Review |
-| :construction: | Apply to file | Code block "Apply to file" action not yet implemented | Phase 1 |
-| :construction: | Import conversations | Import conversations from JSON file | Phase 4 |
 
 ---
 
-## Backlog — Future Features (inspired by kilocode)
+## Prioritized Backlog
 
-Features observed in [kilocode](https://github.com/Kilo-Org/kilocode) that would add meaningful value to OpenRouter Chat.
+All remaining work, ranked by impact vs effort. Items at the top should be picked next.
 
-### Editor Integration
+### P1 — Next (high value, low effort)
 
-| Status | Feature | Description |
-|--------|---------|-------------|
-| :construction: | Context menu actions | Right-click selected code → Explain / Fix / Improve — sends selection + intent as a new chat message |
-| :construction: | Generate commit message | AI-generated git commit message from staged diff, accessible via SCM panel context menu |
-| :construction: | Add terminal output to context | Button or context menu to include current terminal output in the next chat message |
+| Status | Feature | Why now | Effort |
+|--------|---------|---------|--------|
+| :construction: | **Apply to file** | Completes the core code-editing loop — users can insert code but not apply it to the file | S |
+| :construction: | **Diff preview & approval** | Required safety gate before Apply to file ships — prevents silent overwrites | S |
+| :construction: | **Context menu actions** | Right-click selected code → Explain / Fix / Improve — highest-frequency use case missing from the editor | S |
+| :construction: | **Custom instructions file** | Load `.openrouter-instructions.md` / `.cursorrules` as a persistent system prompt — immediate productivity gain for teams | S |
+| :construction: | **Enriched context on `ready`** | One-line fix: `ready` sends `buildContext()` instead of `buildEnrichedContext()` — the rich LSP context is silently dropped on panel open | XS |
+| :construction: | **inlineSuggest kill switch** | Inline provider should respect `editor.inlineSuggest.enabled` — one guard clause | XS |
+| :construction: | **Retry with backoff** | Exponential backoff for 429/5xx — prevents hard failures on transient rate limits | XS |
+| :construction: | **deactivate cleanup** | Abort in-flight requests and dispose resources on extension deactivate | XS |
 
-### Context & Instructions
+### P2 — Soon (good value, moderate effort)
 
-| Status | Feature | Description |
-|--------|---------|-------------|
-| :construction: | Custom instructions file | Load a project-level `.openrouter-instructions.md` (or `.cursorrules`) as a persistent system prompt addition |
-| :construction: | Image attachments | Attach images (screenshots, diagrams) to chat messages for multi-modal models |
-| :construction: | Drag-and-drop files | Drag files from the Explorer into the chat input to attach or include their contents as context |
+| Status | Feature | Why | Effort |
+|--------|---------|-----|--------|
+| :construction: | **Import conversations** | Completes the export/import pair — export already ships | S |
+| :construction: | **OAuth token management** | Refresh + revocation needed for the OAuth flow to be production-ready | M |
+| :construction: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
+| :construction: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
+| :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
+| :construction: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
+| :construction: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
+| :construction: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
 
-### Chat UX
+### P3 — Later (higher effort or lower urgency)
 
-| Status | Feature | Description |
-|--------|---------|-------------|
-| :construction: | Multiple chat sessions | Tabbed or panel-based multi-session UI — run parallel conversations without losing history |
-| :construction: | Slash commands | `/fix`, `/explain`, `/test` etc. — project-defined or built-in slash commands in the chat input |
-| :construction: | Task completion notification | VSCode notification (and optional sound) when a long-running streaming response finishes |
+| Status | Feature | Why | Effort |
+|--------|---------|-----|--------|
+| :construction: | **Image attachments** | Attach screenshots/diagrams to chat for multi-modal models — increasingly expected | M |
+| :construction: | **Drag-and-drop files** | Drag files from Explorer into chat input to attach or inline their contents | M |
+| :construction: | **Slash commands** | `/fix`, `/explain`, `/test` in chat input — good UX, not a blocker | M |
+| :construction: | **Custom OpenAI-compatible providers** | Ollama, LM Studio, Azure OpenAI alongside OpenRouter — opens up local models | L |
 
-### Provider & Model
+### P4 — Future / exploratory (large scope)
 
-| Status | Feature | Description |
-|--------|---------|-------------|
-| :construction: | Custom OpenAI-compatible providers | Configure additional providers (Ollama, LM Studio, Azure OpenAI) alongside OpenRouter with custom base URLs and headers |
-
-### Advanced / Agentic
-
-| Status | Feature | Description |
-|--------|---------|-------------|
-| :construction: | MCP server integration | Register and invoke Model Context Protocol servers from within the chat — extends tool-use beyond built-in editor tools |
-| :construction: | Git worktree isolation | Each agentic chat session operates on its own git worktree branch, preventing cross-contamination during parallel tasks |
-| :construction: | Semantic codebase search | Vector-index the workspace so the LLM can search by meaning rather than exact text — useful for large repos |
-| :construction: | Diff preview & approval | Show a unified diff of proposed file edits and require explicit user approval before applying any change |
+| Status | Feature | Why | Effort |
+|--------|---------|-----|--------|
+| :construction: | **Multiple chat sessions** | Parallel tabbed conversations — significant UI overhaul | XL |
+| :construction: | **MCP server integration** | Register and invoke MCP servers — major extensibility surface | XL |
+| :construction: | **Git worktree isolation** | Per-session isolated worktree branch for safe agentic edits | L |
+| :construction: | **Semantic codebase search** | Vector-index workspace for meaning-based retrieval — needs embedding pipeline | XL |
