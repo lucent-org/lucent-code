@@ -81,6 +81,7 @@ export class MessageHandler {
 
     try {
       const MAX_TOOL_ITERATIONS = 5;
+      let completed = false;
 
       for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
         let fullContent = '';
@@ -130,7 +131,16 @@ export class MessageHandler {
 
           for (const tc of toolCalls) {
             let args: Record<string, unknown> = {};
-            try { args = JSON.parse(tc.function.arguments); } catch { /* malformed args */ }
+            let parseError: string | undefined;
+            try { args = JSON.parse(tc.function.arguments); } catch { parseError = `Failed to parse tool arguments: ${tc.function.arguments}`; }
+            if (parseError) {
+              this.conversationMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: `Error: ${parseError}`,
+              });
+              continue;
+            }
             const result = await this.toolExecutor.execute(tc.function.name, args);
             this.conversationMessages.push({
               role: 'tool',
@@ -143,7 +153,13 @@ export class MessageHandler {
 
         // finish_reason === 'stop' — final response
         this.conversationMessages.push({ role: 'assistant', content: fullContent });
+        completed = true;
         break;
+      }
+
+      if (!completed) {
+        postMessage({ type: 'streamError', error: 'Tool execution loop exceeded maximum iterations' });
+        return;
       }
 
       // Persist — save only user/assistant messages (filter out tool messages)
@@ -159,7 +175,7 @@ export class MessageHandler {
         await this.history.save(this.currentConversation);
         postMessage({ type: 'conversationSaved', id: this.currentConversation.id, title: this.currentConversation.title });
 
-        if (savable.filter(m => m.role === 'user' || m.role === 'assistant').length === 2) {
+        if (savable.length === 2) {
           this.autoTitle(this.currentConversation, postMessage);
         }
       }

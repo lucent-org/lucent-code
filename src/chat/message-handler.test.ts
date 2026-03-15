@@ -582,6 +582,24 @@ describe('MessageHandler', () => {
       expect(mockClient.chatStream).toHaveBeenCalledTimes(2);
     });
 
+    it('should post streamError after exceeding max tool iterations', async () => {
+      // Always return tool_calls — never resolves with 'stop'
+      // Use mockImplementation so each call gets a fresh async generator instance
+      mockClient.chatStream.mockImplementation(() =>
+        createToolCallStream([{ id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' }])
+      );
+
+      await toolHandler.handleMessage(
+        { type: 'sendMessage', content: 'loop forever', model: 'test-model' },
+        postMessage
+      );
+
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'streamError' }));
+      expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'streamEnd' }));
+      // 5 iterations max
+      expect(mockClient.chatStream).toHaveBeenCalledTimes(5);
+    });
+
     it('should pass TOOL_DEFINITIONS in the API request when toolExecutor is provided', async () => {
       mockClient.chatStream.mockReturnValue(
         createMockStream([
