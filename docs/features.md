@@ -16,7 +16,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Syntax-highlighted code blocks | Code blocks with language-aware syntax highlighting | 1 |
 | :white_check_mark: | Copy code button | One-click copy on code blocks | 1 |
 | :white_check_mark: | Insert at cursor | Insert code block content at the current editor cursor | 1 |
-| :construction: | Apply to file | Apply code block as an edit to the referenced file | 1 |
+| :white_check_mark: | Apply to file | Apply code block as a WorkspaceEdit to the referenced or user-selected file; inline diff for ≤1 hunk, native diff editor for 2+ hunks | 1 |
 | :white_check_mark: | Cancel generation | Stop button to abort in-flight streaming responses | 1 |
 | :white_check_mark: | Multi-line input | Shift+Enter for newlines, Enter to submit | 1 |
 | :white_check_mark: | Empty state guidance | Welcome screen with API key hint or quick-start suggestions | 1 |
@@ -115,7 +115,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 118 tests across 14 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 132 tests across 15 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -162,10 +162,10 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 
 | Status | Feature | Why now | Effort |
 |--------|---------|---------|--------|
-| :construction: | **Apply to file** | Completes the core code-editing loop — users can insert code but not apply it to the file | S |
-| :construction: | **Diff preview & approval** | Required safety gate before Apply to file ships — prevents silent overwrites | S |
-| :construction: | **Context menu actions** | Right-click selected code → Explain / Fix / Improve — highest-frequency use case missing from the editor | S |
-| :construction: | **Custom instructions file** | Load `.openrouter-instructions.md` / `.cursorrules` as a persistent system prompt — immediate productivity gain for teams | S |
+| :white_check_mark: | ~~Apply to file~~ | Fixed — Apply button on code blocks; inline diff for ≤1 hunk, native diff editor for 2+ hunks | S |
+| :white_check_mark: | ~~Diff preview & approval~~ | Fixed — inline DiffView with Apply/Discard; native diff + notification for multi-hunk changes | S |
+| :white_check_mark: | ~~Context menu actions~~ | Fixed — Explain/Fix/Improve submenus on selected code, append or new chat | S |
+| :white_check_mark: | ~~Custom instructions file~~ | Fixed — loads .openrouter-instructions.md or .cursorrules from workspace root into system prompt | S |
 | :construction: | **Enriched context on `ready`** | One-line fix: `ready` sends `buildContext()` instead of `buildEnrichedContext()` — the rich LSP context is silently dropped on panel open | XS |
 | :construction: | **inlineSuggest kill switch** | Inline provider should respect `editor.inlineSuggest.enabled` — one guard clause | XS |
 | :construction: | **Retry with backoff** | Exponential backoff for 429/5xx — prevents hard failures on transient rate limits | XS |
