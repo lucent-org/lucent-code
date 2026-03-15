@@ -189,9 +189,6 @@ describe('InlineCompletionProvider', () => {
 
     expect(result.items).toHaveLength(0);
     expect(mockFetch).not.toHaveBeenCalled();
-
-    // Restore the original mock implementation so subsequent tests are unaffected
-    vi.mocked(workspace.getConfiguration).mockRestore();
   });
 
   it('should return empty when no model configured', async () => {
