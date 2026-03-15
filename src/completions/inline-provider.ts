@@ -26,6 +26,10 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
   ): Promise<vscode.InlineCompletionList> {
     const emptyResult = new vscode.InlineCompletionList([]);
 
+    if (vscode.workspace.getConfiguration('editor').get<boolean>('inlineSuggest.enabled', true) === false) {
+      return emptyResult;
+    }
+
     const model = this.settings.completionsModel || this.settings.chatModel;
     if (!model) {
       return emptyResult;

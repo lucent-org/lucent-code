@@ -66,12 +66,22 @@ describe('InlineCompletionProvider', () => {
   let provider: InlineCompletionProvider;
   let client: OpenRouterClient;
   let settings: Settings;
+  let mockDocument: any;
+  let mockPosition: any;
+  let mockToken: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     client = new OpenRouterClient(() => Promise.resolve('sk-test'));
     settings = new Settings();
     provider = new InlineCompletionProvider(client, settings);
+    mockDocument = {
+      getText: () => 'function hello() {\n  \n}',
+      languageId: 'typescript',
+      uri: { toString: () => 'file:///test.ts' },
+    };
+    mockPosition = { line: 1, character: 2 };
+    mockToken = { isCancellationRequested: false, onCancellationRequested: vi.fn() };
   });
 
   it('should return completions from the API', async () => {
@@ -150,6 +160,38 @@ describe('InlineCompletionProvider', () => {
 
     const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(fetchBody.model).toBe('test/model');
+  });
+
+  it('should return empty list when editor.inlineSuggest.enabled is false', async () => {
+    const { workspace } = await import('vscode');
+    (workspace.getConfiguration as any).mockImplementation((section: string) => ({
+      get: (key: string, defaultValue?: unknown) => {
+        if (section === 'editor' && key === 'inlineSuggest.enabled') return false;
+        const vals: Record<string, unknown> = {
+          'completions.model': 'test/model',
+          'completions.triggerMode': 'manual',
+          'completions.debounceMs': 300,
+          'completions.maxContextLines': 100,
+          'chat.model': 'fallback/model',
+          'chat.temperature': 0.7,
+          'chat.maxTokens': 4096,
+        };
+        return vals[`${section}.${key}`] ?? vals[key] ?? defaultValue;
+      },
+    }));
+
+    const result = await provider.provideInlineCompletionItems(
+      mockDocument,
+      mockPosition,
+      {} as any,
+      mockToken
+    );
+
+    expect(result.items).toHaveLength(0);
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    // Restore the original mock implementation so subsequent tests are unaffected
+    vi.mocked(workspace.getConfiguration).mockRestore();
   });
 
   it('should return empty when no model configured', async () => {
