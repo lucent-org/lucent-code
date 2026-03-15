@@ -69,9 +69,14 @@ export class MessageHandler {
     const capabilities = this.contextBuilder.getCapabilities();
     const contextPrompt = this.contextBuilder.formatEnrichedPrompt(context, capabilities);
 
+    const customInstructions = this.contextBuilder.getCustomInstructions();
     const systemMessage: ChatMessage = {
       role: 'system',
-      content: `You are a helpful coding assistant integrated into VSCode. You have access to the user's current editor context.\n\n${contextPrompt}`,
+      content: [
+        'You are a helpful coding assistant integrated into VSCode. You have access to the user\'s current editor context.',
+        customInstructions ? `\n\n## Project Instructions:\n${customInstructions}` : '',
+        `\n\n${contextPrompt}`,
+      ].join(''),
     };
 
     this.conversationMessages.push({ role: 'user', content });

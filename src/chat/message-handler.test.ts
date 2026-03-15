@@ -88,6 +88,7 @@ describe('MessageHandler', () => {
     buildEnrichedContext: ReturnType<typeof vi.fn>;
     formatEnrichedPrompt: ReturnType<typeof vi.fn>;
     getCapabilities: ReturnType<typeof vi.fn>;
+    getCustomInstructions: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     setChatModel: ReturnType<typeof vi.fn>;
@@ -131,6 +132,7 @@ describe('MessageHandler', () => {
       buildEnrichedContext: vi.fn(() => Promise.resolve(mockContext)),
       formatEnrichedPrompt: vi.fn(() => 'formatted context'),
       getCapabilities: vi.fn(() => undefined),
+      getCustomInstructions: vi.fn(() => undefined),
     };
 
     mockSettings = {

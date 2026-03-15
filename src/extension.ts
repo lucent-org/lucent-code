@@ -12,13 +12,20 @@ import { CapabilityDetector } from './lsp/capability-detector';
 import { EditorToolExecutor } from './lsp/editor-tools';
 import { ConversationHistory } from './chat/history';
 import { NotificationService } from './core/notifications';
+import { InstructionsLoader } from './core/instructions-loader';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
   const auth = new AuthManager(context.secrets);
   const settings = new Settings();
   const client = new OpenRouterClient(() => auth.getApiKey());
   const contextBuilder = new ContextBuilder();
+
+  // Set up instructions loader
+  const instructionsLoader = new InstructionsLoader();
+  await instructionsLoader.load();
+  instructionsLoader.watch();
+  contextBuilder.setInstructionsLoader(instructionsLoader);
 
   // Set up code intelligence
   const codeIntelligence = new CodeIntelligence();
@@ -117,6 +124,7 @@ export function activate(context: vscode.ExtensionContext) {
     dispose: () => {
       auth.dispose();
       completionProvider.dispose();
+      instructionsLoader.dispose();
     },
   });
 }
