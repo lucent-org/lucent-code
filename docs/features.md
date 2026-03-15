@@ -153,3 +153,48 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :construction: | deactivate cleanup | Empty `deactivate()` — should abort in-flight requests and clean up | Review |
 | :construction: | Apply to file | Code block "Apply to file" action not yet implemented | Phase 1 |
 | :construction: | Import conversations | Import conversations from JSON file | Phase 4 |
+
+---
+
+## Backlog — Future Features (inspired by kilocode)
+
+Features observed in [kilocode](https://github.com/Kilo-Org/kilocode) that would add meaningful value to OpenRouter Chat.
+
+### Editor Integration
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| :construction: | Context menu actions | Right-click selected code → Explain / Fix / Improve — sends selection + intent as a new chat message |
+| :construction: | Generate commit message | AI-generated git commit message from staged diff, accessible via SCM panel context menu |
+| :construction: | Add terminal output to context | Button or context menu to include current terminal output in the next chat message |
+
+### Context & Instructions
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| :construction: | Custom instructions file | Load a project-level `.openrouter-instructions.md` (or `.cursorrules`) as a persistent system prompt addition |
+| :construction: | Image attachments | Attach images (screenshots, diagrams) to chat messages for multi-modal models |
+| :construction: | Drag-and-drop files | Drag files from the Explorer into the chat input to attach or include their contents as context |
+
+### Chat UX
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| :construction: | Multiple chat sessions | Tabbed or panel-based multi-session UI — run parallel conversations without losing history |
+| :construction: | Slash commands | `/fix`, `/explain`, `/test` etc. — project-defined or built-in slash commands in the chat input |
+| :construction: | Task completion notification | VSCode notification (and optional sound) when a long-running streaming response finishes |
+
+### Provider & Model
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| :construction: | Custom OpenAI-compatible providers | Configure additional providers (Ollama, LM Studio, Azure OpenAI) alongside OpenRouter with custom base URLs and headers |
+
+### Advanced / Agentic
+
+| Status | Feature | Description |
+|--------|---------|-------------|
+| :construction: | MCP server integration | Register and invoke Model Context Protocol servers from within the chat — extends tool-use beyond built-in editor tools |
+| :construction: | Git worktree isolation | Each agentic chat session operates on its own git worktree branch, preventing cross-contamination during parallel tasks |
+| :construction: | Semantic codebase search | Vector-index the workspace so the LLM can search by meaning rather than exact text — useful for large repos |
+| :construction: | Diff preview & approval | Show a unified diff of proposed file edits and require explicit user approval before applying any change |
