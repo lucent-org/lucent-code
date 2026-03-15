@@ -65,6 +65,36 @@
       {
         "command": "openRouterChat.focusChat",
         "title": "OpenRouter Chat: Focus Chat Panel"
+      },
+      {
+        "command": "openRouterChat.explainCode",
+        "title": "Explain (Add to Chat)",
+        "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.explainCodeNew",
+        "title": "Explain (New Chat)",
+        "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.fixCode",
+        "title": "Fix (Add to Chat)",
+        "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.fixCodeNew",
+        "title": "Fix (New Chat)",
+        "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.improveCode",
+        "title": "Improve (Add to Chat)",
+        "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.improveCodeNew",
+        "title": "Improve (New Chat)",
+        "category": "OpenRouter Chat"
       }
     ],
     "configuration": {
@@ -135,7 +165,30 @@
         "key": "ctrl+shift+l",
         "mac": "cmd+shift+l"
       }
-    ]
+    ],
+    "submenus": [
+      {
+        "id": "openRouterChat.editorContext",
+        "label": "OpenRouter Chat"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "openRouterChat.editorContext",
+          "when": "editorHasSelection",
+          "group": "navigation@100"
+        }
+      ],
+      "openRouterChat.editorContext": [
+        { "command": "openRouterChat.explainCode", "group": "1_explain@1" },
+        { "command": "openRouterChat.explainCodeNew", "group": "1_explain@2" },
+        { "command": "openRouterChat.fixCode", "group": "2_fix@1" },
+        { "command": "openRouterChat.fixCodeNew", "group": "2_fix@2" },
+        { "command": "openRouterChat.improveCode", "group": "3_improve@1" },
+        { "command": "openRouterChat.improveCodeNew", "group": "3_improve@2" }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
