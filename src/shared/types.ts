@@ -94,7 +94,8 @@ export type ExtensionMessage =
   | { type: 'conversationLoaded'; conversation: Conversation }
   | { type: 'conversationSaved'; id: string; title: string }
   | { type: 'conversationTitled'; id: string; title: string }
-  | { type: 'triggerSend'; content: string; newChat: boolean };
+  | { type: 'triggerSend'; content: string; newChat: boolean }
+  | { type: 'showDiff'; lines: DiffLine[]; filename: string; fileUri: string };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; model: string }
@@ -106,7 +107,16 @@ export type WebviewMessage =
   | { type: 'listConversations' }
   | { type: 'loadConversation'; id: string }
   | { type: 'deleteConversation'; id: string }
-  | { type: 'exportConversation'; id: string; format: 'json' | 'markdown' };
+  | { type: 'exportConversation'; id: string; format: 'json' | 'markdown' }
+  | { type: 'applyToFile'; code: string; language: string; filename?: string }
+  | { type: 'confirmApply'; fileUri: string };
+
+// ---- Diff types ----
+
+export interface DiffLine {
+  type: 'context' | 'added' | 'removed';
+  content: string;
+}
 
 // ---- Code context ----
 
