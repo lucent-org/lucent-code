@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -147,9 +147,10 @@ describe('OpenRouterClient', () => {
     it('should throw on API error', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        text: () => Promise.resolve('Server error'),
+        status: 400,
+        statusText: 'Bad Request',
+        headers: { get: () => null },
+        text: () => Promise.resolve('Bad request'),
       });
 
       const generator = client.chatStream({
@@ -157,7 +158,7 @@ describe('OpenRouterClient', () => {
         messages: [{ role: 'user', content: 'Hi' }],
       });
 
-      await expect(generator.next()).rejects.toThrow('OpenRouter API error (500)');
+      await expect(generator.next()).rejects.toThrow('OpenRouter API error (400)');
     });
 
     it('should stop when it encounters [DONE] marker', async () => {
@@ -236,6 +237,164 @@ describe('OpenRouterClient', () => {
       await expect(
         noKeyClient.listModels()
       ).rejects.toThrow('No API key configured');
+    });
+  });
+
+  describe('withRetry', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('retries on 429 and succeeds on second attempt', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: { get: () => null },
+          text: () => Promise.resolve('Rate limited'),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 'gen-1', choices: [], usage: {} }),
+        });
+
+      const promise = client.chat({
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+
+      // Advance timers to skip the backoff delay
+      await vi.runAllTimersAsync();
+
+      await expect(promise).resolves.toBeDefined();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries on 500 and succeeds', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: { get: () => null },
+          text: () => Promise.resolve('Server error'),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 'gen-1', choices: [], usage: {} }),
+        });
+
+      const promise = client.chat({
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).resolves.toBeDefined();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does NOT retry on 400', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: { get: () => null },
+        text: () => Promise.resolve('Bad request'),
+      });
+
+      await expect(
+        client.chat({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })
+      ).rejects.toThrow('OpenRouter API error (400)');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('exhausts retries and throws after 4 total attempts', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: { get: () => null },
+        text: () => Promise.resolve('Service unavailable'),
+      });
+
+      const promise = client.chat({
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+      // Prevent unhandled rejection while timers run
+      promise.catch(() => {});
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).rejects.toThrow('OpenRouter API error (503)');
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('respects Retry-After header on 429', async () => {
+      const retryAfterSeconds = 2;
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: { get: (name: string) => name.toLowerCase() === 'retry-after' ? String(retryAfterSeconds) : null },
+          text: () => Promise.resolve('Rate limited'),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ id: 'gen-1', choices: [], usage: {} }),
+        });
+
+      // Spy on setTimeout to capture delay values
+      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+      const promise = client.chat({
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+
+      await vi.runAllTimersAsync();
+      await promise;
+
+      // The delay used should be 2000ms (from Retry-After: 2)
+      const delayArgs = setTimeoutSpy.mock.calls.map(call => call[1]);
+      expect(delayArgs.some(d => d === retryAfterSeconds * 1000)).toBe(true);
+    });
+
+    it('aborts during backoff sleep', async () => {
+      const controller = new AbortController();
+
+      // chatStream accepts a signal, so use it to test abort propagation
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        headers: { get: () => null },
+        text: () => Promise.resolve('Service unavailable'),
+      });
+
+      const gen = client.chatStream(
+        { model: 'anthropic/claude-sonnet-4', messages: [{ role: 'user', content: 'Hi' }] },
+        controller.signal
+      );
+
+      // Start the generator — it will hit 503, then start sleeping
+      const promise = gen.next();
+      // Suppress unhandled rejection while we set up assertions
+      promise.catch(() => {});
+
+      // Abort during the backoff sleep, then advance timers
+      controller.abort();
+      await vi.runAllTimersAsync();
+
+      await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+      // Should not have retried after abort — only 1 fetch call
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 });
