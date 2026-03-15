@@ -11,11 +11,12 @@ interface ContentPart {
   type: 'text' | 'code';
   content: string;
   language?: string;
+  filename?: string;
 }
 
 function parseContent(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
-  const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+  const codeBlockRegex = /```([\w]*)([^\n]*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match;
 
@@ -23,7 +24,9 @@ function parseContent(content: string): ContentPart[] {
     if (match.index > lastIndex) {
       parts.push({ type: 'text', content: content.slice(lastIndex, match.index) });
     }
-    parts.push({ type: 'code', content: match[2].trim(), language: match[1] || undefined });
+    const language = match[1] || undefined;
+    const filename = match[2].trim() || undefined;
+    parts.push({ type: 'code', content: match[3].trim(), language, filename });
     lastIndex = match.index + match[0].length;
   }
 
@@ -47,7 +50,7 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
               when={part.type === 'code'}
               fallback={<span innerHTML={formatText(part.content)} />}
             >
-              <CodeBlock code={part.content} language={part.language} />
+              <CodeBlock code={part.content} language={part.language} filename={part.filename} />
             </Show>
           )}
         </For>
