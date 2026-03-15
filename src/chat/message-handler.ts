@@ -219,7 +219,7 @@ export class MessageHandler {
   }
 
   private handleCancel(): void {
-    this.abortController?.abort();
+    this.abort();
   }
 
   private async handleGetModels(postMessage: (msg: ExtensionMessage) => void): Promise<void> {

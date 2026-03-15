@@ -39,6 +39,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const notifications = new NotificationService();
   messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
+  const handler = messageHandler;
 
   // Set up webview message handling
   const setupWebviewMessaging = () => {
@@ -47,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       const postMessage = (msg: unknown) => webview.postMessage(msg);
-      await messageHandler!.handleMessage(message, postMessage);
+      await handler.handleMessage(message, postMessage);
     });
   };
 
@@ -85,7 +86,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('openRouterChat.newChat', () => {
-      messageHandler!.handleMessage({ type: 'newChat' }, () => {});
+      handler.handleMessage({ type: 'newChat' }, () => {});
     })
   );
 
