@@ -54,12 +54,18 @@ export class MessageHandler {
       case 'exportConversation':
         await this.handleExportConversation(message.id, message.format, postMessage);
         break;
-      case 'ready':
+      case 'ready': {
         this.pendingApply.clear();
         await this.handleGetModels(postMessage);
-        const context = this.contextBuilder.buildContext();
+        let context;
+        try {
+          context = await this.contextBuilder.buildEnrichedContext();
+        } catch {
+          context = this.contextBuilder.buildContext();
+        }
         postMessage({ type: 'contextUpdate', context });
         break;
+      }
       case 'applyToFile':
         await this.handleApplyToFile(message.code, message.language, message.filename, postMessage);
         break;

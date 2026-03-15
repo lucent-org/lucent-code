@@ -123,6 +123,7 @@ describe('MessageHandler', () => {
   };
   let postMessage: ReturnType<typeof vi.fn>;
   let mockContext: CodeContext;
+  let mockEnrichedContext: CodeContext;
   let mockModels: OpenRouterModel[];
 
   beforeEach(() => {
@@ -136,6 +137,18 @@ describe('MessageHandler', () => {
         cursorLine: 0,
         cursorCharacter: 0,
       },
+    };
+
+    mockEnrichedContext = {
+      activeFile: {
+        uri: 'file:///test.ts',
+        languageId: 'typescript',
+        content: 'const x = 1;',
+        cursorLine: 0,
+        cursorCharacter: 0,
+      },
+      definitions: [],
+      diagnostics: [],
     };
 
     mockModels = [
@@ -155,7 +168,7 @@ describe('MessageHandler', () => {
     mockContextBuilder = {
       buildContext: vi.fn().mockReturnValue(mockContext),
       formatForPrompt: vi.fn().mockReturnValue('formatted context'),
-      buildEnrichedContext: vi.fn(() => Promise.resolve(mockContext)),
+      buildEnrichedContext: vi.fn().mockResolvedValue(mockEnrichedContext),
       formatEnrichedPrompt: vi.fn(() => 'formatted context'),
       getCapabilities: vi.fn(() => undefined),
       getCustomInstructions: vi.fn(() => undefined),
@@ -252,7 +265,7 @@ describe('MessageHandler', () => {
   });
 
   describe('ready', () => {
-    it('should call getModels and post contextUpdate', async () => {
+    it('should call getModels and post contextUpdate with enriched context', async () => {
       await handler.handleMessage({ type: 'ready' }, postMessage);
 
       expect(mockClient.listModels).toHaveBeenCalledOnce();
@@ -260,11 +273,19 @@ describe('MessageHandler', () => {
         type: 'modelsLoaded',
         models: mockModels,
       });
-      expect(mockContextBuilder.buildContext).toHaveBeenCalled();
+      expect(mockContextBuilder.buildEnrichedContext).toHaveBeenCalled();
       expect(postMessage).toHaveBeenCalledWith({
         type: 'contextUpdate',
-        context: mockContext,
+        context: mockEnrichedContext,
       });
+    });
+
+    it('should fall back to basic context when buildEnrichedContext throws', async () => {
+      mockContextBuilder.buildEnrichedContext.mockRejectedValueOnce(new Error('LSP unavailable'));
+      await handler.handleMessage({ type: 'ready' }, postMessage);
+      expect(postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'contextUpdate' })
+      );
     });
   });
 
