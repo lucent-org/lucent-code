@@ -404,7 +404,7 @@ export class MessageHandler {
       const doc = await vscode.workspace.openTextDocument(fileUri);
       const fullRange = new vscode.Range(
         new vscode.Position(0, 0),
-        new vscode.Position(doc.lineCount, 0)
+        new vscode.Position(doc.lineCount, 0) // intentional: VSCode clamps to end of document
       );
       edit.replace(fileUri, fullRange, code);
     } catch {

@@ -625,6 +625,7 @@ describe('MessageHandler', () => {
       );
 
       expect(vscode.window.showOpenDialog).toHaveBeenCalled();
+      expect(postMessage).not.toHaveBeenCalled();
     });
 
     it('should apply file on confirmApply', async () => {
