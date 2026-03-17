@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Dark background -->
+  <rect width="128" height="128" rx="16" fill="#0d0d1a"/>
+
+  <!-- Radial gradient glow -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="15%"  stop-color="#e0e7ff" stop-opacity="0.9"/>
+      <stop offset="40%"  stop-color="#a78bfa" stop-opacity="0.55"/>
+      <stop offset="65%"  stop-color="#38bdf8" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0d0d1a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ring1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#a78bfa" stop-opacity="0"/>
+      <stop offset="85%"  stop-color="#a78bfa" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ring2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0"/>
+      <stop offset="85%"  stop-color="#38bdf8" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Outer atmospheric halo rings -->
+  <circle cx="64" cy="64" r="54" fill="url(#ring2)"/>
+  <circle cx="64" cy="64" r="42" fill="url(#ring1)"/>
+
+  <!-- Main glow body -->
+  <circle cx="64" cy="64" r="46" fill="url(#glow)"/>
+
+  <!-- Bright inner core -->
+  <circle cx="64" cy="64" r="10" fill="#ffffff" opacity="0.92"/>
+  <!-- Hot centre point -->
+  <circle cx="64" cy="64" r="5"  fill="#ffffff"/>
+</svg>
