@@ -110,6 +110,7 @@ describe('MessageHandler', () => {
   let handler: MessageHandler;
   let mockClient: {
     chatStream: ReturnType<typeof vi.fn>;
+    chat: ReturnType<typeof vi.fn>;
     listModels: ReturnType<typeof vi.fn>;
   };
   let mockContextBuilder: {
@@ -166,6 +167,7 @@ describe('MessageHandler', () => {
 
     mockClient = {
       chatStream: vi.fn(),
+      chat: vi.fn(),
       listModels: vi.fn().mockResolvedValue(mockModels),
     };
 
@@ -567,6 +569,31 @@ describe('MessageHandler', () => {
       const callArgs = mockClient.chatStream.mock.calls[0][0];
       // system + new user only = 2
       expect(callArgs.messages).toHaveLength(2);
+    });
+
+    it('strips ContentPart[] to plain text when auto-titling', async () => {
+      // Arrange: chatStream returns stop so the stream completes and triggers autoTitle
+      mockClient.chatStream.mockImplementation(async function* () {
+        yield { choices: [{ delta: { content: 'response' }, finish_reason: 'stop' }] };
+      });
+      mockClient.chat.mockResolvedValue({
+        choices: [{ message: { content: 'A title', role: 'assistant' }, finish_reason: 'stop' }],
+      });
+
+      const imgUrl = 'data:image/png;base64,abc123';
+
+      // Act: send a message with an image (triggers autoTitle after 2nd save — user + assistant)
+      await handlerWithHistory.handleMessage(
+        { type: 'sendMessage', content: 'describe this image', images: [imgUrl], model: 'gpt-4o' },
+        postMessage
+      );
+
+      // Assert: autoTitle was called (client.chat was called)
+      expect(mockClient.chat).toHaveBeenCalled();
+      const autoTitleCall = mockClient.chat.mock.calls[0][0];
+      const userMsg = autoTitleCall.messages.find((m: any) => m.role === 'user');
+      expect(typeof userMsg.content).toBe('string');
+      expect(userMsg.content).toBe('describe this image');
     });
   });
 
