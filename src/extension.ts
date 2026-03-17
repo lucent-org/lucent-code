@@ -38,6 +38,34 @@ export async function activate(context: vscode.ExtensionContext) {
   const history = new ConversationHistory(context.globalStorageUri);
 
   const notifications = new NotificationService();
+
+  // Auth status bar item
+  const authStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
+  authStatusBar.command = 'openRouterChat.authMenu';
+  context.subscriptions.push(authStatusBar);
+
+  const updateAuthStatus = async () => {
+    const isAuthed = await auth.isAuthenticated();
+    if (isAuthed) {
+      authStatusBar.text = '$(key) OpenRouter';
+      authStatusBar.tooltip = 'OpenRouter: Signed in — click to manage';
+      authStatusBar.backgroundColor = undefined;
+    } else {
+      authStatusBar.text = '$(warning) OpenRouter: No API key';
+      authStatusBar.tooltip = 'OpenRouter: Not signed in — click to set up';
+      authStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    }
+    authStatusBar.show();
+  };
+
+  // Update status bar on auth changes
+  context.subscriptions.push(
+    auth.onDidChangeAuth(() => updateAuthStatus())
+  );
+
+  // Set initial state
+  updateAuthStatus();
+
   messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
   const handler = messageHandler;
   handler.onStreamEnd = () => {
@@ -122,6 +150,33 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('openRouterChat.focusChat', () => {
       vscode.commands.executeCommand('openRouterChat.chatView.focus');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.signOut', async () => {
+      await auth.signOut();
+      vscode.window.showInformationMessage('Signed out of OpenRouter.');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.authMenu', async () => {
+      const isAuthed = await auth.isAuthenticated();
+      const options = isAuthed
+        ? ['Set API Key', 'Sign in with OAuth', 'Sign out']
+        : ['Set API Key', 'Sign in with OAuth'];
+
+      const choice = await vscode.window.showQuickPick(options, {
+        placeHolder: isAuthed ? 'OpenRouter: Signed in' : 'OpenRouter: Not signed in',
+      });
+
+      if (choice === 'Set API Key') auth.promptForApiKey();
+      else if (choice === 'Sign in with OAuth') auth.startOAuth();
+      else if (choice === 'Sign out') {
+        await auth.signOut();
+        vscode.window.showInformationMessage('Signed out of OpenRouter.');
+      }
     })
   );
 

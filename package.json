@@ -104,6 +104,16 @@
         "command": "openRouterChat.improveCodeNew",
         "title": "Improve (New Chat)",
         "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.signOut",
+        "title": "Sign Out",
+        "category": "OpenRouter Chat"
+      },
+      {
+        "command": "openRouterChat.authMenu",
+        "title": "Manage Authentication",
+        "category": "OpenRouter Chat"
       }
     ],
     "configuration": {
