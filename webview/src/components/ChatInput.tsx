@@ -14,6 +14,17 @@ const MENTION_SOURCES: MentionSource[] = [
   { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
 ];
 
+interface Attachment {
+  id: string;
+  name: string;
+  kind: 'image' | 'text';
+  data: string;
+  mimeType: string;
+  error?: string;
+}
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
 interface ChatInputProps {
   onSend: (content: string, images: string[]) => void;
   onCancel: () => void;
@@ -26,17 +37,6 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [showMentions, setShowMentions] = createSignal(false);
   const [mentionFilter, setMentionFilter] = createSignal('');
   const [isResolvingMention, setIsResolvingMention] = createSignal(false);
-
-  interface Attachment {
-    id: string;
-    name: string;
-    kind: 'image' | 'text';
-    data: string;
-    mimeType: string;
-    error?: string;
-  }
-
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
   const [attachments, setAttachments] = createSignal<Attachment[]>([]);
 
