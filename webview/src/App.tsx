@@ -86,16 +86,18 @@ const App: Component = () => {
   };
 
   const handleResolveMention = (type: string): Promise<string | null> => {
+    const requestType = `get${type.charAt(0).toUpperCase() + type.slice(1)}Output` as 'getTerminalOutput';
+    const responseType = `${type}Output` as 'terminalOutput';
     return new Promise((resolve) => {
       const handler = (event: MessageEvent) => {
         const msg = event.data as { type: string; content?: string | null };
-        if (msg.type === 'terminalOutput') {
+        if (msg.type === responseType) {
           window.removeEventListener('message', handler);
           resolve(msg.content ?? null);
         }
       };
       window.addEventListener('message', handler);
-      vscode.postMessage({ type: 'getTerminalOutput' });
+      vscode.postMessage({ type: requestType });
       setTimeout(() => {
         window.removeEventListener('message', handler);
         resolve(null);

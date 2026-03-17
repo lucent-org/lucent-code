@@ -21,6 +21,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [input, setInput] = createSignal('');
   const [showMentions, setShowMentions] = createSignal(false);
   const [mentionFilter, setMentionFilter] = createSignal('');
+  const [isResolvingMention, setIsResolvingMention] = createSignal(false);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -56,15 +57,20 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const selectMention = async (source: MentionSource) => {
     setShowMentions(false);
+    setIsResolvingMention(true);
     const value = input();
     const lastAt = value.lastIndexOf('@');
     const beforeAt = lastAt !== -1 ? value.slice(0, lastAt) : value;
 
-    const content = await props.onResolveMention(source.id);
-    if (content) {
-      setInput(`${beforeAt}<${source.id} output>\n${content}\n</${source.id} output> `);
-    } else {
-      setInput(`${beforeAt}[${source.label}: not available] `);
+    try {
+      const content = await props.onResolveMention(source.id);
+      if (content) {
+        setInput(`${beforeAt}<${source.id} output>\n${content}\n</${source.id} output> `);
+      } else {
+        setInput(`${beforeAt}[${source.label}: not available] `);
+      }
+    } finally {
+      setIsResolvingMention(false);
     }
   };
 
@@ -101,7 +107,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           onKeyDown={handleKeyDown}
           placeholder="Ask about your code... Type @ for context"
           rows={3}
-          disabled={props.isStreaming}
+          disabled={props.isStreaming || isResolvingMention()}
         />
       </div>
       <div class="chat-input-actions">
