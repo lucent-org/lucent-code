@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock vscode module
+vi.mock('fs', () => ({
+  writeFileSync: vi.fn(),
+}));
+
 vi.mock('vscode', () => ({
   workspace: {
     getConfiguration: vi.fn(() => ({
@@ -757,6 +761,69 @@ describe('MessageHandler', () => {
       await sendPromise;
 
       expect(onStreamEnd).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('large output offloading', () => {
+    let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
+    let handler: MessageHandler;
+
+    beforeEach(() => {
+      mockToolExecutor = { execute: vi.fn() };
+      handler = new MessageHandler(
+        mockClient as unknown as OpenRouterClient,
+        mockContextBuilder as unknown as ContextBuilder,
+        mockSettings as unknown as Settings,
+        mockToolExecutor as unknown as EditorToolExecutor,
+      );
+    });
+
+    it('truncates tool output longer than 8000 chars', async () => {
+      const longOutput = 'x'.repeat(9000);
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'search_files', arguments: '{"pattern":"**/*.ts"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: longOutput });
+
+      await handler.handleMessage(
+        { type: 'sendMessage', content: 'find ts files', model: 'gpt-4' },
+        () => {}
+      );
+
+      // The second chatStream call receives the tool result — check it was truncated
+      const secondCallMessages = mockClient.chatStream.mock.calls[1][0].messages;
+      const toolResultMsg = secondCallMessages.find((m: any) => m.role === 'tool');
+      expect(toolResultMsg.content).toContain('[Output truncated');
+      expect(toolResultMsg.content.length).toBeLessThan(longOutput.length);
+    });
+
+    it('does not truncate output under 8000 chars', async () => {
+      const shortOutput = 'x'.repeat(100);
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'search_files', arguments: '{"pattern":"**/*.ts"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: shortOutput });
+
+      await handler.handleMessage(
+        { type: 'sendMessage', content: 'find ts files', model: 'gpt-4' },
+        () => {}
+      );
+
+      const secondCallMessages = mockClient.chatStream.mock.calls[1][0].messages;
+      const toolResultMsg = secondCallMessages.find((m: any) => m.role === 'tool');
+      expect(toolResultMsg.content).toBe(shortOutput);
     });
   });
 

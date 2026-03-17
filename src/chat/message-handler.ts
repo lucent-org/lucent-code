@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import * as Diff from 'diff';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
@@ -167,7 +170,9 @@ export class MessageHandler {
             this.conversationMessages.push({
               role: 'tool',
               tool_call_id: tc.id,
-              content: result.success ? (result.message ?? 'Done') : `Error: ${result.error}`,
+              content: this.truncateToolOutput(
+                result.success ? (result.message ?? 'Done') : `Error: ${result.error}`
+              ),
             });
           }
           continue;
@@ -310,6 +315,18 @@ export class MessageHandler {
     } catch {
       // Silently fail — title stays as default
     }
+  }
+
+  private truncateToolOutput(content: string): string {
+    const LIMIT = 8000;
+    if (content.length <= LIMIT) return content;
+
+    const tmpFile = path.join(os.tmpdir(), `openrouter-tool-${Date.now()}.txt`);
+    try {
+      fs.writeFileSync(tmpFile, content, 'utf8');
+    } catch { /* best effort */ }
+
+    return `${content.slice(0, LIMIT)}\n\n[Output truncated: ${content.length.toLocaleString()} chars. Showing first 8,000.\nFull result saved to: ${tmpFile}]`;
   }
 
   private async handleApplyToFile(
