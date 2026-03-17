@@ -190,7 +190,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | :white_check_mark: | **OAuth token management** | Refresh + revocation needed for the OAuth flow to be production-ready | M |
 | :white_check_mark: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
 | :white_check_mark: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
-| :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
+| :white_check_mark: | **Add terminal output to context** | `>_` button adds terminal output as a removable chip; prepended as `<terminal output>` XML on send | S |
 | :white_check_mark: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
 | :white_check_mark: | **Premium web search** | Optional Tavily API key in settings for higher-quality search results than DuckDuckGo | XS |
 | :white_check_mark: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
