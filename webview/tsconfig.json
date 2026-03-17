@@ -10,7 +10,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "paths": {
+      "@shared": ["../src/shared/types"]
+    }
   },
   "include": ["src/**/*"]
 }

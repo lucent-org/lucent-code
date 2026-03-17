@@ -1,26 +1,12 @@
 import { createSignal, createRoot } from 'solid-js';
 import { getVsCodeApi } from '../utils/vscode-api';
 import type { DiffLine } from '../components/DiffView';
+import type { ConversationSummary, OpenRouterModel, Conversation } from '@shared';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
-}
-
-export interface Model {
-  id: string;
-  name: string;
-  context_length: number;
-  pricing: { prompt: string; completion: string };
-}
-
-export interface ConversationSummary {
-  id: string;
-  title: string;
-  model: string;
-  messageCount: number;
-  updatedAt: string;
 }
 
 interface DiffState {
@@ -31,7 +17,7 @@ interface DiffState {
 
 function createChatStore() {
   const [messages, setMessages] = createSignal<ChatMessage[]>([]);
-  const [models, setModels] = createSignal<Model[]>([]);
+  const [models, setModels] = createSignal<OpenRouterModel[]>([]);
   const [selectedModel, setSelectedModel] = createSignal<string>('');
   const [isStreaming, setIsStreaming] = createSignal(false);
   const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
@@ -104,7 +90,7 @@ function createChatStore() {
     });
   }
 
-  function handleModelsLoaded(modelList: Model[]) {
+  function handleModelsLoaded(modelList: OpenRouterModel[]) {
     setModels(modelList);
     if (!selectedModel() && modelList.length > 0) {
       setSelectedModel(modelList[0].id);
@@ -120,12 +106,14 @@ function createChatStore() {
     setConversations(list);
   }
 
-  function handleConversationLoaded(conversation: { id: string; title: string; messages: Array<{ role: string; content: string }> }) {
+  function handleConversationLoaded(conversation: Conversation) {
     setCurrentConversationId(conversation.id);
-    setMessages(conversation.messages.map((m) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })));
+    setMessages(conversation.messages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })));
     setShowConversationList(false);
   }
 
