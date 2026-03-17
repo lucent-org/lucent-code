@@ -122,4 +122,68 @@ describe('ConversationHistory', () => {
     const result = await history.load('conv-1234567890-abc123');
     expect(result).toBeUndefined();
   });
+
+  describe('importFromJson', () => {
+    it('imports a valid conversation with a new ID', async () => {
+      const source = JSON.stringify({
+        id: 'conv-original-id',
+        title: 'Imported Chat',
+        model: 'gpt-4',
+        messages: [
+          { role: 'user', content: 'Hello' },
+          { role: 'assistant', content: 'Hi!' },
+        ],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+
+      const imported = await history.importFromJson(source);
+      expect(imported.id).not.toBe('conv-original-id'); // new ID
+      expect(imported.title).toBe('Imported Chat');
+      expect(imported.model).toBe('gpt-4');
+      expect(imported.messages).toHaveLength(2);
+
+      // Verify it was saved to disk
+      const loaded = await history.load(imported.id);
+      expect(loaded).toBeDefined();
+      expect(loaded!.title).toBe('Imported Chat');
+    });
+
+    it('throws on invalid JSON', async () => {
+      await expect(history.importFromJson('not-json')).rejects.toThrow();
+    });
+
+    it('throws when title is missing', async () => {
+      const json = JSON.stringify({
+        id: 'x', model: 'gpt-4', messages: [],
+        createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+      await expect(history.importFromJson(json)).rejects.toThrow('Invalid conversation: missing title');
+    });
+
+    it('throws when model is missing', async () => {
+      const json = JSON.stringify({
+        id: 'x', title: 'Test', messages: [],
+        createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+      await expect(history.importFromJson(json)).rejects.toThrow('Invalid conversation: missing model');
+    });
+
+    it('throws when messages is not an array', async () => {
+      const json = JSON.stringify({
+        id: 'x', title: 'Test', model: 'gpt-4', messages: 'bad',
+        createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+      await expect(history.importFromJson(json)).rejects.toThrow('Invalid conversation: messages must be an array');
+    });
+
+    it('throws when a message has invalid role', async () => {
+      const json = JSON.stringify({
+        id: 'x', title: 'Test', model: 'gpt-4',
+        messages: [{ role: 'system', content: 'bad' }],
+        createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+      await expect(history.importFromJson(json)).rejects.toThrow('Invalid conversation: message role must be user or assistant');
+    });
+  });
 });

@@ -93,6 +93,41 @@ export class ConversationHistory {
     return parts.join('\n');
   }
 
+  async importFromJson(json: string): Promise<Conversation> {
+    let data: unknown;
+    try {
+      data = JSON.parse(json);
+    } catch {
+      throw new Error('Invalid JSON');
+    }
+
+    const raw = data as Record<string, unknown>;
+    if (typeof raw.title !== 'string') throw new Error('Invalid conversation: missing title');
+    if (typeof raw.model !== 'string') throw new Error('Invalid conversation: missing model');
+    if (!Array.isArray(raw.messages)) throw new Error('Invalid conversation: messages must be an array');
+    for (const msg of raw.messages as unknown[]) {
+      const m = msg as Record<string, unknown>;
+      if (m.role !== 'user' && m.role !== 'assistant') {
+        throw new Error('Invalid conversation: message role must be user or assistant');
+      }
+    }
+
+    const conversation: Conversation = {
+      id: this.generateId(),
+      title: raw.title as string,
+      model: raw.model as string,
+      messages: (raw.messages as Array<{ role: string; content: string }>).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: String(m.content ?? ''),
+      })),
+      createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.save(conversation);
+    return conversation;
+  }
+
   private getFilePath(id: string): string {
     // Sanitize: only allow alphanumeric, hyphens, and underscores
     const sanitized = id.replace(/[^a-zA-Z0-9\-_]/g, '');
