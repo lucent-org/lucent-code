@@ -1,9 +1,9 @@
 {
-  "name": "openrouter-chat",
-  "displayName": "OpenRouter Chat",
-  "description": "Chat with any AI model via OpenRouter — Copilot-like experience with chat panel and inline completions",
+  "name": "lucent-code",
+  "displayName": "Lucent Code",
+  "description": "The only VS Code AI that uses your language server — not text search. Chat, completions, and code intelligence in one.",
   "version": "0.1.0",
-  "publisher": "openrouter-chat",
+  "publisher": "lucentcode",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -12,15 +12,22 @@
   "keywords": [
     "ai",
     "chat",
-    "openrouter",
-    "copilot",
+    "lsp",
+    "code-intelligence",
     "completions",
-    "code-intelligence"
+    "openrouter",
+    "inline-completions",
+    "semantic",
+    "all-in-one",
+    "chat-assistant",
+    "copilot-alternative",
+    "language-server"
   ],
   "galleryBanner": {
-    "color": "#1a1a2e",
+    "color": "#0d0d1a",
     "theme": "dark"
   },
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -34,115 +41,115 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "openrouter-chat",
-          "title": "OpenRouter Chat",
+          "id": "lucent-code",
+          "title": "Lucent Code",
           "icon": "$(comment-discussion)"
         }
       ]
     },
     "views": {
-      "openrouter-chat": [
+      "lucent-code": [
         {
           "type": "webview",
-          "id": "openRouterChat.chatView",
+          "id": "lucentCode.chatView",
           "name": "Chat"
         }
       ]
     },
     "commands": [
       {
-        "command": "openRouterChat.setApiKey",
+        "command": "lucentCode.setApiKey",
         "title": "Set API Key",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.importConversation",
+        "command": "lucentCode.importConversation",
         "title": "Import Conversation",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.newChat",
+        "command": "lucentCode.newChat",
         "title": "New Chat",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.triggerCompletion",
+        "command": "lucentCode.triggerCompletion",
         "title": "Trigger Inline Completion",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.focusChat",
+        "command": "lucentCode.focusChat",
         "title": "Focus Chat Panel",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.explainCode",
+        "command": "lucentCode.explainCode",
         "title": "Explain (Add to Chat)",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.explainCodeNew",
+        "command": "lucentCode.explainCodeNew",
         "title": "Explain (New Chat)",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.fixCode",
+        "command": "lucentCode.fixCode",
         "title": "Fix (Add to Chat)",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.fixCodeNew",
+        "command": "lucentCode.fixCodeNew",
         "title": "Fix (New Chat)",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.improveCode",
+        "command": "lucentCode.improveCode",
         "title": "Improve (Add to Chat)",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.improveCodeNew",
+        "command": "lucentCode.improveCodeNew",
         "title": "Improve (New Chat)",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.signOut",
+        "command": "lucentCode.signOut",
         "title": "Sign Out",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       },
       {
-        "command": "openRouterChat.authMenu",
+        "command": "lucentCode.authMenu",
         "title": "Manage Authentication",
-        "category": "OpenRouter Chat"
+        "category": "Lucent Code"
       }
     ],
     "configuration": {
-      "title": "OpenRouter Chat",
+      "title": "Lucent Code",
       "properties": {
-        "openRouterChat.chat.model": {
+        "lucentCode.chat.model": {
           "type": "string",
           "default": "",
           "description": "Default model ID for chat (e.g., 'anthropic/claude-sonnet-4'). Leave empty to select manually."
         },
-        "openRouterChat.chat.temperature": {
+        "lucentCode.chat.temperature": {
           "type": "number",
           "default": 0.7,
           "minimum": 0,
           "maximum": 2,
           "description": "Temperature for chat responses"
         },
-        "openRouterChat.chat.maxTokens": {
+        "lucentCode.chat.maxTokens": {
           "type": "number",
           "default": 4096,
           "minimum": 1,
           "description": "Maximum tokens for chat responses"
         },
-        "openRouterChat.completions.model": {
+        "lucentCode.completions.model": {
           "type": "string",
           "default": "",
           "description": "Model ID for inline completions (e.g., 'anthropic/claude-haiku-4-5-20251001'). Leave empty to use the chat model."
         },
-        "openRouterChat.completions.triggerMode": {
+        "lucentCode.completions.triggerMode": {
           "type": "string",
           "enum": [
             "auto",
@@ -151,14 +158,14 @@
           "default": "auto",
           "description": "Trigger mode for inline completions: 'auto' (suggest while typing) or 'manual' (only via keyboard shortcut)"
         },
-        "openRouterChat.completions.debounceMs": {
+        "lucentCode.completions.debounceMs": {
           "type": "number",
           "default": 300,
           "minimum": 100,
           "maximum": 2000,
           "description": "Debounce delay in milliseconds for auto-trigger mode"
         },
-        "openRouterChat.completions.maxContextLines": {
+        "lucentCode.completions.maxContextLines": {
           "type": "number",
           "default": 100,
           "minimum": 10,
@@ -169,59 +176,59 @@
     },
     "keybindings": [
       {
-        "command": "openRouterChat.triggerCompletion",
+        "command": "lucentCode.triggerCompletion",
         "key": "alt+\\",
         "when": "editorTextFocus"
       },
       {
-        "command": "openRouterChat.newChat",
+        "command": "lucentCode.newChat",
         "key": "ctrl+shift+n",
         "mac": "cmd+shift+n",
-        "when": "openRouterChat.chatView.visible"
+        "when": "lucentCode.chatView.visible"
       },
       {
-        "command": "openRouterChat.focusChat",
+        "command": "lucentCode.focusChat",
         "key": "ctrl+shift+l",
         "mac": "cmd+shift+l"
       }
     ],
     "submenus": [
       {
-        "id": "openRouterChat.editorContext",
-        "label": "OpenRouter Chat"
+        "id": "lucentCode.editorContext",
+        "label": "Lucent Code"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "submenu": "openRouterChat.editorContext",
+          "submenu": "lucentCode.editorContext",
           "when": "editorHasSelection",
           "group": "navigation@100"
         }
       ],
-      "openRouterChat.editorContext": [
+      "lucentCode.editorContext": [
         {
-          "command": "openRouterChat.explainCode",
+          "command": "lucentCode.explainCode",
           "group": "1_explain@1"
         },
         {
-          "command": "openRouterChat.explainCodeNew",
+          "command": "lucentCode.explainCodeNew",
           "group": "1_explain@2"
         },
         {
-          "command": "openRouterChat.fixCode",
+          "command": "lucentCode.fixCode",
           "group": "2_fix@1"
         },
         {
-          "command": "openRouterChat.fixCodeNew",
+          "command": "lucentCode.fixCodeNew",
           "group": "2_fix@2"
         },
         {
-          "command": "openRouterChat.improveCode",
+          "command": "lucentCode.improveCode",
           "group": "3_improve@1"
         },
         {
-          "command": "openRouterChat.improveCodeNew",
+          "command": "lucentCode.improveCodeNew",
           "group": "3_improve@2"
         }
       ]
