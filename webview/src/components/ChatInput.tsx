@@ -1,18 +1,70 @@
-import { Component, createSignal, Show } from 'solid-js';
+import { Component, createSignal, Show, For } from 'solid-js';
+
+interface MentionSource {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const MENTION_SOURCES: MentionSource[] = [
+  { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal' },
+];
 
 interface ChatInputProps {
   onSend: (content: string) => void;
   onCancel: () => void;
   isStreaming: boolean;
+  onResolveMention: (type: string) => Promise<string | null>;
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
   const [input, setInput] = createSignal('');
+  const [showMentions, setShowMentions] = createSignal(false);
+  const [mentionFilter, setMentionFilter] = createSignal('');
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Escape') {
+      setShowMentions(false);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && !showMentions()) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleInput = (e: Event) => {
+    const value = (e.currentTarget as HTMLTextAreaElement).value;
+    setInput(value);
+
+    // Detect @ trigger — only open at start or after a space
+    const lastAt = value.lastIndexOf('@');
+    if (lastAt !== -1 && (lastAt === 0 || value[lastAt - 1] === ' ')) {
+      const after = value.slice(lastAt + 1);
+      // Only show if no space after @
+      if (!after.includes(' ')) {
+        setMentionFilter(after.toLowerCase());
+        setShowMentions(true);
+        return;
+      }
+    }
+    setShowMentions(false);
+  };
+
+  const filteredSources = () =>
+    MENTION_SOURCES.filter((s) => s.label.toLowerCase().includes(mentionFilter()));
+
+  const selectMention = async (source: MentionSource) => {
+    setShowMentions(false);
+    const value = input();
+    const lastAt = value.lastIndexOf('@');
+    const beforeAt = lastAt !== -1 ? value.slice(0, lastAt) : value;
+
+    const content = await props.onResolveMention(source.id);
+    if (content) {
+      setInput(`${beforeAt}<${source.id} output>\n${content}\n</${source.id} output> `);
+    } else {
+      setInput(`${beforeAt}[${source.label}: not available] `);
     }
   };
 
@@ -26,15 +78,32 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   return (
     <div class="chat-input-container">
-      <textarea
-        class="chat-input"
-        value={input()}
-        onInput={(e) => setInput(e.currentTarget.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Ask about your code..."
-        rows={3}
-        disabled={props.isStreaming}
-      />
+      <div class="chat-input-wrapper">
+        <Show when={showMentions() && filteredSources().length > 0}>
+          <div class="mention-dropdown">
+            <For each={filteredSources()}>
+              {(source) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                >
+                  <span class="mention-item-label">{source.label}</span>
+                  <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <textarea
+          class="chat-input"
+          value={input()}
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask about your code... Type @ for context"
+          rows={3}
+          disabled={props.isStreaming}
+        />
+      </div>
       <div class="chat-input-actions">
         <Show
           when={props.isStreaming}

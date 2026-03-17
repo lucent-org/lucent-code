@@ -416,6 +416,56 @@ body {
   border-color: var(--accent);
 }
 
+/* Mention dropdown */
+.chat-input-wrapper {
+  position: relative;
+}
+
+.mention-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.mention-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  gap: 2px;
+}
+
+.mention-item:hover {
+  background: var(--accent);
+}
+
+.mention-item-label {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--fg-primary);
+}
+
+.mention-item-desc {
+  font-size: 0.8em;
+  color: var(--fg-secondary);
+}
+
+.mention-item:hover .mention-item-label,
+.mention-item:hover .mention-item-desc {
+  color: var(--accent-fg);
+}
+
 .chat-input-actions {
   display: flex;
   justify-content: flex-end;

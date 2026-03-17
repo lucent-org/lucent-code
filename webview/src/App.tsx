@@ -9,9 +9,9 @@ import { getVsCodeApi } from './utils/vscode-api';
 
 const App: Component = () => {
   let messagesEndRef: HTMLDivElement | undefined;
+  const vscode = getVsCodeApi();
 
   onMount(() => {
-    const vscode = getVsCodeApi();
 
     window.addEventListener('message', (event) => {
       const message = event.data;
@@ -85,6 +85,24 @@ const App: Component = () => {
     chatStore.sendMessage(content);
   };
 
+  const handleResolveMention = (type: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const handler = (event: MessageEvent) => {
+        const msg = event.data as { type: string; content?: string | null };
+        if (msg.type === 'terminalOutput') {
+          window.removeEventListener('message', handler);
+          resolve(msg.content ?? null);
+        }
+      };
+      window.addEventListener('message', handler);
+      vscode.postMessage({ type: 'getTerminalOutput' });
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        resolve(null);
+      }, 3000);
+    });
+  };
+
   return (
     <div class="app">
       <div class="toolbar">
@@ -156,6 +174,7 @@ const App: Component = () => {
         onSend={handleSend}
         onCancel={chatStore.cancelRequest}
         isStreaming={chatStore.isStreaming()}
+        onResolveMention={handleResolveMention}
       />
     </div>
   );
