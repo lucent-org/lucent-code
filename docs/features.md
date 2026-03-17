@@ -72,6 +72,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Document symbols | Get file structure via `executeDocumentSymbolProvider` | 3 |
 | :white_check_mark: | Context caching | Brief TTL cache (~5s) to avoid redundant language service calls | 3 |
 | :white_check_mark: | Graceful fallback | Omit context types not supported by the current language | 3 |
+| :white_check_mark: | Grep fallback | Search file contents via regex when LSP returns no results or language has no server | 3 |
+| :white_check_mark: | Glob fallback | Find files by pattern when LSP cannot enumerate files | 3 |
 
 ## Editor Capability Hints
 
@@ -86,6 +88,11 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Tool-use: replace range | LLM can replace a code range | 3 |
 | :construction: | Contextual code actions | Include available quick fixes at cursor in the prompt | 3 |
 | :construction: | Diff preview | Show diff preview for user approval before destructive changes | 3 |
+| :white_check_mark: | Tool-use: search web | LLM can search the web via DuckDuckGo (no API key required) | - |
+| :white_check_mark: | Tool-use: fetch URL | LLM can fetch any URL as Markdown via Jina AI reader (no API key required) | - |
+| :white_check_mark: | Tool-use: HTTP request | LLM can make GET/POST/PUT/DELETE requests to local or remote APIs | - |
+| :white_check_mark: | HITL tool approval | Destructive tool calls show inline approval card in chat; user allows or denies | - |
+| :white_check_mark: | Large output offloading | Tool results over 8,000 chars are truncated; full result saved to tmpfile | - |
 | :white_check_mark: | Language-aware advertising | Only advertise capabilities the current language actually supports | 3 |
 
 ## Settings & Configuration
@@ -115,7 +122,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 156 tests across 15 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 175 tests across 15 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -181,6 +188,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | :white_check_mark: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
 | :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
 | :construction: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
+| :construction: | **Premium web search** | Optional Tavily/Brave/Serper API key in settings for higher-quality search results than DuckDuckGo | XS |
 | :white_check_mark: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
 | :white_check_mark: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
 
