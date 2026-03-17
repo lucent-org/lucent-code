@@ -251,8 +251,23 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             </For>
           </div>
         </Show>
-        <Show when={attachments().length > 0}>
+        <Show when={attachments().length > 0 || terminalContent() !== null || terminalError()}>
           <div class="attachment-chips">
+            <Show when={terminalError()}>
+              <div class="attachment-chip attachment-chip-empty-terminal">
+                <span class="attachment-name">No active terminal</span>
+              </div>
+            </Show>
+            <Show when={terminalContent() !== null}>
+              <div class="attachment-chip attachment-chip--terminal">
+                <span class="attachment-name">&gt;_ Terminal ({terminalContent()!.split('\n').length} lines)</span>
+                <button
+                  class="attachment-remove"
+                  onClick={() => setTerminalContent(null)}
+                  title="Remove"
+                >×</button>
+              </div>
+            </Show>
             <For each={attachments()}>
               {(att) => (
                 <div class={`attachment-chip${att.error ? ' attachment-chip-error' : ''}`}>
@@ -299,6 +314,13 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           title="Attach files"
           disabled={props.isStreaming}
         >📎</button>
+        <button
+          class="attach-button"
+          aria-label="Add terminal output"
+          onClick={() => void handleTerminalButton()}
+          title="Add terminal output"
+          disabled={props.isStreaming || isResolvingMention()}
+        >&gt;_</button>
         <Show
           when={props.isStreaming}
           fallback={
