@@ -250,7 +250,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const message = response.choices[0]?.message?.content?.trim() ?? '';
         if (message) repo.inputBox.value = message;
       } catch (error) {
-        await notifications.handleError(error instanceof Error ? error : new Error(String(error)));
+        await notifications.handleError(error instanceof Error ? error.message : String(error));
       }
     })
   );
