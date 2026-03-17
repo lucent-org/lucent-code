@@ -279,5 +279,15 @@ describe('EditorToolExecutor', () => {
         body: '{"name":"test"}',
       });
     });
+
+    it('returns error on non-ok response', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 500 });
+      const result = await executor.execute('http_request', {
+        method: 'GET',
+        url: 'http://localhost:3000/api/fail',
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('500');
+    });
   });
 });

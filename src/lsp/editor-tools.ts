@@ -362,6 +362,7 @@ export class EditorToolExecutor {
     const body = args.body as string | undefined;
 
     const response = await fetch(url, { method, headers, body });
+    if (!response.ok) return { success: false, error: `HTTP request failed: ${response.status}` };
     const text = await response.text();
     return { success: true, message: JSON.stringify({ status: response.status, body: text }) };
   }
