@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'events';
 
 // These must be declared with vi.hoisted so they're available inside the hoisted vi.mock factory
-const { mockSecretStorage, mockWindow } = vi.hoisted(() => ({
+const { mockSecretStorage, mockWindow, mockFetch } = vi.hoisted(() => ({
   mockSecretStorage: {
     get: vi.fn(),
     store: vi.fn(),
@@ -13,6 +13,7 @@ const { mockSecretStorage, mockWindow } = vi.hoisted(() => ({
     showInformationMessage: vi.fn(),
     showErrorMessage: vi.fn(),
   },
+  mockFetch: vi.fn(),
 }));
 
 // Ensure crypto.subtle is available for PKCE code challenge generation
@@ -33,6 +34,8 @@ if (!globalThis.crypto?.subtle) {
     },
   });
 }
+
+vi.stubGlobal('fetch', mockFetch);
 
 vi.mock('vscode', () => ({
   window: mockWindow,
@@ -140,5 +143,57 @@ describe('AuthManager', () => {
     expect(mockWindow.showErrorMessage).toHaveBeenCalledWith(
       expect.stringContaining('state mismatch')
     );
+  });
+
+  describe('isAuthenticated', () => {
+    it('returns true when API key is stored', async () => {
+      mockSecretStorage.get.mockResolvedValue('sk-test');
+      expect(await auth.isAuthenticated()).toBe(true);
+    });
+
+    it('returns false when no API key is stored', async () => {
+      mockSecretStorage.get.mockResolvedValue(undefined);
+      expect(await auth.isAuthenticated()).toBe(false);
+    });
+  });
+
+  describe('signOut', () => {
+    it('clears the stored key', async () => {
+      mockSecretStorage.get.mockResolvedValue('sk-test');
+      mockFetch.mockResolvedValue({ ok: true });
+
+      await auth.signOut();
+
+      expect(mockSecretStorage.delete).toHaveBeenCalled();
+    });
+
+    it('fires onDidChangeAuth with false', async () => {
+      mockSecretStorage.get.mockResolvedValue('sk-test');
+      mockFetch.mockResolvedValue({ ok: true });
+
+      const listener = vi.fn();
+      auth.onDidChangeAuth(listener);
+      await auth.signOut();
+
+      expect(listener).toHaveBeenCalledWith(false);
+    });
+
+    it('still clears key if revocation request fails (network error)', async () => {
+      mockSecretStorage.get.mockResolvedValue('sk-test');
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      await auth.signOut(); // must not throw
+
+      expect(mockSecretStorage.delete).toHaveBeenCalled();
+    });
+
+    it('is a no-op when not authenticated', async () => {
+      mockSecretStorage.get.mockResolvedValue(undefined);
+
+      await auth.signOut(); // must not throw, must not call fetch
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSecretStorage.delete).not.toHaveBeenCalled();
+    });
   });
 });

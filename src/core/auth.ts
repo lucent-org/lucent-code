@@ -47,6 +47,25 @@ export class AuthManager {
     return this.promptForApiKey();
   }
 
+  async isAuthenticated(): Promise<boolean> {
+    return !!(await this.getApiKey());
+  }
+
+  async signOut(): Promise<void> {
+    const key = await this.getApiKey();
+    if (!key) return;
+
+    // Best-effort server-side revocation — don't block or throw on failure
+    try {
+      await fetch('https://openrouter.ai/api/v1/auth/key', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${key}` },
+      });
+    } catch { /* ignore network errors */ }
+
+    await this.clearApiKey();
+  }
+
   async startOAuth(): Promise<void> {
     const codeVerifier = this.generateCodeVerifier();
     const codeChallenge = await this.generateCodeChallenge(codeVerifier);
