@@ -709,6 +709,38 @@ describe('MessageHandler', () => {
     });
   });
 
+  describe('onStreamEnd callback', () => {
+    it('calls onStreamEnd after a successful stream', async () => {
+      const mockChunks = [
+        { choices: [{ delta: { content: 'hello' }, finish_reason: null }] },
+        { choices: [{ delta: {}, finish_reason: 'stop' }] },
+      ];
+      mockClient.chatStream.mockReturnValueOnce(createMockStream(mockChunks));
+
+      const onStreamEnd = vi.fn();
+      handler.onStreamEnd = onStreamEnd;
+
+      await handler.handleMessage({ type: 'sendMessage', content: 'hi', model: 'gpt-4' }, postMessage);
+
+      expect(onStreamEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call onStreamEnd when the request is aborted', async () => {
+      const abortError = new Error('AbortError');
+      abortError.name = 'AbortError';
+      mockClient.chatStream.mockImplementationOnce(() => {
+        throw abortError;
+      });
+
+      const onStreamEnd = vi.fn();
+      handler.onStreamEnd = onStreamEnd;
+
+      await handler.handleMessage({ type: 'sendMessage', content: 'hi', model: 'gpt-4' }, postMessage);
+
+      expect(onStreamEnd).not.toHaveBeenCalled();
+    });
+  });
+
   describe('tool-use agentic loop', () => {
     let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
     let mockNotifications: { handleError: ReturnType<typeof vi.fn> };
