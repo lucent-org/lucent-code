@@ -39,6 +39,8 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [isResolvingMention, setIsResolvingMention] = createSignal(false);
 
   const [attachments, setAttachments] = createSignal<Attachment[]>([]);
+  const [isDragging, setIsDragging] = createSignal(false);
+  let fileInputRef: HTMLInputElement | undefined;
 
   const handleFiles = (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -66,6 +68,31 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         reader.readAsText(file);
       }
     }
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    // Only clear if leaving the wrapper entirely (not a child)
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) handleFiles(files);
+  };
+
+  const handleFileInputChange = (e: Event) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (files && files.length > 0) handleFiles(files);
+    (e.target as HTMLInputElement).value = ''; // reset so same file can be re-picked
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -145,7 +172,12 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   return (
     <div class="chat-input-container">
-      <div class="chat-input-wrapper">
+      <div
+        class={`chat-input-wrapper${isDragging() ? ' drag-over' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <Show when={showMentions() && filteredSources().length > 0}>
           <div class="mention-dropdown">
             <For each={actionSources()}>
@@ -175,6 +207,28 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             </For>
           </div>
         </Show>
+        <Show when={attachments().length > 0}>
+          <div class="attachment-chips">
+            <For each={attachments()}>
+              {(att) => (
+                <div class={`attachment-chip${att.error ? ' attachment-chip-error' : ''}`}>
+                  <Show when={att.kind === 'image' && !att.error}>
+                    <img class="attachment-thumb" src={att.data} alt={att.name} />
+                  </Show>
+                  <span class="attachment-name" title={att.name}>{att.name}</span>
+                  <Show when={!!att.error}>
+                    <span class="attachment-error">{att.error}</span>
+                  </Show>
+                  <button
+                    class="attachment-remove"
+                    onClick={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                    title="Remove"
+                  >×</button>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
         <textarea
           class="chat-input"
           value={input()}
@@ -186,17 +240,33 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         />
       </div>
       <div class="chat-input-actions">
+        <input
+          ref={fileInputRef}
+          type="file"
+          style="display:none"
+          accept="image/*,.ts,.tsx,.js,.jsx,.py,.go,.rs,.java,.c,.cpp,.cs,.rb,.swift,.kt,.php,.html,.css,.json,.md,.yaml,.toml,.txt"
+          multiple
+          onChange={handleFileInputChange}
+        />
+        <button
+          class="attach-button"
+          onClick={() => fileInputRef?.click()}
+          title="Attach files"
+          disabled={props.isStreaming}
+        >📎</button>
         <Show
           when={props.isStreaming}
           fallback={
-            <button class="send-button" onClick={handleSend} disabled={!input().trim()}>
+            <button
+              class="send-button"
+              onClick={handleSend}
+              disabled={!input().trim() && attachments().filter((a) => !a.error).length === 0}
+            >
               Send
             </button>
           }
         >
-          <button class="cancel-button" onClick={props.onCancel}>
-            Stop
-          </button>
+          <button class="cancel-button" onClick={props.onCancel}>Stop</button>
         </Show>
       </div>
     </div>

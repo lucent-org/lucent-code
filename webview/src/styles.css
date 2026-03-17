@@ -708,3 +708,90 @@ body {
 .tool-call-btn--deny:hover {
   background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
 }
+
+/* Drag-and-drop highlight */
+.chat-input-wrapper.drag-over .chat-input {
+  border-color: var(--accent);
+  outline: 2px dashed var(--accent);
+}
+
+/* Attachment chips */
+.attachment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.8em;
+  max-width: 200px;
+}
+
+.attachment-chip-error {
+  border-color: var(--vscode-errorForeground, #f44);
+}
+
+.attachment-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-error {
+  color: var(--vscode-errorForeground, #f44);
+  flex-shrink: 0;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg-secondary);
+  padding: 0 2px;
+  font-size: 1em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.attachment-remove:hover {
+  color: var(--fg-primary);
+}
+
+/* Paperclip button */
+.attach-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1em;
+  padding: 4px 6px;
+  color: var(--fg-secondary);
+  border-radius: 4px;
+}
+
+.attach-button:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+}
+
+.attach-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
