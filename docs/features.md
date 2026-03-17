@@ -188,11 +188,11 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 |--------|---------|-----|--------|
 | :white_check_mark: | **Import conversations** | Completes the export/import pair — export already ships | S |
 | :white_check_mark: | **OAuth token management** | Refresh + revocation needed for the OAuth flow to be production-ready | M |
-| :construction: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
+| :white_check_mark: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
 | :white_check_mark: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
 | :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
 | :construction: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
-| :construction: | **Premium web search** | Optional Tavily/Brave/Serper API key in settings for higher-quality search results than DuckDuckGo | XS |
+| :white_check_mark: | **Premium web search** | Optional Tavily API key in settings for higher-quality search results than DuckDuckGo | XS |
 | :white_check_mark: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
 | :white_check_mark: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
 
