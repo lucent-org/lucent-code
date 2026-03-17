@@ -58,6 +58,13 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
     <div class={`chat-message ${props.message.role}`}>
       <div class="message-role">{props.message.role === 'user' ? 'You' : 'Assistant'}</div>
       <div class="message-content">
+        <Show when={props.message.role === 'user' && (props.message.images?.length ?? 0) > 0}>
+          <div class="message-images">
+            <For each={props.message.images ?? []}>
+              {(src) => <img class="message-image-thumb" src={src} alt="attachment" />}
+            </For>
+          </div>
+        </Show>
         <For each={parts()}>
           {(part) => (
             <Show
