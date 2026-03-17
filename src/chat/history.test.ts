@@ -142,6 +142,7 @@ describe('ConversationHistory', () => {
       expect(imported.title).toBe('Imported Chat');
       expect(imported.model).toBe('gpt-4');
       expect(imported.messages).toHaveLength(2);
+      expect(imported.createdAt).toBe('2024-01-01T00:00:00.000Z');
 
       // Verify it was saved to disk
       const loaded = await history.load(imported.id);
@@ -150,7 +151,7 @@ describe('ConversationHistory', () => {
     });
 
     it('throws on invalid JSON', async () => {
-      await expect(history.importFromJson('not-json')).rejects.toThrow();
+      await expect(history.importFromJson('not-json')).rejects.toThrow('Invalid JSON');
     });
 
     it('throws when title is missing', async () => {
