@@ -12,73 +12,44 @@
   <!-- Background -->
   <rect width="128" height="128" rx="16" fill="#0d0d1a"/>
 
-  <!-- Left cluster — internal connection traces -->
-  <g stroke="#a78bfa" stroke-width="1" fill="none" opacity="0.18">
-    <line x1="22"  y1="20"  x2="44"  y2="28"/>
-    <line x1="22"  y1="20"  x2="18"  y2="52"/>
-    <line x1="44"  y1="28"  x2="34"  y2="64"/>
-    <line x1="18"  y1="52"  x2="34"  y2="64"/>
-    <line x1="18"  y1="52"  x2="18"  y2="76"/>
-    <line x1="34"  y1="64"  x2="18"  y2="76"/>
-    <line x1="18"  y1="76"  x2="44"  y2="100"/>
-    <line x1="18"  y1="76"  x2="22"  y2="108"/>
-    <line x1="44"  y1="100" x2="22"  y2="108"/>
+  <!-- Left { bracket -->
+  <path
+    d="M 40,20 L 28,20 Q 22,20 22,30 L 22,56 Q 22,64 14,64 Q 22,64 22,72 L 22,98 Q 22,108 28,108 L 40,108"
+    fill="none" stroke="#ffffff" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+
+  <!-- Right } bracket -->
+  <path
+    d="M 88,20 L 100,20 Q 106,20 106,30 L 106,56 Q 106,64 114,64 Q 106,64 106,72 L 106,98 Q 106,108 100,108 L 88,108"
+    fill="none" stroke="#ffffff" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+
+  <!-- Connection traces (7 lines) -->
+  <g stroke="#ffffff" stroke-width="1" fill="none" opacity="0.20">
+    <line x1="52" y1="34" x2="57" y2="52"/>
+    <line x1="76" y1="34" x2="71" y2="52"/>
+    <line x1="57" y1="52" x2="71" y2="52"/>
+    <line x1="57" y1="52" x2="71" y2="76"/>
+    <line x1="57" y1="76" x2="71" y2="76"/>
+    <line x1="57" y1="76" x2="52" y2="94"/>
+    <line x1="71" y1="76" x2="76" y2="94"/>
   </g>
 
-  <!-- Right cluster — internal connection traces -->
-  <g stroke="#a78bfa" stroke-width="1" fill="none" opacity="0.18">
-    <line x1="106" y1="20"  x2="84"  y2="28"/>
-    <line x1="106" y1="20"  x2="110" y2="52"/>
-    <line x1="84"  y1="28"  x2="94"  y2="64"/>
-    <line x1="110" y1="52"  x2="94"  y2="64"/>
-    <line x1="110" y1="52"  x2="110" y2="76"/>
-    <line x1="94"  y1="64"  x2="110" y2="76"/>
-    <line x1="110" y1="76"  x2="84"  y2="100"/>
-    <line x1="110" y1="76"  x2="106" y2="108"/>
-    <line x1="84"  y1="100" x2="106" y2="108"/>
-  </g>
-
-  <!-- Cross-gap traces (cyan, signals crossing between halves) -->
-  <g stroke="#38bdf8" stroke-width="1" fill="none" opacity="0.22">
-    <line x1="44"  y1="28"  x2="58"  y2="58"/>
-    <line x1="34"  y1="64"  x2="58"  y2="58"/>
-    <line x1="58"  y1="58"  x2="70"  y2="70"/>
-    <line x1="70"  y1="70"  x2="94"  y2="64"/>
-    <line x1="84"  y1="28"  x2="70"  y2="70"/>
-    <line x1="44"  y1="100" x2="70"  y2="70"/>
-  </g>
-
-  <!-- Left cluster — outer nodes (electric sky blue) -->
+  <!-- Cyan outer nodes -->
   <g fill="#38bdf8">
-    <circle cx="22"  cy="20"  r="4.5"/>
-    <circle cx="18"  cy="52"  r="4.5"/>
-    <circle cx="18"  cy="76"  r="4.5"/>
-    <circle cx="22"  cy="108" r="4.5"/>
+    <circle cx="52" cy="34" r="4.5"/>
+    <circle cx="76" cy="34" r="4.5"/>
+    <circle cx="52" cy="94" r="4.5"/>
+    <circle cx="76" cy="94" r="4.5"/>
   </g>
 
-  <!-- Left cluster — inner nodes (lavender-purple) -->
+  <!-- Purple lower-centre nodes -->
   <g fill="#a78bfa">
-    <circle cx="44"  cy="28"  r="5.5"/>
-    <circle cx="34"  cy="64"  r="5.5"/>
-    <circle cx="44"  cy="100" r="5.5"/>
+    <circle cx="57" cy="76" r="5.5"/>
+    <circle cx="71" cy="76" r="5.5"/>
   </g>
 
-  <!-- Right cluster — outer nodes (electric sky blue) -->
-  <g fill="#38bdf8">
-    <circle cx="106" cy="20"  r="4.5"/>
-    <circle cx="110" cy="52"  r="4.5"/>
-    <circle cx="110" cy="76"  r="4.5"/>
-    <circle cx="106" cy="108" r="4.5"/>
-  </g>
-
-  <!-- Right cluster — inner nodes (lavender-purple) -->
-  <g fill="#a78bfa">
-    <circle cx="84"  cy="28"  r="5.5"/>
-    <circle cx="94"  cy="64"  r="5.5"/>
-    <circle cx="84"  cy="100" r="5.5"/>
-  </g>
-
-  <!-- Centre nodes — white with glow (float in the bracket gap) -->
-  <circle cx="58" cy="58" r="7" fill="#ffffff" filter="url(#core-glow)"/>
-  <circle cx="70" cy="70" r="7" fill="#ffffff" filter="url(#core-glow)"/>
+  <!-- White glowing upper-centre nodes -->
+  <circle cx="57" cy="52" r="7" fill="#ffffff" filter="url(#core-glow)"/>
+  <circle cx="71" cy="52" r="7" fill="#ffffff" filter="url(#core-glow)"/>
 </svg>
