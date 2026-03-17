@@ -19,6 +19,15 @@ export class MessageHandler {
 
   onStreamEnd?: () => void;
 
+  private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
+
+  private static readonly GATED_TOOLS = new Set([
+    'rename_symbol',
+    'insert_code',
+    'replace_range',
+    'apply_code_action',
+  ]);
+
   constructor(
     private readonly client: OpenRouterClient,
     private readonly contextBuilder: ContextBuilder,
@@ -77,6 +86,14 @@ export class MessageHandler {
       case 'confirmApply':
         await this.handleConfirmApply(message.fileUri);
         break;
+      case 'toolApprovalResponse': {
+        const resolve = this.pendingApprovals.get(message.requestId);
+        if (resolve) {
+          this.pendingApprovals.delete(message.requestId);
+          resolve(message.approved);
+        }
+        break;
+      }
     }
   }
 
@@ -166,6 +183,17 @@ export class MessageHandler {
               });
               continue;
             }
+            if (MessageHandler.GATED_TOOLS.has(tc.function.name)) {
+              const approved = await this.requestToolApproval(tc.function.name, args, postMessage);
+              if (!approved) {
+                this.conversationMessages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: 'User denied this action.',
+                });
+                continue;
+              }
+            }
             const result = await this.toolExecutor.execute(tc.function.name, args);
             this.conversationMessages.push({
               role: 'tool',
@@ -224,6 +252,10 @@ export class MessageHandler {
 
   abort(): void {
     this.abortController?.abort();
+    for (const resolve of this.pendingApprovals.values()) {
+      resolve(false);
+    }
+    this.pendingApprovals.clear();
   }
 
   private handleCancel(): void {
@@ -315,6 +347,18 @@ export class MessageHandler {
     } catch {
       // Silently fail — title stays as default
     }
+  }
+
+  private requestToolApproval(
+    toolName: string,
+    args: Record<string, unknown>,
+    postMessage: (msg: ExtensionMessage) => void
+  ): Promise<boolean> {
+    const requestId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return new Promise((resolve) => {
+      this.pendingApprovals.set(requestId, resolve);
+      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args });
+    });
   }
 
   private truncateToolOutput(content: string): string {

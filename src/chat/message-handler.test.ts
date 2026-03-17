@@ -827,6 +827,130 @@ describe('MessageHandler', () => {
     });
   });
 
+  describe('HITL tool approval', () => {
+    let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
+    let handler: MessageHandler;
+
+    beforeEach(() => {
+      mockToolExecutor = { execute: vi.fn() };
+      handler = new MessageHandler(
+        mockClient as unknown as OpenRouterClient,
+        mockContextBuilder as unknown as ContextBuilder,
+        mockSettings as unknown as Settings,
+        mockToolExecutor as unknown as EditorToolExecutor,
+      );
+    });
+
+    it('posts toolApprovalRequest for gated tools and executes on approval', async () => {
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'rename_symbol', arguments: '{"uri":"file:///test.ts","line":0,"character":0,"newName":"foo"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'Renamed' });
+
+      const postMessages: ExtensionMessage[] = [];
+
+      // Start without awaiting — we need to interject with the approval response
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'rename foo', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      // Poll until approval request is posted
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+      // Respond with approval
+      await handler.handleMessage(
+        { type: 'toolApprovalResponse', requestId: req.requestId, approved: true },
+        () => {}
+      );
+
+      await sendPromise;
+
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith('rename_symbol', expect.any(Object));
+    });
+
+    it('skips execution and sends "User denied" when denied', async () => {
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'insert_code', arguments: '{"uri":"file:///test.ts","line":0,"character":0,"code":"// hello"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      const postMessages: ExtensionMessage[] = [];
+
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'insert comment', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+      await handler.handleMessage(
+        { type: 'toolApprovalResponse', requestId: req.requestId, approved: false },
+        () => {}
+      );
+
+      await sendPromise;
+
+      expect(mockToolExecutor.execute).not.toHaveBeenCalled();
+      // Verify the tool result sent to LLM says denied
+      const secondCallMessages = mockClient.chatStream.mock.calls[1][0].messages;
+      const toolResultMsg = secondCallMessages.find((m: any) => m.role === 'tool');
+      expect(toolResultMsg.content).toContain('denied');
+    });
+
+    it('does not require approval for non-gated tools (format_document)', async () => {
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'formatted' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'Formatted' });
+
+      const postMessages: ExtensionMessage[] = [];
+      await handler.handleMessage(
+        { type: 'sendMessage', content: 'format file', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+      expect(mockToolExecutor.execute).toHaveBeenCalledWith('format_document', expect.any(Object));
+    });
+
+    it('clears pending approvals when abort() is called', () => {
+      const resolved: boolean[] = [];
+      const requestId = 'test-id';
+      (handler as any).pendingApprovals.set(requestId, (v: boolean) => resolved.push(v));
+
+      handler.abort();
+
+      expect(resolved).toEqual([false]);
+      expect((handler as any).pendingApprovals.size).toBe(0);
+    });
+  });
+
   describe('tool-use agentic loop', () => {
     let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
     let mockNotifications: { handleError: ReturnType<typeof vi.fn> };
