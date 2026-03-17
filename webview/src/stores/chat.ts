@@ -6,6 +6,7 @@ import type { ConversationSummary, OpenRouterModel, Conversation } from '@shared
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_approval';
   content: string;
+  images?: string[];           // base64 data URLs for thumbnail display
   isStreaming?: boolean;
   toolApproval?: {
     requestId: string;
@@ -33,17 +34,18 @@ function createChatStore() {
 
   const vscode = getVsCodeApi();
 
-  function sendMessage(content: string) {
-    if (!content.trim() || isStreaming()) return;
+  function sendMessage(content: string, images: string[] = []) {
+    if (!content.trim() && images.length === 0) return;
+    if (isStreaming()) return;
 
     const model = selectedModel();
     if (!model) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content }]);
+    setMessages((prev) => [...prev, { role: 'user', content, images: images.length ? images : undefined }]);
     setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
     setIsStreaming(true);
 
-    vscode.postMessage({ type: 'sendMessage', content, model });
+    vscode.postMessage({ type: 'sendMessage', content, images: images.length ? images : undefined, model });
   }
 
   function cancelRequest() {
@@ -141,9 +143,21 @@ function createChatStore() {
   function handleConversationLoaded(conversation: Conversation) {
     setCurrentConversationId(conversation.id);
     setMessages(conversation.messages
-      .filter((m): m is { role: 'user' | 'assistant'; content: string; tool_calls?: unknown; tool_call_id?: string } =>
+      .filter((m): m is { role: 'user' | 'assistant'; content: string | import('@shared').ContentPart[]; tool_calls?: unknown; tool_call_id?: string } =>
         m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({ role: m.role, content: m.content })));
+      .map((m) => {
+        if (typeof m.content === 'string') {
+          return { role: m.role, content: m.content };
+        }
+        const text = m.content
+          .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+          .map((p) => p.text)
+          .join('');
+        const images = m.content
+          .filter((p): p is { type: 'image_url'; image_url: { url: string } } => p.type === 'image_url')
+          .map((p) => p.image_url.url);
+        return { role: m.role, content: text, images: images.length ? images : undefined };
+      }));
     setShowConversationList(false);
   }
 

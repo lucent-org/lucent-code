@@ -81,8 +81,8 @@ const App: Component = () => {
     });
   });
 
-  const handleSend = (content: string) => {
-    chatStore.sendMessage(content);
+  const handleSend = (content: string, images: string[] = []) => {
+    chatStore.sendMessage(content, images);
   };
 
   const handleResolveMention = (type: string): Promise<string | null> => {
