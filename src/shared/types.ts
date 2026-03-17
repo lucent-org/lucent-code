@@ -16,7 +16,7 @@ export interface OpenRouterModel {
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: ToolCall[];
   tool_call_id?: string;
 }
@@ -38,6 +38,10 @@ export interface ToolCall {
     arguments: string;
   };
 }
+
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
 
 export interface ChatRequest {
   model: string;
@@ -100,7 +104,7 @@ export type ExtensionMessage =
   | { type: 'terminalOutput'; content: string | null };
 
 export type WebviewMessage =
-  | { type: 'sendMessage'; content: string; model: string }
+  | { type: 'sendMessage'; content: string; images?: string[]; model: string }
   | { type: 'cancelRequest' }
   | { type: 'getModels' }
   | { type: 'setModel'; modelId: string }

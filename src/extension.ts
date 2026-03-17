@@ -14,6 +14,7 @@ import { ConversationHistory } from './chat/history';
 import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
 import { TerminalBuffer } from './core/terminal-buffer';
+import { messageText } from './core/message-text';
 
 interface GitExtension {
   getAPI(version: 1): GitAPI;
@@ -255,7 +256,7 @@ export async function activate(context: vscode.ExtensionContext) {
           temperature: 0.3,
           max_tokens: 100,
         });
-        const message = response.choices[0]?.message?.content?.trim() ?? '';
+        const message = messageText(response.choices[0]?.message?.content ?? '').trim();
         if (message) repo.inputBox.value = message;
       } catch (error) {
         await notifications.handleError(error instanceof Error ? error.message : String(error));

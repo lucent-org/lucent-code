@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import * as path from 'path';
 import type { Conversation, ConversationSummary, ChatMessage } from '../shared/types';
+import { messageText } from '../core/message-text';
 
 export class ConversationHistory {
   private readonly conversationsDir: string;
@@ -87,8 +88,8 @@ export class ConversationHistory {
     parts.push(`# ${conv.title}`);
     parts.push(`\n*Model: ${conv.model} | ${new Date(conv.createdAt).toLocaleString()}*\n`);
     for (const msg of conv.messages) {
-      if (msg.role === 'user') parts.push(`\n**User:**\n\n${msg.content}\n`);
-      else if (msg.role === 'assistant') parts.push(`\n**Assistant:**\n\n${msg.content}\n`);
+      if (msg.role === 'user') parts.push(`\n**User:**\n\n${messageText(msg.content)}\n`);
+      else if (msg.role === 'assistant') parts.push(`\n**Assistant:**\n\n${messageText(msg.content)}\n`);
     }
     return parts.join('\n');
   }

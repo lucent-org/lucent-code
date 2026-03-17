@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
+import { messageText } from '../core/message-text';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
@@ -345,7 +346,7 @@ export class MessageHandler {
         max_tokens: 20,
       });
 
-      const title = response.choices[0]?.message?.content?.trim();
+      const title = messageText(response.choices[0]?.message?.content ?? '').trim();
       if (title && this.history) {
         conversation.title = title;
         await this.history.save(conversation);

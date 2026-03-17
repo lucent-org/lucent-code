@@ -3,6 +3,7 @@ import { OpenRouterClient } from '../core/openrouter-client';
 import { Settings } from '../core/settings';
 import { TriggerConfig } from './trigger-config';
 import { buildCompletionPrompt } from './prompt-builder';
+import { messageText } from '../core/message-text';
 
 export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
   private readonly triggerConfig = new TriggerConfig();
@@ -73,7 +74,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
         return emptyResult;
       }
 
-      const completionText = response.choices[0]?.message?.content?.trim();
+      const completionText = messageText(response.choices[0]?.message?.content ?? '').trim();
       if (!completionText) {
         this.statusBarItem.text = '$(sparkle) OpenRouter';
         return emptyResult;
