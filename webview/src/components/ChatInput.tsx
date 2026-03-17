@@ -119,13 +119,19 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   };
 
   const handleTerminalButton = async () => {
-    const content = await props.onResolveMention('terminal');
-    if (content) {
-      setTerminalContent(content);
-      setTerminalError(false);
-    } else {
-      setTerminalError(true);
-      setTimeout(() => setTerminalError(false), 2000);
+    if (isResolvingMention()) return;
+    setIsResolvingMention(true);
+    try {
+      const content = await props.onResolveMention('terminal');
+      if (content) {
+        setTerminalContent(content);
+        setTerminalError(false);
+      } else {
+        setTerminalError(true);
+        setTimeout(() => setTerminalError(false), 2000);
+      }
+    } finally {
+      setIsResolvingMention(false);
     }
   };
 
@@ -205,6 +211,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     setInput('');
     setAttachments([]);
     setTerminalContent(null);
+    setTerminalError(false);
   };
 
   return (
