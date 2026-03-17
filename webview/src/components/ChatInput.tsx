@@ -254,7 +254,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         <Show when={attachments().length > 0 || terminalContent() !== null || terminalError()}>
           <div class="attachment-chips">
             <Show when={terminalError()}>
-              <div class="attachment-chip attachment-chip-empty-terminal">
+              <div class="attachment-chip attachment-chip--empty-terminal">
                 <span class="attachment-name">No active terminal</span>
                 <button
                   class="attachment-remove"

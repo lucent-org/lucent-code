@@ -743,7 +743,7 @@ body {
   border-color: var(--vscode-terminal-foreground, #38bdf8);
 }
 
-.attachment-chip-empty-terminal {
+.attachment-chip--empty-terminal {
   border-color: var(--vscode-errorForeground, #f44);
   animation: fade-out 2s forwards;
 }
