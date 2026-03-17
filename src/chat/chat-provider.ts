@@ -35,6 +35,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return this.webviewView?.webview;
   }
 
+  public get isVisible(): boolean {
+    return this.webviewView?.visible ?? false;
+  }
+
   public postMessageToWebview(message: ExtensionMessage): void {
     if (this.webviewView) {
       this.webviewView.webview.postMessage(message);
