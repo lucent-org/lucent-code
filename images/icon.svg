@@ -1,37 +1,84 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <!-- Dark background -->
-  <rect width="128" height="128" rx="16" fill="#0d0d1a"/>
-
-  <!-- Radial gradient glow -->
   <defs>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
-      <stop offset="15%"  stop-color="#e0e7ff" stop-opacity="0.9"/>
-      <stop offset="40%"  stop-color="#a78bfa" stop-opacity="0.55"/>
-      <stop offset="65%"  stop-color="#38bdf8" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#0d0d1a" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="ring1" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#a78bfa" stop-opacity="0"/>
-      <stop offset="85%"  stop-color="#a78bfa" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="ring2" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0"/>
-      <stop offset="85%"  stop-color="#38bdf8" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
-    </radialGradient>
+    <filter id="core-glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
-  <!-- Outer atmospheric halo rings -->
-  <circle cx="64" cy="64" r="54" fill="url(#ring2)"/>
-  <circle cx="64" cy="64" r="42" fill="url(#ring1)"/>
+  <!-- Background -->
+  <rect width="128" height="128" rx="16" fill="#0d0d1a"/>
 
-  <!-- Main glow body -->
-  <circle cx="64" cy="64" r="46" fill="url(#glow)"/>
+  <!-- Left cluster — internal connection traces -->
+  <g stroke="#a78bfa" stroke-width="1" fill="none" opacity="0.18">
+    <line x1="22"  y1="20"  x2="44"  y2="28"/>
+    <line x1="22"  y1="20"  x2="18"  y2="52"/>
+    <line x1="44"  y1="28"  x2="34"  y2="64"/>
+    <line x1="18"  y1="52"  x2="34"  y2="64"/>
+    <line x1="18"  y1="52"  x2="18"  y2="76"/>
+    <line x1="34"  y1="64"  x2="18"  y2="76"/>
+    <line x1="18"  y1="76"  x2="44"  y2="100"/>
+    <line x1="18"  y1="76"  x2="22"  y2="108"/>
+    <line x1="44"  y1="100" x2="22"  y2="108"/>
+  </g>
 
-  <!-- Bright inner core -->
-  <circle cx="64" cy="64" r="10" fill="#ffffff" opacity="0.92"/>
-  <!-- Hot centre point -->
-  <circle cx="64" cy="64" r="5"  fill="#ffffff"/>
+  <!-- Right cluster — internal connection traces -->
+  <g stroke="#a78bfa" stroke-width="1" fill="none" opacity="0.18">
+    <line x1="106" y1="20"  x2="84"  y2="28"/>
+    <line x1="106" y1="20"  x2="110" y2="52"/>
+    <line x1="84"  y1="28"  x2="94"  y2="64"/>
+    <line x1="110" y1="52"  x2="94"  y2="64"/>
+    <line x1="110" y1="52"  x2="110" y2="76"/>
+    <line x1="94"  y1="64"  x2="110" y2="76"/>
+    <line x1="110" y1="76"  x2="84"  y2="100"/>
+    <line x1="110" y1="76"  x2="106" y2="108"/>
+    <line x1="84"  y1="100" x2="106" y2="108"/>
+  </g>
+
+  <!-- Cross-gap traces (cyan, signals crossing between halves) -->
+  <g stroke="#38bdf8" stroke-width="1" fill="none" opacity="0.22">
+    <line x1="44"  y1="28"  x2="58"  y2="58"/>
+    <line x1="34"  y1="64"  x2="58"  y2="58"/>
+    <line x1="58"  y1="58"  x2="70"  y2="70"/>
+    <line x1="70"  y1="70"  x2="94"  y2="64"/>
+    <line x1="84"  y1="28"  x2="70"  y2="70"/>
+    <line x1="44"  y1="100" x2="70"  y2="70"/>
+  </g>
+
+  <!-- Left cluster — outer nodes (electric sky blue) -->
+  <g fill="#38bdf8">
+    <circle cx="22"  cy="20"  r="4.5"/>
+    <circle cx="18"  cy="52"  r="4.5"/>
+    <circle cx="18"  cy="76"  r="4.5"/>
+    <circle cx="22"  cy="108" r="4.5"/>
+  </g>
+
+  <!-- Left cluster — inner nodes (lavender-purple) -->
+  <g fill="#a78bfa">
+    <circle cx="44"  cy="28"  r="5.5"/>
+    <circle cx="34"  cy="64"  r="5.5"/>
+    <circle cx="44"  cy="100" r="5.5"/>
+  </g>
+
+  <!-- Right cluster — outer nodes (electric sky blue) -->
+  <g fill="#38bdf8">
+    <circle cx="106" cy="20"  r="4.5"/>
+    <circle cx="110" cy="52"  r="4.5"/>
+    <circle cx="110" cy="76"  r="4.5"/>
+    <circle cx="106" cy="108" r="4.5"/>
+  </g>
+
+  <!-- Right cluster — inner nodes (lavender-purple) -->
+  <g fill="#a78bfa">
+    <circle cx="84"  cy="28"  r="5.5"/>
+    <circle cx="94"  cy="64"  r="5.5"/>
+    <circle cx="84"  cy="100" r="5.5"/>
+  </g>
+
+  <!-- Centre nodes — white with glow (float in the bracket gap) -->
+  <circle cx="58" cy="58" r="7" fill="#ffffff" filter="url(#core-glow)"/>
+  <circle cx="70" cy="70" r="7" fill="#ffffff" filter="url(#core-glow)"/>
 </svg>
