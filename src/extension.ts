@@ -96,6 +96,30 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.importConversation', async () => {
+      const picked = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        filters: { 'JSON': ['json'] },
+        openLabel: 'Import Conversation',
+      });
+      if (!picked || picked.length === 0) return;
+
+      try {
+        const bytes = await vscode.workspace.fs.readFile(picked[0]);
+        const json = new TextDecoder().decode(bytes);
+        const imported = await history.importFromJson(json);
+        vscode.window.showInformationMessage(`Conversation imported: "${imported.title}"`);
+        // Refresh conversation list in webview if it's open
+        const conversations = await history.list();
+        chatProvider.postMessageToWebview({ type: 'conversationList', conversations });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Import failed: ${msg}`);
+      }
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('openRouterChat.focusChat', () => {
       vscode.commands.executeCommand('openRouterChat.chatView.focus');
     })

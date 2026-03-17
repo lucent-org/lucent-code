@@ -56,6 +56,11 @@
         "category": "OpenRouter Chat"
       },
       {
+        "command": "openRouterChat.importConversation",
+        "title": "Import Conversation",
+        "category": "OpenRouter Chat"
+      },
+      {
         "command": "openRouterChat.newChat",
         "title": "New Chat",
         "category": "OpenRouter Chat"
