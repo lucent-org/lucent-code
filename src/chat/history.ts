@@ -117,9 +117,9 @@ export class ConversationHistory {
       id: this.generateId(),
       title: raw.title as string,
       model: raw.model as string,
-      messages: (raw.messages as Array<{ role: string; content: string }>).map((m) => ({
+      messages: (raw.messages as Array<{ role: string; content: unknown }>).map((m) => ({
         role: m.role as 'user' | 'assistant',
-        content: String(m.content ?? ''),
+        content: Array.isArray(m.content) ? m.content as ChatMessage['content'] : String(m.content ?? ''),
       })),
       createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
