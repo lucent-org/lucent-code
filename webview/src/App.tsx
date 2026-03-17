@@ -119,10 +119,10 @@ const App: Component = () => {
         <Show when={chatStore.messages().length > 0} fallback={
           <div class="empty-state">
             <div class="empty-state-icon">&#x1F4AC;</div>
-            <div class="empty-state-title">OpenRouter Chat</div>
+            <div class="empty-state-title">Lucent Code</div>
             <div class="empty-state-hint">
               <Show when={chatStore.models().length > 0} fallback={
-                <span>Set your API key to get started.<br/>Use the command palette: <code>OpenRouter Chat: Set API Key</code></span>
+                <span>Set your API key to get started.<br/>Use the command palette: <code>Lucent Code: Set API Key</code></span>
               }>
                 <span>Ask a question about your code, or try one of these:</span>
                 <div class="empty-state-suggestions">
