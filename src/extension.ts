@@ -64,7 +64,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   // Set initial state
-  updateAuthStatus();
+  void updateAuthStatus();
 
   messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
   const handler = messageHandler;
