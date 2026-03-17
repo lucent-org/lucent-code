@@ -90,7 +90,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Tool-use: format document | LLM can trigger document formatting | 3 |
 | :white_check_mark: | Tool-use: insert code | LLM can insert code at a specific position | 3 |
 | :white_check_mark: | Tool-use: replace range | LLM can replace a code range | 3 |
-| :construction: | Contextual code actions | Include available quick fixes at cursor in the prompt | 3 |
+| :white_check_mark: | Contextual code actions | Include available quick fixes at cursor in the prompt | 3 |
 | :construction: | Diff preview | Show diff preview for user approval before destructive changes | 3 |
 | :white_check_mark: | Tool-use: search web | LLM can search the web via DuckDuckGo (no API key required) | - |
 | :white_check_mark: | Tool-use: fetch URL | LLM can fetch any URL as Markdown via Jina AI reader (no API key required) | - |
@@ -191,7 +191,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | :white_check_mark: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
 | :white_check_mark: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
 | :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
-| :construction: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
+| :white_check_mark: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
 | :white_check_mark: | **Premium web search** | Optional Tavily API key in settings for higher-quality search results than DuckDuckGo | XS |
 | :white_check_mark: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
 | :white_check_mark: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
