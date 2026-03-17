@@ -260,7 +260,8 @@
     "watch:webview": "cd webview && npx vite build --watch",
     "dev": "concurrently \"npm run watch:ext\" \"npm run watch:webview\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:icon": "node scripts/generate-icon.mjs"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",
