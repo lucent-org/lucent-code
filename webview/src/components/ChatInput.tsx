@@ -59,6 +59,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const filteredSources = () =>
     MENTION_SOURCES.filter((s) => s.label.toLowerCase().includes(mentionFilter()));
 
+  const actionSources = () => filteredSources().filter((s) => s.kind === 'action');
+  const contextSources = () => filteredSources().filter((s) => s.kind === 'context');
+
   const selectMention = async (source: MentionSource) => {
     setShowMentions(false);
     setIsResolvingMention(true);
@@ -95,40 +98,31 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       <div class="chat-input-wrapper">
         <Show when={showMentions() && filteredSources().length > 0}>
           <div class="mention-dropdown">
-            {(() => {
-              const sources = filteredSources();
-              const actions = sources.filter((s) => s.kind === 'action');
-              const contexts = sources.filter((s) => s.kind === 'context');
-              return (
-                <>
-                  <For each={actions}>
-                    {(source) => (
-                      <button
-                        class="mention-item"
-                        onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
-                      >
-                        <span class="mention-item-label">{source.label}</span>
-                        <span class="mention-item-desc">{source.description}</span>
-                      </button>
-                    )}
-                  </For>
-                  <Show when={actions.length > 0 && contexts.length > 0}>
-                    <div class="mention-group-separator" />
-                  </Show>
-                  <For each={contexts}>
-                    {(source) => (
-                      <button
-                        class="mention-item"
-                        onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
-                      >
-                        <span class="mention-item-label">{source.label}</span>
-                        <span class="mention-item-desc">{source.description}</span>
-                      </button>
-                    )}
-                  </For>
-                </>
-              );
-            })()}
+            <For each={actionSources()}>
+              {(source) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                >
+                  <span class="mention-item-label">{source.label}</span>
+                  <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
+            <Show when={actionSources().length > 0 && contextSources().length > 0}>
+              <div class="mention-group-separator" />
+            </Show>
+            <For each={contextSources()}>
+              {(source) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                >
+                  <span class="mention-item-label">{source.label}</span>
+                  <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
           </div>
         </Show>
         <textarea
