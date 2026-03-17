@@ -115,7 +115,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 142 tests across 15 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 144 tests across 15 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -149,7 +149,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | ~~inlineSuggest kill switch~~ | Fixed — guard clause checks `editor.inlineSuggest.enabled === false` before any API call | Review |
 | :white_check_mark: | ~~Enriched context on ready~~ | Fixed — `ready` handler calls `buildEnrichedContext()` with fallback to `buildContext()` | Review |
 | :construction: | Type duplication | ChatMessage, ConversationSummary, Model defined in both extension and webview | Review |
-| :construction: | Idiomatic scroll-to-bottom | Use Solid.js `createEffect` watching messages instead of imperative calls | Review |
+| :white_check_mark: | ~~Idiomatic scroll-to-bottom~~ | Fixed — `createEffect` watches the messages signal and scrolls to bottom reactively | Review |
 | :white_check_mark: | ~~deactivate cleanup~~ | Fixed — `abort()` method on `MessageHandler`, called from `deactivate()` via module-scope reference | Review |
 
 ---
@@ -178,10 +178,10 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | :construction: | **Import conversations** | Completes the export/import pair — export already ships | S |
 | :construction: | **OAuth token management** | Refresh + revocation needed for the OAuth flow to be production-ready | M |
 | :construction: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
-| :construction: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
+| :white_check_mark: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
 | :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
 | :construction: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
-| :construction: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
+| :white_check_mark: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
 | :construction: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
 
 ### P3 — Later (higher effort or lower urgency)
