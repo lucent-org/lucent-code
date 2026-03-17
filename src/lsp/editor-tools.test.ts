@@ -186,5 +186,11 @@ describe('EditorToolExecutor', () => {
       expect(result.success).toBe(true);
       expect(result.message).toContain('hello');
     });
+
+    it('returns error for invalid regex pattern', async () => {
+      const result = await executor.execute('grep_files', { pattern: '[invalid' });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/invalid regex/i);
+    });
   });
 });
