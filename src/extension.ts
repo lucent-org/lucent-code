@@ -41,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Auth status bar item
   const authStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
-  authStatusBar.command = 'openRouterChat.authMenu';
+  authStatusBar.command = 'lucentCode.authMenu';
   context.subscriptions.push(authStatusBar);
 
   const updateAuthStatus = async () => {
@@ -105,26 +105,26 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register manual trigger command
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.triggerCompletion', () => {
+    vscode.commands.registerCommand('lucentCode.triggerCompletion', () => {
       vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
     })
   );
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.setApiKey', () => {
+    vscode.commands.registerCommand('lucentCode.setApiKey', () => {
       auth.promptForApiKey();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.newChat', () => {
+    vscode.commands.registerCommand('lucentCode.newChat', () => {
       handler.handleMessage({ type: 'newChat' }, () => {});
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.importConversation', async () => {
+    vscode.commands.registerCommand('lucentCode.importConversation', async () => {
       const picked = await vscode.window.showOpenDialog({
         canSelectMany: false,
         filters: { 'JSON': ['json'] },
@@ -148,20 +148,20 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.focusChat', () => {
-      vscode.commands.executeCommand('openRouterChat.chatView.focus');
+    vscode.commands.registerCommand('lucentCode.focusChat', () => {
+      vscode.commands.executeCommand('lucentCode.chatView.focus');
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.signOut', async () => {
+    vscode.commands.registerCommand('lucentCode.signOut', async () => {
       await auth.signOut();
       vscode.window.showInformationMessage('Signed out of OpenRouter.');
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.authMenu', async () => {
+    vscode.commands.registerCommand('lucentCode.authMenu', async () => {
       const isAuthed = await auth.isAuthenticated();
       const options = isAuthed
         ? ['Set API Key', 'Sign in with OAuth', 'Sign out']
@@ -193,17 +193,17 @@ export async function activate(context: vscode.ExtensionContext) {
     const labels = { explain: 'Explain', fix: 'Fix', improve: 'Improve' } as const;
     const content = `${labels[action]} this code:\n\`\`\`${lang}\n${selection}\n\`\`\``;
 
-    await vscode.commands.executeCommand('openRouterChat.chatView.focus');
+    await vscode.commands.executeCommand('lucentCode.chatView.focus');
     chatProvider.postMessageToWebview({ type: 'triggerSend', content, newChat });
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('openRouterChat.explainCode', makeContextAction('explain', false)),
-    vscode.commands.registerCommand('openRouterChat.explainCodeNew', makeContextAction('explain', true)),
-    vscode.commands.registerCommand('openRouterChat.fixCode', makeContextAction('fix', false)),
-    vscode.commands.registerCommand('openRouterChat.fixCodeNew', makeContextAction('fix', true)),
-    vscode.commands.registerCommand('openRouterChat.improveCode', makeContextAction('improve', false)),
-    vscode.commands.registerCommand('openRouterChat.improveCodeNew', makeContextAction('improve', true)),
+    vscode.commands.registerCommand('lucentCode.explainCode', makeContextAction('explain', false)),
+    vscode.commands.registerCommand('lucentCode.explainCodeNew', makeContextAction('explain', true)),
+    vscode.commands.registerCommand('lucentCode.fixCode', makeContextAction('fix', false)),
+    vscode.commands.registerCommand('lucentCode.fixCodeNew', makeContextAction('fix', true)),
+    vscode.commands.registerCommand('lucentCode.improveCode', makeContextAction('improve', false)),
+    vscode.commands.registerCommand('lucentCode.improveCodeNew', makeContextAction('improve', true)),
   );
 
   // Prompt for API key on first activation if not set
@@ -211,7 +211,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!key) {
       vscode.window
         .showInformationMessage(
-          'Welcome to OpenRouter Chat! Set your API key to get started.',
+          'Welcome to Lucent Code! Set your API key to get started.',
           'Set API Key'
         )
         .then((selection) => {

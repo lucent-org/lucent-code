@@ -453,7 +453,7 @@ export class MessageHandler {
     code: string,
     language: string
   ): Promise<void> {
-    vscode.window.setStatusBarMessage('OpenRouter Chat: Opening diff editor...', 3000);
+    vscode.window.setStatusBarMessage('Lucent Code: Opening diff editor...', 3000);
     const proposedDoc = await vscode.workspace.openTextDocument({ content: code, language });
     const filename = fileUri.path.split('/').pop() ?? fileUri.fsPath;
     await vscode.commands.executeCommand('vscode.diff', fileUri, proposedDoc.uri, `Review changes: ${filename}`);

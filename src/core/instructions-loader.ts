@@ -21,7 +21,7 @@ export class InstructionsLoader {
         const bytes = await vscode.workspace.fs.readFile(uri);
         if (bytes.byteLength > MAX_BYTES) {
           vscode.window.showWarningMessage(
-            `OpenRouter Chat: ${filename} exceeds 50 KB and will be ignored.`
+            `Lucent Code: ${filename} exceeds 50 KB and will be ignored.`
           );
           continue;
         }

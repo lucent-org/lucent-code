@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ExtensionMessage } from '../shared/types';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'openRouterChat.chatView';
+  public static readonly viewType = 'lucentCode.chatView';
   private webviewView?: vscode.WebviewView;
   private pendingMessages: ExtensionMessage[] = [];
   public onResolve?: () => void;
@@ -61,7 +61,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};" />
   <link rel="stylesheet" href="${styleUri}" />
-  <title>OpenRouter Chat</title>
+  <title>Lucent Code</title>
 </head>
 <body>
   <div id="root"></div>

@@ -10,7 +10,7 @@ export class NotificationService {
         'Set API Key'
       );
       if (action === 'Set API Key') {
-        vscode.commands.executeCommand('openRouterChat.setApiKey');
+        vscode.commands.executeCommand('lucentCode.setApiKey');
       }
     } else if (lower.includes('429') || lower.includes('rate limit')) {
       vscode.window.showWarningMessage(
@@ -22,7 +22,7 @@ export class NotificationService {
         'Update API Key'
       );
       if (action === 'Update API Key') {
-        vscode.commands.executeCommand('openRouterChat.setApiKey');
+        vscode.commands.executeCommand('lucentCode.setApiKey');
       }
     } else if (lower.includes('fetch failed') || lower.includes('network') || lower.includes('econnrefused')) {
       vscode.window.showErrorMessage(

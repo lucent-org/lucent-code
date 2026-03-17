@@ -19,7 +19,7 @@ export class OpenRouterClient {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://github.com/openrouter-chat/vscode',
-      'X-Title': 'OpenRouter Chat VSCode',
+      'X-Title': 'Lucent Code VSCode',
     };
   }
 

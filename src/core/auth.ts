@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const SECRET_KEY = 'openRouterChat.apiKey';
+const SECRET_KEY = 'lucentCode.apiKey';
 
 export class AuthManager {
   private readonly onDidChangeAuthEmitter = new vscode.EventEmitter<boolean>();
@@ -75,7 +75,7 @@ export class AuthManager {
     this.pendingOAuth = { state, codeVerifier };
 
     const callbackUri = await vscode.env.asExternalUri(
-      vscode.Uri.parse('vscode://openrouter-chat/oauth-callback')
+      vscode.Uri.parse('vscode://lucent-code/oauth-callback')
     );
 
     const params = new URLSearchParams({

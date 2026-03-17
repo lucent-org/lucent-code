@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const SECTION = 'openRouterChat';
+const SECTION = 'lucentCode';
 
 export class Settings {
   private get config() {
