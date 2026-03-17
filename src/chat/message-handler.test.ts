@@ -726,16 +726,35 @@ describe('MessageHandler', () => {
     });
 
     it('does not call onStreamEnd when the request is aborted', async () => {
-      const abortError = new Error('AbortError');
-      abortError.name = 'AbortError';
-      mockClient.chatStream.mockImplementationOnce(() => {
-        throw abortError;
-      });
+      let rejectStream!: (err: Error) => void;
+      mockClient.chatStream.mockReturnValue(
+        (async function* () {
+          yield { choices: [{ delta: { content: 'partial' }, finish_reason: null }] };
+          await new Promise<void>((_resolve, reject) => {
+            rejectStream = reject;
+          });
+        })()
+      );
 
       const onStreamEnd = vi.fn();
       handler.onStreamEnd = onStreamEnd;
 
-      await handler.handleMessage({ type: 'sendMessage', content: 'hi', model: 'gpt-4' }, postMessage);
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'hi', model: 'gpt-4' },
+        postMessage
+      );
+
+      // Wait for the stream to start
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Abort mid-stream
+      handler.abort();
+
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      rejectStream(abortError);
+
+      await sendPromise;
 
       expect(onStreamEnd).not.toHaveBeenCalled();
     });
