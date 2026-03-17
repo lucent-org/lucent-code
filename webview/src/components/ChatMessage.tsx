@@ -2,6 +2,8 @@ import { Component, Show, For, createMemo } from 'solid-js';
 import DOMPurify from 'dompurify';
 import type { ChatMessage as ChatMessageType } from '../stores/chat';
 import CodeBlock from './CodeBlock';
+import ToolCallCard from './ToolCallCard';
+import type { ToolApprovalData } from './ToolCallCard';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -38,6 +40,18 @@ function parseContent(content: string): ContentPart[] {
 }
 
 const ChatMessage: Component<ChatMessageProps> = (props) => {
+  // Render tool approval card inline
+  if (props.message.role === 'tool_approval' && props.message.toolApproval) {
+    return (
+      <ToolCallCard
+        approval={props.message.toolApproval as ToolApprovalData}
+        onRespond={(requestId, approved) => {
+          window.dispatchEvent(new CustomEvent('tool-approval', { detail: { requestId, approved } }));
+        }}
+      />
+    );
+  }
+
   const parts = createMemo(() => parseContent(props.message.content));
 
   return (

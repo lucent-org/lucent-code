@@ -4,9 +4,15 @@ import type { DiffLine } from '../components/DiffView';
 import type { ConversationSummary, OpenRouterModel, Conversation } from '@shared';
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool_approval';
   content: string;
   isStreaming?: boolean;
+  toolApproval?: {
+    requestId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    status: 'pending' | 'approved' | 'denied';
+  };
 }
 
 interface DiffState {
@@ -72,6 +78,32 @@ function createChatStore() {
       }
       return updated;
     });
+  }
+
+  function handleToolApprovalRequest(
+    requestId: string,
+    toolName: string,
+    args: Record<string, unknown>
+  ) {
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'tool_approval' as const,
+        content: '',
+        toolApproval: { requestId, toolName, args, status: 'pending' as const },
+      },
+    ]);
+  }
+
+  function resolveToolApproval(requestId: string, approved: boolean) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.toolApproval?.requestId === requestId
+          ? { ...m, toolApproval: { ...m.toolApproval!, status: approved ? 'approved' : 'denied' } as const }
+          : m
+      )
+    );
+    vscode.postMessage({ type: 'toolApprovalResponse', requestId, approved });
   }
 
   function handleStreamError(error: string) {
@@ -168,6 +200,8 @@ function createChatStore() {
     toggleConversationList,
     diffState,
     setDiffState,
+    handleToolApprovalRequest,
+    resolveToolApproval,
   };
 }
 

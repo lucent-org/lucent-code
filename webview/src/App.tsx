@@ -58,10 +58,20 @@ const App: Component = () => {
             fileUri: message.fileUri,
           });
           break;
+        case 'toolApprovalRequest': {
+          const msg = message as any;
+          chatStore.handleToolApprovalRequest(msg.requestId, msg.toolName, msg.args);
+          break;
+        }
       }
     });
 
     vscode.postMessage({ type: 'ready' });
+
+    window.addEventListener('tool-approval', (e: Event) => {
+      const { requestId, approved } = (e as CustomEvent).detail;
+      chatStore.resolveToolApproval(requestId, approved);
+    });
   });
 
   createEffect(() => {
