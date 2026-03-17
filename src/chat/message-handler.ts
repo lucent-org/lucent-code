@@ -10,6 +10,7 @@ import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS } from '../lsp/editor-tools';
 import { ConversationHistory } from './history';
 import { NotificationService } from '../core/notifications';
+import { TerminalBuffer } from '../core/terminal-buffer';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -34,7 +35,8 @@ export class MessageHandler {
     private readonly settings: Settings,
     private readonly toolExecutor?: EditorToolExecutor,
     private readonly history?: ConversationHistory,
-    private readonly notifications: NotificationService = new NotificationService()
+    private readonly notifications: NotificationService = new NotificationService(),
+    private readonly terminalBuffer?: TerminalBuffer
   ) {}
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -92,6 +94,11 @@ export class MessageHandler {
           this.pendingApprovals.delete(message.requestId);
           resolve(message.approved);
         }
+        break;
+      }
+      case 'getTerminalOutput': {
+        const content = this.terminalBuffer?.getActiveTerminalOutput() ?? null;
+        postMessage({ type: 'terminalOutput', content });
         break;
       }
     }

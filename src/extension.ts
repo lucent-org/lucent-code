@@ -13,6 +13,7 @@ import { EditorToolExecutor } from './lsp/editor-tools';
 import { ConversationHistory } from './chat/history';
 import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
+import { TerminalBuffer } from './core/terminal-buffer';
 
 interface GitExtension {
   getAPI(version: 1): GitAPI;
@@ -48,6 +49,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const history = new ConversationHistory(context.globalStorageUri);
 
   const notifications = new NotificationService();
+  const terminalBuffer = new TerminalBuffer();
 
   // Auth status bar item
   const authStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
@@ -76,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set initial state
   void updateAuthStatus();
 
-  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
+  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer);
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -287,6 +289,7 @@ export async function activate(context: vscode.ExtensionContext) {
       auth.dispose();
       completionProvider.dispose();
       instructionsLoader.dispose();
+      terminalBuffer.dispose();
     },
   });
 }
