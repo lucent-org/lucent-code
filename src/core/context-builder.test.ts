@@ -214,6 +214,24 @@ describe('ContextBuilder', () => {
       const prompt = builder.formatEnrichedPrompt(context);
       expect(prompt).not.toContain('Diagnostics');
     });
+
+    it('includes code actions section when present', () => {
+      const builder = new ContextBuilder();
+      const context: CodeContext = {
+        codeActions: ['Add missing import', 'Extract to function'],
+      };
+      const result = builder.formatEnrichedPrompt(context);
+      expect(result).toContain('Available Code Actions at Cursor');
+      expect(result).toContain('Add missing import');
+      expect(result).toContain('Extract to function');
+    });
+
+    it('omits code actions section when empty', () => {
+      const builder = new ContextBuilder();
+      const context: CodeContext = {};
+      const result = builder.formatEnrichedPrompt(context);
+      expect(result).not.toContain('Available Code Actions');
+    });
   });
 
   describe('buildEnrichedContext — code actions', () => {

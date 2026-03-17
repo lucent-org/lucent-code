@@ -113,7 +113,7 @@ export class ContextBuilder {
       }));
     }
 
-    // Fetch available code actions at cursor
+    // Code actions are independent of LSP — fetch whenever an active file is present.
     try {
       const uri = vscode.Uri.parse(context.activeFile.uri);
       const pos = new vscode.Position(line, char);
