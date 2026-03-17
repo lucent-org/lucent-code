@@ -14,6 +14,16 @@ import { ConversationHistory } from './chat/history';
 import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
 
+interface GitExtension {
+  getAPI(version: 1): GitAPI;
+}
+interface GitAPI {
+  repositories: Array<{
+    diff(staged: boolean): Promise<string>;
+    inputBox: { value: string };
+  }>;
+}
+
 let messageHandler: MessageHandler | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -204,6 +214,45 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('lucentCode.fixCodeNew', makeContextAction('fix', true)),
     vscode.commands.registerCommand('lucentCode.improveCode', makeContextAction('improve', false)),
     vscode.commands.registerCommand('lucentCode.improveCodeNew', makeContextAction('improve', true)),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.generateCommitMessage', async () => {
+      const gitExt = vscode.extensions.getExtension<GitExtension>('vscode.git');
+      if (!gitExt) {
+        vscode.window.showInformationMessage('Git extension not found.');
+        return;
+      }
+      const git = gitExt.exports.getAPI(1);
+      const repo = git.repositories[0];
+      if (!repo) {
+        vscode.window.showInformationMessage('No Git repository found.');
+        return;
+      }
+      const diff = await repo.diff(true);
+      if (!diff.trim()) {
+        vscode.window.showInformationMessage('No staged changes to generate a message from.');
+        return;
+      }
+      const key = await auth.ensureAuthenticated();
+      if (!key) return;
+      const model = settings.chatModel || 'anthropic/claude-haiku-4-5-20251001';
+      try {
+        const response = await client.chat({
+          model,
+          messages: [{
+            role: 'user',
+            content: `Write a concise conventional commit message for this staged diff. Return only the commit message line, no explanation, no markdown.\n\n${diff}`,
+          }],
+          temperature: 0.3,
+          max_tokens: 100,
+        });
+        const message = response.choices[0]?.message?.content?.trim() ?? '';
+        if (message) repo.inputBox.value = message;
+      } catch (error) {
+        await notifications.handleError(error instanceof Error ? error : new Error(String(error)));
+      }
+    })
   );
 
   // Prompt for API key on first activation if not set
