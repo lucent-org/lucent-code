@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased] — Rebrand to Lucent Code
+
+### Changed
+- Extension renamed from **OpenRouter Chat** to **Lucent Code**
+- Publisher ID: `lucentcode`, Extension ID: `lucentcode.lucent-code`
+- All command IDs updated: `openRouterChat.*` → `lucentCode.*`
+- All setting keys updated: `openRouterChat.*` → `lucentCode.*`
+- New icon: glowing light source on dark `#0d0d1a` background
+- New dark gallery banner (`#0d0d1a`) — distinct from all other AI extensions on the marketplace
+- Updated marketplace description, README, and keywords
+
+> **Migration note:** If you have custom keybindings pointing to `openRouterChat.*` commands, update them to `lucentCode.*`.
+
+---
+
 ## [0.1.0] - 2026-03-14
 
 ### Added
