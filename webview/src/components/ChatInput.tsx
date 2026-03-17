@@ -15,7 +15,7 @@ const MENTION_SOURCES: MentionSource[] = [
 ];
 
 interface ChatInputProps {
-  onSend: (content: string) => void;
+  onSend: (content: string, images: string[]) => void;
   onCancel: () => void;
   isStreaming: boolean;
   onResolveMention: (type: string) => Promise<string | null>;
@@ -26,6 +26,47 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [showMentions, setShowMentions] = createSignal(false);
   const [mentionFilter, setMentionFilter] = createSignal('');
   const [isResolvingMention, setIsResolvingMention] = createSignal(false);
+
+  interface Attachment {
+    id: string;
+    name: string;
+    kind: 'image' | 'text';
+    data: string;
+    mimeType: string;
+    error?: string;
+  }
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+  const [attachments, setAttachments] = createSignal<Attachment[]>([]);
+
+  const handleFiles = (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    for (const file of fileArray) {
+      const id = Math.random().toString(36).slice(2);
+      const kind: 'image' | 'text' = file.type.startsWith('image/') ? 'image' : 'text';
+
+      if (file.size > MAX_FILE_SIZE) {
+        setAttachments((prev) => [
+          ...prev,
+          { id, name: file.name, kind, data: '', mimeType: file.type, error: 'Too large (max 5 MB)' },
+        ]);
+        continue;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = (e.target?.result as string) ?? '';
+        setAttachments((prev) => [...prev, { id, name: file.name, kind, data, mimeType: file.type }]);
+      };
+
+      if (kind === 'image') {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
+    }
+  };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -86,11 +127,20 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   };
 
   const handleSend = () => {
-    const content = input().trim();
-    if (content && !props.isStreaming) {
-      props.onSend(content);
-      setInput('');
-    }
+    if (props.isStreaming) return;
+
+    const validAttachments = attachments().filter((a) => !a.error);
+    const textFiles = validAttachments.filter((a) => a.kind === 'text');
+    const images = validAttachments.filter((a) => a.kind === 'image').map((a) => a.data);
+
+    const textParts = textFiles.map((a) => `\`\`\`${a.name}\n${a.data}\n\`\`\``);
+    const fullContent = [...textParts, input().trim()].filter(Boolean).join('\n\n');
+
+    if (!fullContent && images.length === 0) return;
+
+    props.onSend(fullContent, images);
+    setInput('');
+    setAttachments([]);
   };
 
   return (
