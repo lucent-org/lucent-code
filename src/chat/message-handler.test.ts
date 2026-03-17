@@ -951,6 +951,58 @@ describe('MessageHandler', () => {
     });
   });
 
+  describe('handleSendMessage with images', () => {
+    let handler: MessageHandler;
+    let mockClient: any;
+    let mockContextBuilder: any;
+    let mockSettings: any;
+    let messages: ExtensionMessage[];
+
+    beforeEach(() => {
+      messages = [];
+
+      mockContextBuilder = {
+        buildEnrichedContext: vi.fn().mockResolvedValue({}),
+        getCapabilities: vi.fn().mockReturnValue({}),
+        formatEnrichedPrompt: vi.fn().mockReturnValue(''),
+        getCustomInstructions: vi.fn().mockReturnValue(''),
+      };
+      mockSettings = { temperature: 0.7, maxTokens: 4096, setChatModel: vi.fn() };
+
+      mockClient = {
+        chatStream: vi.fn().mockImplementation(async function* () {
+          yield { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] };
+        }),
+        listModels: vi.fn().mockResolvedValue([]),
+      };
+
+      handler = new MessageHandler(mockClient, mockContextBuilder, mockSettings);
+    });
+
+    it('builds string content when no images', async () => {
+      await handler.handleMessage(
+        { type: 'sendMessage', content: 'hello', images: [], model: 'gpt-4o' },
+        (m) => messages.push(m)
+      );
+      const call = mockClient.chatStream.mock.calls[0][0];
+      const userMsg = call.messages.find((m: any) => m.role === 'user');
+      expect(userMsg.content).toBe('hello');
+    });
+
+    it('builds ContentPart[] content when images present', async () => {
+      const imgUrl = 'data:image/png;base64,abc123';
+      await handler.handleMessage(
+        { type: 'sendMessage', content: 'what is this?', images: [imgUrl], model: 'gpt-4o' },
+        (m) => messages.push(m)
+      );
+      const call = mockClient.chatStream.mock.calls[0][0];
+      const userMsg = call.messages.find((m: any) => m.role === 'user');
+      expect(Array.isArray(userMsg.content)).toBe(true);
+      expect(userMsg.content[0]).toEqual({ type: 'text', text: 'what is this?' });
+      expect(userMsg.content[1]).toEqual({ type: 'image_url', image_url: { url: imgUrl } });
+    });
+  });
+
   describe('tool-use agentic loop', () => {
     let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
     let mockNotifications: { handleError: ReturnType<typeof vi.fn> };

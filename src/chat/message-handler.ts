@@ -43,7 +43,7 @@ export class MessageHandler {
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     switch (message.type) {
       case 'sendMessage':
-        await this.handleSendMessage(message.content, message.model, postMessage);
+        await this.handleSendMessage(message.content, message.images ?? [], message.model, postMessage);
         break;
       case 'cancelRequest':
         this.handleCancel();
@@ -107,6 +107,7 @@ export class MessageHandler {
 
   private async handleSendMessage(
     content: string,
+    images: string[],
     model: string,
     postMessage: (msg: ExtensionMessage) => void
   ): Promise<void> {
@@ -124,7 +125,13 @@ export class MessageHandler {
       ].join(''),
     };
 
-    this.conversationMessages.push({ role: 'user', content });
+    const userContent = images.length > 0
+      ? [
+          { type: 'text' as const, text: content },
+          ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+        ]
+      : content;
+    this.conversationMessages.push({ role: 'user', content: userContent });
     this.abortController = new AbortController();
 
     const tools = this.toolExecutor ? TOOL_DEFINITIONS : undefined;
@@ -340,7 +347,7 @@ export class MessageHandler {
         model: conversation.model,
         messages: [
           { role: 'system', content: 'Generate a short title (3-6 words) for this conversation. Output only the title, nothing else.' },
-          ...conversation.messages.slice(0, 2),
+          ...conversation.messages.slice(0, 2).map((m) => ({ ...m, content: messageText(m.content) })),
         ],
         temperature: 0.3,
         max_tokens: 20,
