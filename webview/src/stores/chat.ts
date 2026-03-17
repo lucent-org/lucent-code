@@ -1,7 +1,7 @@
 import { createSignal, createRoot } from 'solid-js';
 import { getVsCodeApi } from '../utils/vscode-api';
 import type { DiffLine } from '../components/DiffView';
-import type { ConversationSummary, OpenRouterModel, Conversation } from '@shared';
+import type { ConversationSummary, OpenRouterModel, Conversation, ContentPart } from '@shared';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_approval';
@@ -143,7 +143,7 @@ function createChatStore() {
   function handleConversationLoaded(conversation: Conversation) {
     setCurrentConversationId(conversation.id);
     setMessages(conversation.messages
-      .filter((m): m is { role: 'user' | 'assistant'; content: string | import('@shared').ContentPart[]; tool_calls?: unknown; tool_call_id?: string } =>
+      .filter((m): m is { role: 'user' | 'assistant'; content: string | ContentPart[]; tool_calls?: unknown; tool_call_id?: string } =>
         m.role === 'user' || m.role === 'assistant')
       .map((m) => {
         if (typeof m.content === 'string') {
