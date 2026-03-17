@@ -13,6 +13,7 @@ export class MessageHandler {
   private abortController?: AbortController;
   private currentConversation?: Conversation;
   private pendingApply = new Map<string, string>(); // fileUri string → proposed code
+  onStreamEnd?: () => void;
 
   constructor(
     private readonly client: OpenRouterClient,
@@ -201,6 +202,7 @@ export class MessageHandler {
       }
 
       postMessage({ type: 'streamEnd' });
+      this.onStreamEnd?.();
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         postMessage({ type: 'streamEnd' });
