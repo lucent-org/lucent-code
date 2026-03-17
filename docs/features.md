@@ -19,6 +19,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Apply to file | Apply code block as a WorkspaceEdit to the referenced or user-selected file; inline diff for ≤1 hunk, native diff editor for 2+ hunks | 1 |
 | :white_check_mark: | Cancel generation | Stop button to abort in-flight streaming responses | 1 |
 | :white_check_mark: | Multi-line input | Shift+Enter for newlines, Enter to submit | 1 |
+| :white_check_mark: | `@terminal` context mention | Type `@terminal` in chat input to inject the last 200 lines of the active terminal | P2 |
+| :white_check_mark: | `@fix` / `@explain` / `@test` action mentions | Type `@fix`, `@explain`, or `@test` to insert a focused prompt prefix; works with the existing editor context | P2 |
 | :white_check_mark: | Empty state guidance | Welcome screen with API key hint or quick-start suggestions | 1 |
 | :white_check_mark: | Conversation history | Persist conversations locally, restore on reopen | 4 |
 | :white_check_mark: | Auto-title conversations | Generate conversation titles via a lightweight LLM call | 4 |
@@ -198,7 +200,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 |--------|---------|-----|--------|
 | :construction: | **Image attachments** | Attach screenshots/diagrams to chat for multi-modal models — increasingly expected | M |
 | :construction: | **Drag-and-drop files** | Drag files from Explorer into chat input to attach or inline their contents | M |
-| :construction: | **Slash commands** | `/fix`, `/explain`, `/test` in chat input — good UX, not a blocker | M |
+| :white_check_mark: | ~~Slash commands~~ | Implemented as `@fix`, `@explain`, `@test` action mentions in the `@mentions` dropdown | M |
 | :construction: | **Custom OpenAI-compatible providers** | Ollama, LM Studio, Azure OpenAI alongside OpenRouter — opens up local models | L |
 
 ### P4 — Future / exploratory (large scope)
