@@ -52,6 +52,8 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const [attachments, setAttachments] = createSignal<Attachment[]>([]);
   const [isDragging, setIsDragging] = createSignal(false);
+  const [terminalContent, setTerminalContent] = createSignal<string | null>(null);
+  const [terminalError, setTerminalError] = createSignal(false);
   let fileInputRef: HTMLInputElement | undefined;
 
   const handleFiles = (files: FileList | File[]) => {
@@ -114,6 +116,17 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     const files = (e.target as HTMLInputElement).files;
     if (files && files.length > 0) handleFiles(files);
     (e.target as HTMLInputElement).value = ''; // reset so same file can be re-picked
+  };
+
+  const handleTerminalButton = async () => {
+    const content = await props.onResolveMention('terminal');
+    if (content) {
+      setTerminalContent(content);
+      setTerminalError(false);
+    } else {
+      setTerminalError(true);
+      setTimeout(() => setTerminalError(false), 2000);
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -181,14 +194,17 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     const textFiles = validAttachments.filter((a) => a.kind === 'text');
     const images = validAttachments.filter((a) => a.kind === 'image').map((a) => a.data);
 
+    const terminal = terminalContent();
+    const terminalPart = terminal ? `<terminal output>\n${terminal}\n</terminal output>` : null;
     const textParts = textFiles.map((a) => `\`\`\`${a.name}\n${a.data}\n\`\`\``);
-    const fullContent = [...textParts, input().trim()].filter(Boolean).join('\n\n');
+    const fullContent = [terminalPart, ...textParts, input().trim()].filter(Boolean).join('\n\n');
 
     if (!fullContent && images.length === 0) return;
 
     props.onSend(fullContent, images);
     setInput('');
     setAttachments([]);
+    setTerminalContent(null);
   };
 
   return (
