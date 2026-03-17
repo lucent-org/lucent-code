@@ -182,8 +182,8 @@
       },
       {
         "command": "lucentCode.newChat",
-        "key": "ctrl+shift+n",
-        "mac": "cmd+shift+n",
+        "key": "ctrl+shift+alt+n",
+        "mac": "cmd+shift+alt+n",
         "when": "lucentCode.chatView.visible"
       },
       {
