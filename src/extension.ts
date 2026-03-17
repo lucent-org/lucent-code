@@ -40,6 +40,11 @@ export async function activate(context: vscode.ExtensionContext) {
   const notifications = new NotificationService();
   messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications);
   const handler = messageHandler;
+  handler.onStreamEnd = () => {
+    if (!chatProvider.webviewView?.visible) {
+      vscode.window.showInformationMessage('Response ready');
+    }
+  };
 
   // Set up webview message handling
   const setupWebviewMessaging = () => {

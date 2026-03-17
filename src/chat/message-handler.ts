@@ -13,6 +13,7 @@ export class MessageHandler {
   private abortController?: AbortController;
   private currentConversation?: Conversation;
   private pendingApply = new Map<string, string>(); // fileUri string → proposed code
+
   onStreamEnd?: () => void;
 
   constructor(
