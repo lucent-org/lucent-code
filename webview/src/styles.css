@@ -434,6 +434,12 @@ body {
   overflow: hidden;
 }
 
+.mention-group-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
 .mention-item {
   display: flex;
   flex-direction: column;

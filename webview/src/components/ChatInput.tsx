@@ -4,10 +4,14 @@ interface MentionSource {
   id: string;
   label: string;
   description: string;
+  kind: 'context' | 'action';
 }
 
 const MENTION_SOURCES: MentionSource[] = [
-  { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal' },
+  { id: 'fix',     label: '@fix',     description: 'Fix code at cursor',              kind: 'action'  },
+  { id: 'explain', label: '@explain', description: 'Explain code at cursor',           kind: 'action'  },
+  { id: 'test',    label: '@test',    description: 'Write tests for code at cursor',   kind: 'action'  },
+  { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
 ];
 
 interface ChatInputProps {
@@ -65,7 +69,11 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     try {
       const content = await props.onResolveMention(source.id);
       if (content) {
-        setInput(`${beforeAt}<${source.id} output>\n${content}\n</${source.id} output> `);
+        if (source.kind === 'action') {
+          setInput(`${beforeAt}${content} `);
+        } else {
+          setInput(`${beforeAt}<${source.id} output>\n${content}\n</${source.id} output> `);
+        }
       } else {
         setInput(`${beforeAt}[${source.label}: not available] `);
       }
@@ -87,17 +95,40 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       <div class="chat-input-wrapper">
         <Show when={showMentions() && filteredSources().length > 0}>
           <div class="mention-dropdown">
-            <For each={filteredSources()}>
-              {(source) => (
-                <button
-                  class="mention-item"
-                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
-                >
-                  <span class="mention-item-label">{source.label}</span>
-                  <span class="mention-item-desc">{source.description}</span>
-                </button>
-              )}
-            </For>
+            {(() => {
+              const sources = filteredSources();
+              const actions = sources.filter((s) => s.kind === 'action');
+              const contexts = sources.filter((s) => s.kind === 'context');
+              return (
+                <>
+                  <For each={actions}>
+                    {(source) => (
+                      <button
+                        class="mention-item"
+                        onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                      >
+                        <span class="mention-item-label">{source.label}</span>
+                        <span class="mention-item-desc">{source.description}</span>
+                      </button>
+                    )}
+                  </For>
+                  <Show when={actions.length > 0 && contexts.length > 0}>
+                    <div class="mention-group-separator" />
+                  </Show>
+                  <For each={contexts}>
+                    {(source) => (
+                      <button
+                        class="mention-item"
+                        onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                      >
+                        <span class="mention-item-label">{source.label}</span>
+                        <span class="mention-item-desc">{source.description}</span>
+                      </button>
+                    )}
+                  </For>
+                </>
+              );
+            })()}
           </div>
         </Show>
         <textarea
