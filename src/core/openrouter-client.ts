@@ -18,8 +18,8 @@ export class OpenRouterClient {
     return {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/openrouter-chat/vscode',
-      'X-Title': 'Lucent Code VSCode',
+      'HTTP-Referer': 'https://github.com/lucentcode/lucent-code',
+      'X-Title': 'Lucent Code',
     };
   }
 
