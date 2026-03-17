@@ -25,6 +25,18 @@ interface Attachment {
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
+const ACCEPTED_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java',
+  '.c', '.cpp', '.cs', '.rb', '.swift', '.kt', '.php',
+  '.html', '.css', '.json', '.md', '.yaml', '.toml', '.txt',
+]);
+
+function isAcceptedFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true;
+  const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+  return ACCEPTED_EXTENSIONS.has(ext);
+}
+
 interface ChatInputProps {
   onSend: (content: string, images: string[]) => void;
   onCancel: () => void;
@@ -61,6 +73,12 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         const data = (e.target?.result as string) ?? '';
         setAttachments((prev) => [...prev, { id, name: file.name, kind, data, mimeType: file.type }]);
       };
+      reader.onerror = () => {
+        setAttachments((prev) => [
+          ...prev,
+          { id, name: file.name, kind, data: '', mimeType: file.type, error: 'Read failed' },
+        ]);
+      };
 
       if (kind === 'image') {
         reader.readAsDataURL(file);
@@ -86,7 +104,10 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer?.files;
-    if (files && files.length > 0) handleFiles(files);
+    if (files && files.length > 0) {
+      const accepted = Array.from(files).filter(isAcceptedFile);
+      if (accepted.length > 0) handleFiles(accepted);
+    }
   };
 
   const handleFileInputChange = (e: Event) => {
@@ -250,6 +271,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         />
         <button
           class="attach-button"
+          aria-label="Attach files"
           onClick={() => fileInputRef?.click()}
           title="Attach files"
           disabled={props.isStreaming}
@@ -260,7 +282,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={!input().trim() && attachments().filter((a) => !a.error).length === 0}
+              disabled={isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0)}
             >
               Send
             </button>
