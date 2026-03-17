@@ -1,4 +1,4 @@
-import { Component, For, Show, onMount } from 'solid-js';
+import { Component, For, Show, createEffect, onMount } from 'solid-js';
 import { chatStore } from './stores/chat';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
@@ -18,7 +18,6 @@ const App: Component = () => {
       switch (message.type) {
         case 'streamChunk':
           chatStore.handleStreamChunk(message.content);
-          scrollToBottom();
           break;
         case 'streamEnd':
           chatStore.handleStreamEnd();
@@ -37,7 +36,6 @@ const App: Component = () => {
           break;
         case 'conversationLoaded':
           chatStore.handleConversationLoaded(message.conversation);
-          scrollToBottom();
           break;
         case 'conversationSaved':
           chatStore.handleConversationSaved(message.id);
@@ -52,7 +50,6 @@ const App: Component = () => {
           chatStore.cancelRequest();
           chatStore.handleStreamEnd(); // reset streaming state so sendMessage proceeds
           chatStore.sendMessage(message.content);
-          scrollToBottom();
           break;
         case 'showDiff':
           chatStore.setDiffState({
@@ -67,15 +64,15 @@ const App: Component = () => {
     vscode.postMessage({ type: 'ready' });
   });
 
-  const scrollToBottom = () => {
+  createEffect(() => {
+    chatStore.messages(); // subscribe to signal — fires on new messages and streaming chunks
     requestAnimationFrame(() => {
       messagesEndRef?.scrollIntoView({ behavior: 'smooth' });
     });
-  };
+  });
 
   const handleSend = (content: string) => {
     chatStore.sendMessage(content);
-    scrollToBottom();
   };
 
   return (
