@@ -7,6 +7,9 @@ const { mockExecuteCommand, mockApplyEdit, mockFindFiles, mockReadFile } = vi.ho
   mockReadFile: vi.fn(() => Promise.resolve(new Uint8Array())),
 }));
 
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
 vi.mock('vscode', () => ({
   commands: {
     executeCommand: mockExecuteCommand,
@@ -41,6 +44,7 @@ describe('EditorToolExecutor', () => {
     vi.clearAllMocks();
     mockFindFiles.mockReset();
     mockReadFile.mockReset();
+    mockFetch.mockReset();
     executor = new EditorToolExecutor();
   });
 
@@ -191,6 +195,89 @@ describe('EditorToolExecutor', () => {
       const result = await executor.execute('grep_files', { pattern: '[invalid' });
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/invalid regex/i);
+    });
+  });
+
+  describe('search_web', () => {
+    it('returns abstract and related topics from DuckDuckGo', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          Abstract: 'TypeScript is a typed superset of JavaScript.',
+          RelatedTopics: [
+            { Text: 'TypeScript compiler' },
+          ],
+        }),
+      });
+
+      const result = await executor.execute('search_web', { query: 'TypeScript' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('TypeScript is a typed superset');
+      expect(result.message).toContain('TypeScript compiler');
+    });
+
+    it('returns error on non-ok response', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 429 });
+      const result = await executor.execute('search_web', { query: 'test' });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('429');
+    });
+  });
+
+  describe('fetch_url', () => {
+    it('returns page content via Jina reader', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: async () => '# My Docs\n\nSome content here.',
+      });
+
+      const result = await executor.execute('fetch_url', { url: 'https://example.com/docs' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('My Docs');
+      expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('r.jina.ai'));
+    });
+
+    it('returns error on non-ok response', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 404 });
+      const result = await executor.execute('fetch_url', { url: 'https://example.com/missing' });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('404');
+    });
+  });
+
+  describe('http_request', () => {
+    it('returns status and body as JSON', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => '{"id":1}',
+      });
+
+      const result = await executor.execute('http_request', {
+        method: 'GET',
+        url: 'http://localhost:3000/api/items',
+      });
+      expect(result.success).toBe(true);
+      const parsed = JSON.parse(result.message!);
+      expect(parsed.status).toBe(200);
+      expect(parsed.body).toContain('"id":1');
+    });
+
+    it('handles POST with body and headers', async () => {
+      mockFetch.mockResolvedValue({ ok: true, status: 201, text: async () => 'created' });
+
+      await executor.execute('http_request', {
+        method: 'POST',
+        url: 'http://localhost:3000/api/items',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{"name":"test"}',
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{"name":"test"}',
+      });
     });
   });
 });

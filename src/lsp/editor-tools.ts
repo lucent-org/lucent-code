@@ -133,6 +133,51 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'search_web',
+      description: 'Search the web using DuckDuckGo. Returns an abstract and top results. Use to look up documentation, error messages, or concepts.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'fetch_url',
+      description: 'Fetch a URL and return its content as clean Markdown. Use to read documentation pages, READMEs, or package pages.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'URL to fetch' },
+        },
+        required: ['url'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'http_request',
+      description: 'Make an HTTP request to a URL. Use to query a local dev server, REST API, or any HTTP endpoint.',
+      parameters: {
+        type: 'object',
+        properties: {
+          method: { type: 'string', description: 'HTTP method: GET, POST, PUT, DELETE' },
+          url: { type: 'string', description: 'Request URL' },
+          headers: { type: 'object', description: 'Optional request headers as key-value pairs' },
+          body: { type: 'string', description: 'Optional request body' },
+        },
+        required: ['method', 'url'],
+      },
+    },
+  },
 ];
 
 export class EditorToolExecutor {
@@ -153,6 +198,12 @@ export class EditorToolExecutor {
           return await this.searchFiles(args);
         case 'grep_files':
           return await this.grepFiles(args);
+        case 'search_web':
+          return await this.searchWeb(args);
+        case 'fetch_url':
+          return await this.fetchUrl(args);
+        case 'http_request':
+          return await this.httpRequest(args);
         default:
           return { success: false, error: `Unknown tool: ${toolName}` };
       }
@@ -273,5 +324,45 @@ export class EditorToolExecutor {
     }
 
     return { success: true, message: matches.length > 0 ? matches.join('\n') : 'No matches found' };
+  }
+
+  private async searchWeb(args: Record<string, unknown>): Promise<ToolResult> {
+    const query = args.query as string;
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const response = await fetch(url);
+    if (!response.ok) return { success: false, error: `Search failed: ${response.status}` };
+
+    const data = await response.json() as {
+      Abstract?: string;
+      RelatedTopics?: Array<{ Text?: string }>;
+    };
+
+    const parts: string[] = [];
+    if (data.Abstract) parts.push(data.Abstract);
+    if (data.RelatedTopics) {
+      for (const topic of data.RelatedTopics.slice(0, 5)) {
+        if (topic.Text) parts.push(`- ${topic.Text}`);
+      }
+    }
+    return { success: true, message: parts.join('\n') || 'No results found' };
+  }
+
+  private async fetchUrl(args: Record<string, unknown>): Promise<ToolResult> {
+    const url = args.url as string;
+    const response = await fetch(`https://r.jina.ai/${url}`);
+    if (!response.ok) return { success: false, error: `Fetch failed: ${response.status}` };
+    const text = await response.text();
+    return { success: true, message: text };
+  }
+
+  private async httpRequest(args: Record<string, unknown>): Promise<ToolResult> {
+    const method = (args.method as string).toUpperCase();
+    const url = args.url as string;
+    const headers = args.headers as Record<string, string> | undefined;
+    const body = args.body as string | undefined;
+
+    const response = await fetch(url, { method, headers, body });
+    const text = await response.text();
+    return { success: true, message: JSON.stringify({ status: response.status, body: text }) };
   }
 }
