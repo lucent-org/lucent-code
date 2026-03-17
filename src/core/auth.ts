@@ -23,6 +23,27 @@ export class AuthManager {
     this.onDidChangeAuthEmitter.fire(false);
   }
 
+  private static readonly TAVILY_KEY = 'lucentCode.tavilyApiKey';
+
+  async getTavilyApiKey(): Promise<string | undefined> {
+    return this.secretStorage.get(AuthManager.TAVILY_KEY);
+  }
+
+  async setTavilyApiKey(key: string): Promise<void> {
+    await this.secretStorage.store(AuthManager.TAVILY_KEY, key);
+    vscode.window.showInformationMessage('Tavily API key saved.');
+  }
+
+  async promptForTavilyApiKey(): Promise<void> {
+    const key = await vscode.window.showInputBox({
+      prompt: 'Enter your Tavily API key for premium web search',
+      placeHolder: 'tvly-...',
+      password: true,
+      ignoreFocusOut: true,
+    });
+    if (key) await this.setTavilyApiKey(key);
+  }
+
   async promptForApiKey(): Promise<string | undefined> {
     const key = await vscode.window.showInputBox({
       prompt: 'Enter your OpenRouter API key',

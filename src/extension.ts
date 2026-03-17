@@ -43,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set up code intelligence
   const codeIntelligence = new CodeIntelligence();
   const capabilityDetector = new CapabilityDetector();
-  const toolExecutor = new EditorToolExecutor();
+  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey());
   contextBuilder.setCodeIntelligence(codeIntelligence, capabilityDetector);
 
   const history = new ConversationHistory(context.globalStorageUri);
@@ -126,6 +126,12 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('lucentCode.setApiKey', () => {
       auth.promptForApiKey();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.setTavilyApiKey', () => {
+      auth.promptForTavilyApiKey();
     })
   );
 

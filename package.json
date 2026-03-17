@@ -127,6 +127,11 @@
         "title": "Generate Commit Message",
         "category": "Lucent Code",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "lucentCode.setTavilyApiKey",
+        "title": "Set Tavily API Key (Premium Web Search)",
+        "category": "Lucent Code"
       }
     ],
     "configuration": {

@@ -181,6 +181,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 ];
 
 export class EditorToolExecutor {
+  constructor(
+    private readonly getTavilyApiKey?: () => Promise<string | undefined>
+  ) {}
+
   async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
     try {
       switch (toolName) {
@@ -328,15 +332,42 @@ export class EditorToolExecutor {
 
   private async searchWeb(args: Record<string, unknown>): Promise<ToolResult> {
     const query = args.query as string;
+    const tavilyKey = await this.getTavilyApiKey?.();
+    if (tavilyKey) {
+      try {
+        return await this.searchWebTavily(query, tavilyKey);
+      } catch {
+        // Fall through to DuckDuckGo
+      }
+    }
+    return this.searchWebDuckDuckGo(query);
+  }
+
+  private async searchWebTavily(query: string, apiKey: string): Promise<ToolResult> {
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, max_results: 5, search_depth: 'basic' }),
+    });
+    if (!response.ok) throw new Error(`Tavily search failed: ${response.status}`);
+    const data = await response.json() as {
+      results: Array<{ title: string; url: string; content: string }>;
+    };
+    const parts = data.results.map((r) => `**${r.title}**\n${r.url}\n${r.content}`);
+    return { success: true, message: parts.join('\n\n') || 'No results found' };
+  }
+
+  private async searchWebDuckDuckGo(query: string): Promise<ToolResult> {
     const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
     const response = await fetch(url);
     if (!response.ok) return { success: false, error: `Search failed: ${response.status}` };
-
     const data = await response.json() as {
       Abstract?: string;
       RelatedTopics?: Array<{ Text?: string }>;
     };
-
     const parts: string[] = [];
     if (data.Abstract) parts.push(data.Abstract);
     if (data.RelatedTopics) {
