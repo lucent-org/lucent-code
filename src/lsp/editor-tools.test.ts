@@ -229,7 +229,7 @@ describe('EditorToolExecutor', () => {
           { title: 'Result 1', url: 'https://example.com', content: 'Some content' },
         ],
       };
-      vi.mocked(global.fetch).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => tavilyResponse,
       } as Response);
@@ -239,13 +239,13 @@ describe('EditorToolExecutor', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Result 1');
-      const call = vi.mocked(global.fetch).mock.calls[0];
+      const call = mockFetch.mock.calls[0];
       expect(call[0]).toBe('https://api.tavily.com/search');
     });
 
     it('falls back to DuckDuckGo when no Tavily key', async () => {
       const ddgResponse = { Abstract: 'TypeScript is a language', RelatedTopics: [] };
-      vi.mocked(global.fetch).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ddgResponse,
       } as Response);
@@ -254,7 +254,7 @@ describe('EditorToolExecutor', () => {
       const result = await executor.execute('search_web', { query: 'typescript' });
 
       expect(result.success).toBe(true);
-      const call = vi.mocked(global.fetch).mock.calls[0];
+      const call = mockFetch.mock.calls[0];
       expect((call[0] as string)).toContain('duckduckgo.com');
     });
   });
