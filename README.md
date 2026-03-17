@@ -1,191 +1,84 @@
-# OpenRouter Chat for VSCode
+# Lucent Code
 
-A VSCode extension that brings the full [OpenRouter](https://openrouter.ai) model catalog into your editor — chat with any AI model and get inline code completions, powered by Claude, GPT, Gemini, Llama, and hundreds more.
+### Write code in a new light.
+
+Lucent Code is the AI coding assistant that understands your codebase the same way VS Code does — through your language server, not file search.
+
+While other tools grep through your files hoping to find the right answer, Lucent Code resolves symbols, follows type definitions, looks up references, and reads diagnostics directly from the language server. The result: responses that are accurate, context-aware, and actually useful.
+
+---
+
+## Why Lucent Code is different
+
+| | Other AI tools | Lucent Code |
+|---|---|---|
+| Code understanding | Text search (grep/glob) | Language server (LSP) |
+| Symbol resolution | Regex pattern matching | `executeDefinitionProvider` |
+| Type information | Guessed from context | `executeHoverProvider` |
+| References | File scan | `executeReferenceProvider` |
+| Diagnostics | None | Live errors and warnings |
+| Models | One vendor | Any model via OpenRouter |
+
+---
 
 ## Features
 
-### Chat Panel
+### 🔍 LSP-first code intelligence
+Lucent Code reads your code the way VS Code does. Symbol definitions, type signatures, references, document structure, and live diagnostics are all pulled from your language server — giving the AI the same picture your editor has.
 
-A side panel chat interface in the activity bar, similar to GitHub Copilot Chat or Claude Chat.
+### 💬 Streaming chat panel
+A fast, focused side-panel chat built for developers. Markdown rendering, syntax-highlighted code blocks, copy and insert buttons, and real-time streaming responses. Ask questions, get explanations, request changes — all without leaving your editor.
 
-- **Any model** — Access the full OpenRouter model catalog. Switch models mid-conversation.
-- **Streaming responses** — Real-time token-by-token rendering.
-- **Code blocks** — Syntax-highlighted code blocks with Copy and Insert at Cursor buttons.
-- **Markdown** — Bold, italic, inline code, and code fences rendered in assistant messages.
-- **Code context** — Automatically includes your active file, cursor position, selection, and diagnostics in prompts.
-- **Code intelligence** — Enriches prompts with hover info, definitions, references, and document symbols from VSCode's language services.
-- **Editor capability hints** — Tells the LLM what editor actions are available (rename, format, code actions) so it can suggest them.
-- **Tool-use** — Models that support tool-use can invoke editor actions directly: rename symbols, apply code actions, format documents, insert or replace code.
-- **Conversation history** — Conversations are saved locally and persist across restarts. Browse, load, and delete past conversations.
-- **Auto-titling** — Conversations are automatically titled after the first exchange using a lightweight LLM call.
-- **Export** — Export any conversation as JSON or Markdown.
-- **Cancel generation** — Stop button to abort in-flight responses.
+### ⚡ Inline completions
+Ghost-text suggestions that appear as you type. Supports auto-trigger (debounced) and manual trigger (`Alt+\`). Respects `editor.inlineSuggest.enabled`. Works with any model on OpenRouter.
 
-### Inline Completions
+### 🛠️ AI editor tools — with human approval
+The AI can take direct actions in your editor: rename symbols, insert code, replace ranges, apply quick fixes, and format documents. Destructive operations show an inline approval card — you stay in control.
 
-Copilot-like ghost text suggestions as you type.
+### 🌐 Web and network tools
+The AI can search the web, fetch URLs as clean Markdown, and make HTTP requests to local or remote APIs — no extra API keys required.
 
-- **Auto mode** — Suggestions appear after a configurable debounce (default 300ms).
-- **Manual mode** — Trigger completions only with `Alt+\`.
-- **Separate model** — Use a fast, cheap model for completions while keeping a powerful model for chat.
-- **Windowed context** — Sends code before/after cursor within configurable token limits.
-- **Status bar** — Shows a sparkle icon with loading state during completion requests.
+### 🔄 Any model, via OpenRouter
+Access every major AI model — Claude, GPT-4o, Gemini, Mistral, Llama, and more — through a single OpenRouter API key. Switch models per conversation. No vendor lock-in.
 
-## Getting Started
+### 📚 Conversation history
+Conversations are saved locally and restored on reopen. Export as JSON or Markdown. Import from JSON. Auto-generated titles keep your history organised.
 
-### Prerequisites
+### 📋 Context menu actions
+Right-click any selection for **Explain**, **Fix**, or **Improve** — appended to the current chat or opened in a new one.
 
-- VSCode 1.85.0 or later
-- An [OpenRouter API key](https://openrouter.ai/keys)
+### 📄 Custom instructions
+Drop a `.lucent-instructions.md` or `.cursorrules` file in your workspace root to inject project-specific context into every conversation.
 
-### Installation (Development)
+---
 
-```bash
-# Clone the repository
-git clone <repo-url>
-cd openrouter-chat
+## Getting started
 
-# Install dependencies
-npm install
-cd webview && npm install && cd ..
+1. Install Lucent Code
+2. Get a free API key at [openrouter.ai](https://openrouter.ai)
+3. Run `Lucent Code: Set API Key` from the command palette
+4. Open the chat panel from the activity bar
+5. Select a model and start chatting
 
-# Build
-npm run build
+---
 
-# Launch in VSCode
-# Press F5 to open Extension Development Host
-```
+## Keyboard shortcuts
 
-### Setting Your API Key
+| Action | Shortcut |
+|---|---|
+| Focus chat panel | `Ctrl+Shift+L` |
+| New chat | `Ctrl+Shift+Alt+N` |
+| Trigger inline completion | `Alt+\` |
 
-On first launch, you'll be prompted to enter your OpenRouter API key. You can also set it anytime via:
+---
 
-- Command Palette (`Ctrl+Shift+P`) → **OpenRouter Chat: Set API Key**
+## Requirements
 
-Your API key is stored securely in VSCode's encrypted SecretStorage — never in plaintext settings.
+- VS Code 1.85+
+- An [OpenRouter](https://openrouter.ai) API key (free tier available)
 
-## Configuration
+---
 
-All settings are under `openRouterChat.*` in VSCode settings.
+## Privacy
 
-### Chat Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `openRouterChat.chat.model` | `""` | Default model for chat (e.g., `anthropic/claude-sonnet-4`). Leave empty to select manually. |
-| `openRouterChat.chat.temperature` | `0.7` | Temperature for chat responses (0-2). |
-| `openRouterChat.chat.maxTokens` | `4096` | Maximum tokens for chat responses. |
-
-### Inline Completion Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `openRouterChat.completions.model` | `""` | Model for inline completions. Leave empty to use the chat model. |
-| `openRouterChat.completions.triggerMode` | `"auto"` | `"auto"` (suggest while typing) or `"manual"` (only via `Alt+\`). |
-| `openRouterChat.completions.debounceMs` | `300` | Debounce delay in ms for auto-trigger mode (100-2000). |
-| `openRouterChat.completions.maxContextLines` | `100` | Max lines before/after cursor to include as context (10-500). |
-
-## Commands
-
-| Command | Keybinding | Description |
-|---------|------------|-------------|
-| `OpenRouter Chat: Set API Key` | — | Set or update your OpenRouter API key |
-| `OpenRouter Chat: New Chat` | — | Clear the current conversation |
-| `OpenRouter Chat: Trigger Inline Completion` | `Alt+\` | Manually trigger an inline completion |
-
-## Architecture
-
-Modular monolith — single extension with clearly separated internal modules.
-
-```
-src/
-├── extension.ts                # Entry point — wires all modules together
-├── core/
-│   ├── openrouter-client.ts    # OpenRouter API client (streaming + non-streaming)
-│   ├── auth.ts                 # API key management via SecretStorage
-│   ├── settings.ts             # Typed settings wrapper
-│   └── context-builder.ts      # Gathers editor context for prompts
-├── chat/
-│   ├── chat-provider.ts        # WebviewViewProvider for the side panel
-│   ├── message-handler.ts      # Extension ↔ webview message protocol
-│   └── history.ts              # Conversation persistence (save/load/export)
-├── completions/
-│   ├── inline-provider.ts      # InlineCompletionItemProvider
-│   ├── prompt-builder.ts       # Builds completion prompts with windowed context
-│   └── trigger-config.ts       # Debounce and trigger mode logic
-├── lsp/
-│   ├── code-intelligence.ts    # VSCode language service wrappers (hover, definition, refs, symbols)
-│   ├── capability-detector.ts  # Probes available language providers per file
-│   └── editor-tools.ts         # Tool executor + OpenAI-compatible tool definitions
-└── shared/
-    └── types.ts                # Shared TypeScript interfaces
-
-webview/                        # Solid.js chat UI (separate Vite build)
-├── src/
-│   ├── App.tsx                 # Root component with message handling
-│   ├── components/
-│   │   ├── ChatMessage.tsx     # Message rendering with code block parsing
-│   │   ├── ChatInput.tsx       # Input area with send/stop buttons
-│   │   ├── ModelSelector.tsx   # Searchable model dropdown
-│   │   └── CodeBlock.tsx       # Code blocks with copy/insert actions
-│   ├── stores/
-│   │   ├── chat.ts             # Reactive chat state (Solid signals)
-│   │   └── settings.ts         # Theme settings
-│   └── utils/
-│       ├── vscode-api.ts       # VSCode API bridge (with dev fallback)
-│       └── markdown.ts         # Simple markdown rendering
-└── vite.config.ts              # Vite build → dist/webview/
-```
-
-### Build Pipeline
-
-- **esbuild** bundles the extension host (`src/` → `dist/extension.js`)
-- **Vite** builds the Solid.js webview (`webview/src/` → `dist/webview/`)
-
-```bash
-npm run build          # Build everything
-npm run dev            # Watch mode (extension + webview)
-npm run test           # Run all tests
-npm run test:watch     # Watch mode for tests
-```
-
-## Testing
-
-105 tests across 14 test files covering all modules:
-
-```bash
-npm test
-```
-
-| Module | Tests | What's covered |
-|--------|-------|----------------|
-| Settings | 7 | All config accessors (chat + completions) |
-| Auth | 8 | Key storage, prompting, cancellation, OAuth PKCE |
-| Notifications | 5 | API key, rate limit, auth, network, generic errors |
-| OpenRouter Client | 10 | Model listing, chat, streaming, SSE parsing, errors |
-| Context Builder | 10 | Editor context, selection, formatting, enriched prompts, diagnostics |
-| Markdown Utils | 10 | HTML escaping, markdown rendering, XSS prevention |
-| Message Handler | 14 | All message types, streaming, cancellation, history, persistence |
-| Conversation History | 8 | Create, save, load, list, delete, export JSON/Markdown |
-| Trigger Config | 5 | Debounce, manual mode, abort signals |
-| Prompt Builder | 6 | Context windowing, cursor splitting, message building |
-| Inline Provider | 4 | Completions, model selection, error handling |
-| Code Intelligence | 8 | Hover, definition, diagnostics, symbols, caching |
-| Capability Detector | 4 | Provider probing, prompt formatting, fallbacks |
-| Editor Tools | 6 | All 5 tools, unknown tool handling, error propagation |
-
-## Roadmap
-
-See [docs/features.md](docs/features.md) for the full feature inventory with implementation status.
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 1 — MVP | Done | Chat panel, streaming, auth, code context, model selection |
-| Phase 2 — Inline Completions | Done | Ghost text, auto/manual triggers, debounce |
-| Phase 3 — Code Intelligence | Done | LSP integration, editor capability hints, tool-use |
-| Phase 4 — Auth & Persistence | Done | OAuth structure, conversation history, auto-titling, export |
-| Phase 5 — Polish | Done | Keyboard shortcuts, error notifications, icon, CHANGELOG |
-
-## License
-
-MIT
+All requests go directly from your editor to OpenRouter's API. No telemetry, no data collection, no third-party servers beyond OpenRouter and the model provider you choose.
