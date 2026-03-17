@@ -121,6 +121,12 @@
         "command": "lucentCode.authMenu",
         "title": "Manage Authentication",
         "category": "Lucent Code"
+      },
+      {
+        "command": "lucentCode.generateCommitMessage",
+        "title": "Generate Commit Message",
+        "category": "Lucent Code",
+        "icon": "$(sparkle)"
       }
     ],
     "configuration": {
@@ -230,6 +236,12 @@
         {
           "command": "lucentCode.improveCodeNew",
           "group": "3_improve@2"
+        }
+      ],
+      "scm/inputBox": [
+        {
+          "command": "lucentCode.generateCommitMessage",
+          "group": "navigation"
         }
       ]
     }
