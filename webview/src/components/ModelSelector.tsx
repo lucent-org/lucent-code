@@ -1,8 +1,8 @@
 import { Component, For, createSignal, createMemo, Show } from 'solid-js';
-import type { Model } from '../stores/chat';
+import type { OpenRouterModel } from '@shared';
 
 interface ModelSelectorProps {
-  models: Model[];
+  models: OpenRouterModel[];
   selectedModel: string;
   onSelect: (modelId: string) => void;
 }

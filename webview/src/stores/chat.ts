@@ -109,11 +109,9 @@ function createChatStore() {
   function handleConversationLoaded(conversation: Conversation) {
     setCurrentConversationId(conversation.id);
     setMessages(conversation.messages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })));
+      .filter((m): m is { role: 'user' | 'assistant'; content: string; tool_calls?: unknown; tool_call_id?: string } =>
+        m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({ role: m.role, content: m.content })));
     setShowConversationList(false);
   }
 

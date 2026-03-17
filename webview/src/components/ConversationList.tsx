@@ -1,5 +1,5 @@
 import { Component, For, Show } from 'solid-js';
-import type { ConversationSummary } from '../stores/chat';
+import type { ConversationSummary } from '@shared';
 
 interface ConversationListProps {
   conversations: ConversationSummary[];
