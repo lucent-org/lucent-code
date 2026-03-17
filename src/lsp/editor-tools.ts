@@ -104,6 +104,35 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'search_files',
+      description: 'Find files in the workspace matching a glob pattern. Use as fallback when LSP cannot enumerate files.',
+      parameters: {
+        type: 'object',
+        properties: {
+          pattern: { type: 'string', description: 'Glob pattern e.g. "src/**/*.ts"' },
+        },
+        required: ['pattern'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'grep_files',
+      description: 'Search file contents with a regex pattern. Use as fallback when LSP reference lookup returns no results or the language has no server.',
+      parameters: {
+        type: 'object',
+        properties: {
+          pattern: { type: 'string', description: 'Regex pattern to search for' },
+          include: { type: 'string', description: 'Glob pattern to filter files (default: "**/*")' },
+        },
+        required: ['pattern'],
+      },
+    },
+  },
 ];
 
 export class EditorToolExecutor {
@@ -120,6 +149,10 @@ export class EditorToolExecutor {
           return await this.insertCode(args);
         case 'replace_range':
           return await this.replaceRange(args);
+        case 'search_files':
+          return await this.searchFiles(args);
+        case 'grep_files':
+          return await this.grepFiles(args);
         default:
           return { success: false, error: `Unknown tool: ${toolName}` };
       }
@@ -203,5 +236,42 @@ export class EditorToolExecutor {
     edit.replace(uri, range, args.code as string);
     await vscode.workspace.applyEdit(edit);
     return { success: true, message: `Replaced code at lines ${args.startLine}-${args.endLine}` };
+  }
+
+  private async searchFiles(args: Record<string, unknown>): Promise<ToolResult> {
+    const pattern = args.pattern as string;
+    const uris = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 500);
+    if (uris.length === 0) return { success: true, message: 'No files found' };
+    return { success: true, message: uris.map((u) => u.fsPath).join('\n') };
+  }
+
+  private async grepFiles(args: Record<string, unknown>): Promise<ToolResult> {
+    const pattern = args.pattern as string;
+    const include = (args.include as string | undefined) ?? '**/*';
+    let regex: RegExp;
+    try {
+      regex = new RegExp(pattern);
+    } catch {
+      return { success: false, error: `Invalid regex: ${pattern}` };
+    }
+
+    const uris = await vscode.workspace.findFiles(include, '**/node_modules/**', 100);
+    const matches: string[] = [];
+
+    for (const uri of uris) {
+      if (matches.length >= 50) break;
+      try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        const content = new TextDecoder().decode(bytes);
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length && matches.length < 50; i++) {
+          if (regex.test(lines[i])) {
+            matches.push(`${uri.fsPath}:${i + 1}: ${lines[i].trim()}`);
+          }
+        }
+      } catch { /* skip unreadable files */ }
+    }
+
+    return { success: true, message: matches.length > 0 ? matches.join('\n') : 'No matches found' };
   }
 }

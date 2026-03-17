@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockExecuteCommand, mockApplyEdit } = vi.hoisted(() => ({
+const { mockExecuteCommand, mockApplyEdit, mockFindFiles, mockReadFile } = vi.hoisted(() => ({
   mockExecuteCommand: vi.fn(),
   mockApplyEdit: vi.fn(() => Promise.resolve(true)),
+  mockFindFiles: vi.fn(() => Promise.resolve([])),
+  mockReadFile: vi.fn(() => Promise.resolve(new Uint8Array())),
 }));
 
 vi.mock('vscode', () => ({
@@ -11,6 +13,8 @@ vi.mock('vscode', () => ({
   },
   workspace: {
     applyEdit: mockApplyEdit,
+    findFiles: mockFindFiles,
+    fs: { readFile: mockReadFile },
   },
   Uri: {
     parse: (s: string) => ({ toString: () => s, fsPath: s }),
@@ -35,6 +39,8 @@ describe('EditorToolExecutor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFindFiles.mockReset();
+    mockReadFile.mockReset();
     executor = new EditorToolExecutor();
   });
 
@@ -122,6 +128,63 @@ describe('EditorToolExecutor', () => {
       });
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/no rename/i);
+    });
+  });
+
+  describe('search_files', () => {
+    it('returns matching file paths', async () => {
+      mockFindFiles.mockResolvedValue([
+        { fsPath: '/workspace/src/foo.ts' },
+        { fsPath: '/workspace/src/bar.ts' },
+      ]);
+      const result = await executor.execute('search_files', { pattern: 'src/**/*.ts' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('foo.ts');
+      expect(result.message).toContain('bar.ts');
+    });
+
+    it('returns "No files found" when nothing matches', async () => {
+      mockFindFiles.mockResolvedValue([]);
+      const result = await executor.execute('search_files', { pattern: '**/*.xyz' });
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('No files found');
+    });
+  });
+
+  describe('grep_files', () => {
+    it('returns matching lines with file and line number', async () => {
+      const content = 'line one\nhello world\nline three\n';
+      mockFindFiles.mockResolvedValue([{ fsPath: '/workspace/src/foo.ts' }]);
+      mockReadFile.mockResolvedValue(new TextEncoder().encode(content));
+
+      const result = await executor.execute('grep_files', { pattern: 'hello', include: '**/*.ts' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('foo.ts');
+      expect(result.message).toContain('hello world');
+    });
+
+    it('returns "No matches found" when pattern does not match', async () => {
+      const content = 'nothing here\n';
+      mockFindFiles.mockResolvedValue([{ fsPath: '/workspace/src/foo.ts' }]);
+      mockReadFile.mockResolvedValue(new TextEncoder().encode(content));
+
+      const result = await executor.execute('grep_files', { pattern: 'xyz123' });
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('No matches found');
+    });
+
+    it('skips unreadable files without throwing', async () => {
+      mockFindFiles.mockResolvedValue([
+        { fsPath: '/workspace/src/foo.ts' },
+        { fsPath: '/workspace/src/bad.ts' },
+      ]);
+      mockReadFile
+        .mockResolvedValueOnce(new TextEncoder().encode('hello world\n'))
+        .mockRejectedValueOnce(new Error('Permission denied'));
+
+      const result = await executor.execute('grep_files', { pattern: 'hello' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('hello');
     });
   });
 });
