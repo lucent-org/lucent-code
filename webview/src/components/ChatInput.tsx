@@ -256,17 +256,26 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <Show when={terminalError()}>
               <div class="attachment-chip attachment-chip-empty-terminal">
                 <span class="attachment-name">No active terminal</span>
-              </div>
-            </Show>
-            <Show when={terminalContent() !== null}>
-              <div class="attachment-chip attachment-chip--terminal">
-                <span class="attachment-name">&gt;_ Terminal ({terminalContent()!.split('\n').length} lines)</span>
                 <button
                   class="attachment-remove"
-                  onClick={() => setTerminalContent(null)}
-                  title="Remove"
+                  aria-label="Dismiss"
+                  onClick={() => setTerminalError(false)}
+                  title="Dismiss"
                 >×</button>
               </div>
+            </Show>
+            <Show when={terminalContent()}>
+              {(content) => (
+                <div class="attachment-chip attachment-chip--terminal">
+                  <span class="attachment-name">&gt;_ Terminal ({content().split('\n').length} lines)</span>
+                  <button
+                    class="attachment-remove"
+                    aria-label="Remove terminal output"
+                    onClick={() => setTerminalContent(null)}
+                    title="Remove"
+                  >×</button>
+                </div>
+              )}
             </Show>
             <For each={attachments()}>
               {(att) => (
@@ -327,7 +336,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0)}
+              disabled={isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null)}
             >
               Send
             </button>
