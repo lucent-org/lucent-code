@@ -34,7 +34,7 @@ describe('NotificationService', () => {
       expect.stringContaining('API key'),
       'Set API Key'
     );
-    expect(mockExecuteCommand).toHaveBeenCalledWith('openRouterChat.setApiKey');
+    expect(mockExecuteCommand).toHaveBeenCalledWith('lucentCode.setApiKey');
   });
 
   it('should show rate limit warning', async () => {
@@ -51,7 +51,7 @@ describe('NotificationService', () => {
       expect.stringContaining('Invalid API key'),
       'Update API Key'
     );
-    expect(mockExecuteCommand).toHaveBeenCalledWith('openRouterChat.setApiKey');
+    expect(mockExecuteCommand).toHaveBeenCalledWith('lucentCode.setApiKey');
   });
 
   it('should show network error', async () => {

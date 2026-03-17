@@ -83,14 +83,14 @@ describe('AuthManager', () => {
 
   it('should store API key via setApiKey', async () => {
     await auth.setApiKey('sk-new-key');
-    expect(mockSecretStorage.store).toHaveBeenCalledWith('openRouterChat.apiKey', 'sk-new-key');
+    expect(mockSecretStorage.store).toHaveBeenCalledWith('lucentCode.apiKey', 'sk-new-key');
   });
 
   it('should prompt user and store key via promptForApiKey', async () => {
     mockWindow.showInputBox.mockResolvedValue('sk-prompted-key');
     const key = await auth.promptForApiKey();
     expect(key).toBe('sk-prompted-key');
-    expect(mockSecretStorage.store).toHaveBeenCalledWith('openRouterChat.apiKey', 'sk-prompted-key');
+    expect(mockSecretStorage.store).toHaveBeenCalledWith('lucentCode.apiKey', 'sk-prompted-key');
   });
 
   it('should return undefined if user cancels prompt', async () => {
