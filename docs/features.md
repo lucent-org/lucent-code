@@ -23,7 +23,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Conversation history | Persist conversations locally, restore on reopen | 4 |
 | :white_check_mark: | Auto-title conversations | Generate conversation titles via a lightweight LLM call | 4 |
 | :white_check_mark: | Export conversations | Export as JSON or Markdown | 4 |
-| :construction: | Import conversations | Import conversations from JSON | 4 |
+| :white_check_mark: | Import conversations | Import conversations from JSON | 4 |
 
 ## Model Selection
 
@@ -54,7 +54,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | API key auth | Store API key in VSCode SecretStorage (encrypted) | 1 |
 | :white_check_mark: | Auth prompt on activation | Prompt for credentials if none found on startup | 1 |
 | :white_check_mark: | OAuth flow | Browser-based login via OpenRouter OAuth with proper PKCE (SHA-256) | 4 |
-| :construction: | Token management | Secure token storage, refresh, and revocation | 4 |
+| :white_check_mark: | Token management | Secure token storage, refresh, and revocation | 4 |
 | :white_check_mark: | Auth state events | EventEmitter for login/logout so modules can react | 1 |
 
 ## Code Intelligence (LSP Integration)
@@ -115,7 +115,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 144 tests across 15 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 156 tests across 15 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -148,7 +148,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | ~~Retry with backoff~~ | Fixed — exponential backoff with ±20% jitter for 429/5xx, Retry-After header support, AbortSignal propagation | Review |
 | :white_check_mark: | ~~inlineSuggest kill switch~~ | Fixed — guard clause checks `editor.inlineSuggest.enabled === false` before any API call | Review |
 | :white_check_mark: | ~~Enriched context on ready~~ | Fixed — `ready` handler calls `buildEnrichedContext()` with fallback to `buildContext()` | Review |
-| :construction: | Type duplication | ChatMessage, ConversationSummary, Model defined in both extension and webview | Review |
+| :white_check_mark: | ~~Type duplication~~ | Fixed — `@shared` path alias unifies ChatMessage, ConversationSummary, Model across extension and webview | Review |
 | :white_check_mark: | ~~Idiomatic scroll-to-bottom~~ | Fixed — `createEffect` watches the messages signal and scrolls to bottom reactively | Review |
 | :white_check_mark: | ~~deactivate cleanup~~ | Fixed — `abort()` method on `MessageHandler`, called from `deactivate()` via module-scope reference | Review |
 
@@ -175,14 +175,14 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 
 | Status | Feature | Why | Effort |
 |--------|---------|-----|--------|
-| :construction: | **Import conversations** | Completes the export/import pair — export already ships | S |
-| :construction: | **OAuth token management** | Refresh + revocation needed for the OAuth flow to be production-ready | M |
+| :white_check_mark: | **Import conversations** | Completes the export/import pair — export already ships | S |
+| :white_check_mark: | **OAuth token management** | Refresh + revocation needed for the OAuth flow to be production-ready | M |
 | :construction: | **Generate commit message** | AI-generated commit message from staged diff via SCM context menu — very practical daily use | M |
 | :white_check_mark: | **Task completion notification** | VSCode notification (+ optional sound) when a long streaming response finishes | XS |
 | :construction: | **Add terminal output to context** | Button to include current terminal output in the next message — essential for debugging loops | S |
 | :construction: | **Contextual code actions** | Include available quick-fix actions at cursor in the prompt so the LLM can suggest applying them | M |
 | :white_check_mark: | **Idiomatic scroll-to-bottom** | Replace imperative DOM calls with Solid.js `createEffect` watching messages | XS |
-| :construction: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
+| :white_check_mark: | **Type duplication** | Unify `ChatMessage`, `ConversationSummary`, `Model` across extension and webview | S |
 
 ### P3 — Later (higher effort or lower urgency)
 
