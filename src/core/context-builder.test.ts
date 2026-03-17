@@ -11,6 +11,15 @@ vi.mock('vscode', () => ({
   },
   Uri: {
     file: (path: string) => ({ fsPath: path, toString: () => path }),
+    parse: (uri: string) => ({ toString: () => uri }),
+  },
+  commands: {
+    executeCommand: vi.fn(() => Promise.resolve([])),
+  },
+  Position: vi.fn((line: number, char: number) => ({ line, character: char })),
+  Range: vi.fn((start: any, end: any) => ({ start, end })),
+  CodeActionKind: {
+    QuickFix: { value: 'quickfix' },
   },
 }));
 
@@ -204,6 +213,56 @@ describe('ContextBuilder', () => {
 
       const prompt = builder.formatEnrichedPrompt(context);
       expect(prompt).not.toContain('Diagnostics');
+    });
+  });
+
+  describe('buildEnrichedContext — code actions', () => {
+    it('populates codeActions from executeCodeActionProvider', async () => {
+      const mockActions = [
+        { title: 'Add missing import' },
+        { title: 'Extract to function', kind: { value: 'refactor' } },
+      ];
+      (vscode.commands.executeCommand as any).mockResolvedValueOnce(mockActions);
+
+      (vscode.window as any).activeTextEditor = {
+        document: {
+          uri: { toString: () => 'file:///test.ts' },
+          languageId: 'typescript',
+          getText: vi.fn(() => 'const x = 1;'),
+        },
+        selection: {
+          active: { line: 0, character: 0 },
+          isEmpty: true,
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 0 },
+        },
+      };
+
+      const builder = new ContextBuilder();
+      const context = await builder.buildEnrichedContext();
+      expect(context.codeActions).toEqual(['Add missing import', 'Extract to function']);
+    });
+
+    it('omits codeActions when none available', async () => {
+      (vscode.commands.executeCommand as any).mockResolvedValueOnce([]);
+
+      (vscode.window as any).activeTextEditor = {
+        document: {
+          uri: { toString: () => 'file:///test.ts' },
+          languageId: 'typescript',
+          getText: vi.fn(() => 'const x = 1;'),
+        },
+        selection: {
+          active: { line: 0, character: 0 },
+          isEmpty: true,
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 0 },
+        },
+      };
+
+      const builder = new ContextBuilder();
+      const context = await builder.buildEnrichedContext();
+      expect(context.codeActions).toBeUndefined();
     });
   });
 

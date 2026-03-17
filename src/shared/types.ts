@@ -146,6 +146,7 @@ export interface CodeContext {
     severity: string;
     range: { startLine: number; endLine: number };
   }>;
+  codeActions?: string[];
 }
 
 // ---- Conversations ----

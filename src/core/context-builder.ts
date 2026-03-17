@@ -96,21 +96,40 @@ export class ContextBuilder {
   async buildEnrichedContext(): Promise<CodeContext> {
     const context = this.buildContext();
 
-    if (!this.codeIntelligence || !context.activeFile) {
+    if (!context.activeFile) {
       return context;
     }
 
-    const uri = context.activeFile.uri;
     const line = context.activeFile.cursorLine ?? 0;
     const char = context.activeFile.cursorCharacter ?? 0;
 
-    const lspContext = await this.codeIntelligence.resolveContext(uri, line, char);
+    if (this.codeIntelligence) {
+      const lspContext = await this.codeIntelligence.resolveContext(context.activeFile.uri, line, char);
 
-    context.diagnostics = lspContext.diagnostics.map((d) => ({
-      message: d.message,
-      severity: d.severity,
-      range: { startLine: d.startLine, endLine: d.endLine },
-    }));
+      context.diagnostics = lspContext.diagnostics.map((d) => ({
+        message: d.message,
+        severity: d.severity,
+        range: { startLine: d.startLine, endLine: d.endLine },
+      }));
+    }
+
+    // Fetch available code actions at cursor
+    try {
+      const uri = vscode.Uri.parse(context.activeFile.uri);
+      const pos = new vscode.Position(line, char);
+      const range = new vscode.Range(pos, pos);
+      const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+        'vscode.executeCodeActionProvider',
+        uri,
+        range,
+        vscode.CodeActionKind.QuickFix.value
+      );
+      if (actions && actions.length > 0) {
+        context.codeActions = actions.map((a) => a.title);
+      }
+    } catch {
+      // Code actions not supported for this language — omit
+    }
 
     return context;
   }
@@ -122,6 +141,13 @@ export class ContextBuilder {
       prompt += '\n\n## Diagnostics:\n';
       for (const d of context.diagnostics) {
         prompt += `- [${d.severity}] Line ${d.range.startLine + 1}: ${d.message}\n`;
+      }
+    }
+
+    if (context.codeActions && context.codeActions.length > 0) {
+      prompt += '\n\n## Available Code Actions at Cursor:\n';
+      for (const action of context.codeActions) {
+        prompt += `- ${action}\n`;
       }
     }
 
