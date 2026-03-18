@@ -209,6 +209,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Post MCP status to webview on setup
     postMcpStatus();
+    chatProvider.postMessageToWebview({
+      type: 'autonomousModeChanged',
+      enabled: settings.autonomousMode,
+    });
   };
 
   chatProvider.onResolve = setupWebviewMessaging;
