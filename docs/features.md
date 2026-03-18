@@ -91,7 +91,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Tool-use: insert code | LLM can insert code at a specific position | 3 |
 | :white_check_mark: | Tool-use: replace range | LLM can replace a code range | 3 |
 | :white_check_mark: | Contextual code actions | Include available quick fixes at cursor in the prompt | 3 |
-| :construction: | Diff preview | Show diff preview for user approval before destructive changes | 3 |
+| :white_check_mark: | Diff preview | Show diff preview for user approval before destructive changes | 3 |
 | :white_check_mark: | Tool-use: search web | LLM can search the web via DuckDuckGo (no API key required) | - |
 | :white_check_mark: | Tool-use: fetch URL | LLM can fetch any URL as Markdown via Jina AI reader (no API key required) | - |
 | :white_check_mark: | Tool-use: HTTP request | LLM can make GET/POST/PUT/DELETE requests to local or remote APIs | - |
@@ -241,7 +241,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 
 | Status | Feature | Why | Effort |
 |--------|---------|-----|--------|
-| :construction: | **Multiple chat sessions** | Parallel tabbed conversations — significant UI overhaul | XL |
+| :white_check_mark: | ~~Multiple chat sessions~~ | Session strip: tab row (≥400px) or dropdown (<400px) showing last 5 conversations; switches active conversation | XL |
 | :white_check_mark: | ~~MCP server integration~~ | Implemented — three-tier config, stdio subprocess spawning, namespaced tool merging, approval gate, autonomous mode bypass | XL |
 | :construction: | **Git worktree isolation** | Per-session isolated worktree branch for safe agentic edits | L |
 | :construction: | **Semantic codebase search** | Vector-index workspace for meaning-based retrieval — needs embedding pipeline | XL |
