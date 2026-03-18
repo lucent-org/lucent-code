@@ -23,6 +23,8 @@ interface DiffState {
   fileUri: string;
 }
 
+const MAX_RECENTS = 5;
+
 function createChatStore() {
   const [messages, setMessages] = createSignal<ChatMessage[]>([]);
   const [models, setModels] = createSignal<OpenRouterModel[]>([]);
@@ -36,7 +38,6 @@ function createChatStore() {
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
 
-  const MAX_RECENTS = 5;
   const [recentConversationIds, setRecentConversationIds] = createSignal<string[]>(
     (() => {
       const saved = getVsCodeApi().getState() as { recentConversationIds?: string[] } | undefined;
@@ -44,16 +45,16 @@ function createChatStore() {
     })()
   );
 
+  const vscode = getVsCodeApi();
+
   function pushRecent(id: string) {
     if (!id) return;
     setRecentConversationIds((prev) => {
       const next = [id, ...prev.filter((x) => x !== id)].slice(0, MAX_RECENTS);
-      getVsCodeApi().setState({ ...(getVsCodeApi().getState() as object ?? {}), recentConversationIds: next });
+      vscode.setState({ ...(vscode.getState() as object ?? {}), recentConversationIds: next });
       return next;
     });
   }
-
-  const vscode = getVsCodeApi();
 
   function sendMessage(content: string, images: string[] = []) {
     if (!content.trim() && images.length === 0) return;
