@@ -60,6 +60,7 @@ import type { ExtensionMessage, CodeContext, OpenRouterModel, Conversation, Conv
 import type { ConversationHistory } from './history';
 import type { EditorToolExecutor } from '../lsp/editor-tools';
 import type { NotificationService } from '../core/notifications';
+import type { SkillRegistry } from '../skills/skill-registry';
 
 // Helper to create an async generator from chunks
 async function* createMockStream(chunks: Array<{ choices: Array<{ delta: { content?: string }; finish_reason: string | null }> }>) {
@@ -1113,6 +1114,112 @@ describe('MessageHandler', () => {
       const firstCall = mockClient.chatStream.mock.calls[0][0];
       expect(firstCall.tools).toBeDefined();
       expect(firstCall.tools.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('MessageHandler — skill integration', () => {
+    let mockSkillRegistry: {
+      get: ReturnType<typeof vi.fn>;
+      getSummaries: ReturnType<typeof vi.fn>;
+      getAll: ReturnType<typeof vi.fn>;
+    };
+    let skillHandler: MessageHandler;
+
+    beforeEach(() => {
+      mockSkillRegistry = {
+        get: vi.fn(),
+        getSummaries: vi.fn().mockReturnValue([
+          { name: 'tdd', description: 'Test-driven development approach' },
+        ]),
+        getAll: vi.fn().mockReturnValue([]),
+      };
+
+      skillHandler = new MessageHandler(
+        mockClient as unknown as OpenRouterClient,
+        mockContextBuilder as unknown as ContextBuilder,
+        mockSettings as unknown as Settings,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        mockSkillRegistry as unknown as SkillRegistry
+      );
+    });
+
+    it('handles use_skill tool call by returning skill content', async () => {
+      const skillContent = 'Write tests first, then implementation.';
+      mockSkillRegistry.get.mockImplementation((name: string) => {
+        if (name === 'tdd') {
+          return { name: 'tdd', description: 'Test-driven development approach', content: skillContent, source: 'local' };
+        }
+        return undefined;
+      });
+
+      const toolStream = createToolCallStream([
+        { id: 'call_skill_1', name: 'use_skill', arguments: '{"name":"tdd"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'Here is my tdd approach.' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'help me write tests', model: 'test-model' },
+        postMessage
+      );
+
+      // The second chatStream call should include the tool result with skill content
+      const secondCallMessages = mockClient.chatStream.mock.calls[1][0].messages;
+      const toolResultMsg = secondCallMessages.find((m: any) => m.role === 'tool');
+      expect(toolResultMsg).toBeDefined();
+      expect(toolResultMsg.content).toBe(skillContent);
+    });
+
+    it('returns error message for unknown skill name', async () => {
+      mockSkillRegistry.get.mockReturnValue(undefined);
+
+      const toolStream = createToolCallStream([
+        { id: 'call_skill_2', name: 'use_skill', arguments: '{"name":"unknown"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'Skill not found.' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'use unknown skill', model: 'test-model' },
+        postMessage
+      );
+
+      const secondCallMessages = mockClient.chatStream.mock.calls[1][0].messages;
+      const toolResultMsg = secondCallMessages.find((m: any) => m.role === 'tool');
+      expect(toolResultMsg).toBeDefined();
+      expect(toolResultMsg.content).toContain('Skill not found: unknown');
+    });
+
+    it('includes skill advertisement in system message when registry has skills', async () => {
+      mockSkillRegistry.get.mockReturnValue(undefined);
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'hello', model: 'test-model' },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      const systemMessage = callArgs.messages.find((m: { role: string }) => m.role === 'system');
+      expect(systemMessage).toBeDefined();
+      expect(systemMessage.content).toContain('Available Skills');
+      expect(systemMessage.content).toContain('tdd');
+      expect(systemMessage.content).toContain('use_skill');
     });
   });
 });

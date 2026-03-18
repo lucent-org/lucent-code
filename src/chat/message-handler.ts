@@ -8,10 +8,12 @@ import { messageText } from '../core/message-text';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
-import { EditorToolExecutor, TOOL_DEFINITIONS } from '../lsp/editor-tools';
+import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION } from '../lsp/editor-tools';
 import { ConversationHistory } from './history';
 import { NotificationService } from '../core/notifications';
 import { TerminalBuffer } from '../core/terminal-buffer';
+import { SkillRegistry } from '../skills/skill-registry';
+import { SkillMatcher } from '../skills/skill-matcher';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -22,6 +24,7 @@ export class MessageHandler {
   onStreamEnd?: () => void;
 
   private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
+  private readonly skillMatcher = new SkillMatcher();
 
   private static readonly GATED_TOOLS = new Set([
     'rename_symbol',
@@ -37,7 +40,8 @@ export class MessageHandler {
     private readonly toolExecutor?: EditorToolExecutor,
     private readonly history?: ConversationHistory,
     private readonly notifications: NotificationService = new NotificationService(),
-    private readonly terminalBuffer?: TerminalBuffer
+    private readonly terminalBuffer?: TerminalBuffer,
+    private readonly skillRegistry?: SkillRegistry
   ) {}
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -81,6 +85,10 @@ export class MessageHandler {
           context = this.contextBuilder.buildContext();
         }
         postMessage({ type: 'contextUpdate', context });
+        const skillSummaries = this.skillRegistry?.getSummaries() ?? [];
+        if (skillSummaries.length > 0) {
+          postMessage({ type: 'skillsLoaded', skills: skillSummaries });
+        }
         break;
       }
       case 'applyToFile':
@@ -100,6 +108,11 @@ export class MessageHandler {
       case 'getTerminalOutput': {
         const content = this.terminalBuffer?.getActiveTerminalOutput() ?? null;
         postMessage({ type: 'terminalOutput', content });
+        break;
+      }
+      case 'getSkillContent': {
+        const skill = this.skillRegistry?.get(message.name);
+        postMessage({ type: 'skillContent', name: message.name, content: skill?.content ?? null });
         break;
       }
     }
@@ -125,16 +138,35 @@ export class MessageHandler {
       ].join(''),
     };
 
+    const skillSummaries = this.skillRegistry?.getSummaries() ?? [];
+    if (skillSummaries.length > 0) {
+      const advertisement = `\n\n## Available Skills\nThe following skills are available. Use the \`use_skill\` tool when a skill is relevant.\n\n${skillSummaries.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`;
+      systemMessage.content += advertisement;
+    }
+
+    const skillMatches = this.skillRegistry
+      ? this.skillMatcher.match(content, this.skillRegistry.getSummaries())
+      : [];
+    const skillBlocks = skillMatches
+      .map((name) => this.skillRegistry!.get(name))
+      .filter((s): s is NonNullable<typeof s> => s !== undefined)
+      .map((s) => `<skill name="${s.name}">\n${s.content}\n</skill>`)
+      .join('\n\n');
+
+    const baseContent = skillBlocks ? `${skillBlocks}\n\n${content}` : content;
     const userContent = images.length > 0
       ? [
-          { type: 'text' as const, text: content },
+          { type: 'text' as const, text: baseContent },
           ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
         ]
-      : content;
+      : baseContent;
     this.conversationMessages.push({ role: 'user', content: userContent });
     this.abortController = new AbortController();
 
-    const tools = this.toolExecutor ? TOOL_DEFINITIONS : undefined;
+    const skillTools = this.skillRegistry ? [USE_SKILL_TOOL_DEFINITION] : [];
+    const editorTools = this.toolExecutor ? TOOL_DEFINITIONS : [];
+    const allTools = [...skillTools, ...editorTools];
+    const tools = allTools.length > 0 ? allTools : undefined;
 
     try {
       const MAX_TOOL_ITERATIONS = 5;
@@ -177,7 +209,7 @@ export class MessageHandler {
           finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
         }
 
-        if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && this.toolExecutor) {
+        if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && (this.toolExecutor || this.skillRegistry)) {
           const toolCalls: ToolCall[] = Array.from(toolCallAccumulator.values()).map((tc, i) => ({
             id: tc.id || `call_${i}`,
             type: 'function' as const,
@@ -195,6 +227,24 @@ export class MessageHandler {
                 role: 'tool',
                 tool_call_id: tc.id,
                 content: `Error: ${parseError}`,
+              });
+              continue;
+            }
+            if (tc.function.name === 'use_skill') {
+              const skillName = (args.name as string) ?? '';
+              const skill = this.skillRegistry?.get(skillName);
+              this.conversationMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: skill ? skill.content : `Skill not found: ${skillName}`,
+              });
+              continue;
+            }
+            if (!this.toolExecutor) {
+              this.conversationMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: `Error: No tool executor available`,
               });
               continue;
             }

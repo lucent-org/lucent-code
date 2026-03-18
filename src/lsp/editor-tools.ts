@@ -180,6 +180,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 ];
 
+export const USE_SKILL_TOOL_DEFINITION: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'use_skill',
+    description: 'Load a skill\'s full instructions to guide your approach for a specific task. Call this when a skill listed in Available Skills is relevant.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The skill name as listed in Available Skills' },
+      },
+      required: ['name'],
+    },
+  },
+};
+
 export class EditorToolExecutor {
   constructor(
     private readonly getTavilyApiKey?: () => Promise<string | undefined>
