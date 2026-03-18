@@ -1,4 +1,4 @@
-import { Component, For } from 'solid-js';
+import { Component, For, Show } from 'solid-js';
 import { getVsCodeApi } from '../utils/vscode-api';
 
 export interface DiffLine {
@@ -11,6 +11,7 @@ interface DiffViewProps {
   filename: string;
   fileUri: string;
   onDismiss: () => void;
+  readOnly?: boolean;
 }
 
 const DiffView: Component<DiffViewProps> = (props) => {
@@ -23,10 +24,12 @@ const DiffView: Component<DiffViewProps> = (props) => {
     <div class="diff-view">
       <div class="diff-header">
         <span class="diff-filename">{props.filename.split(/[\\/]/).pop()}</span>
-        <div class="diff-actions">
-          <button class="diff-apply" onClick={apply}>Apply</button>
-          <button class="diff-discard" onClick={props.onDismiss}>Discard</button>
-        </div>
+        <Show when={!props.readOnly}>
+          <div class="diff-actions">
+            <button class="diff-apply" onClick={apply}>Apply</button>
+            <button class="diff-discard" onClick={props.onDismiss}>Discard</button>
+          </div>
+        </Show>
       </div>
       <pre class="diff-content">
         <For each={props.lines}>
