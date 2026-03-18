@@ -111,6 +111,22 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Trigger mode setting | Auto / manual inline completion trigger | 2 |
 | :white_check_mark: | Debounce delay setting | Configurable debounce for auto-trigger | 2 |
 
+## Skill Sets
+
+| Status | Feature | Description | Phase |
+|--------|---------|-------------|-------|
+| :white_check_mark: | Claude Code skill cache | Auto-loads skills from ~/.claude/plugins/cache/ and ~/.claude/skills/ | - |
+| :white_check_mark: | GitHub repo source | Fetch skills from any public GitHub repository | - |
+| :white_check_mark: | npm/unpkg source | Fetch skills from npm packages via unpkg.com | - |
+| :white_check_mark: | Superpowers marketplace | Fetch versioned skill packs from the superpowers registry | - |
+| :white_check_mark: | Local directory source | Load skills from a local directory | - |
+| :white_check_mark: | Skill advertisement | System prompt lists available skills (name + description) each turn | - |
+| :white_check_mark: | Semantic pre-injection | Keyword matching auto-injects relevant skills before model responds | - |
+| :white_check_mark: | use_skill tool | Model can explicitly request a skill's full content via tool call | - |
+| :white_check_mark: | Slash command autocomplete | Type /skill-name to select and attach a skill chip | - |
+| :white_check_mark: | Skill browser | ⚡ button + browseSkills command opens quick pick of all loaded skills | - |
+| :white_check_mark: | Add/refresh commands | addSkillSource wizard and refreshSkills command | - |
+
 ## Polish & UX
 
 | Status | Feature | Description | Phase |
