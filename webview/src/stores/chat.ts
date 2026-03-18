@@ -33,6 +33,7 @@ function createChatStore() {
   const [diffState, setDiffState] = createSignal<DiffState | null>(null);
   const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description: string }[]>([]);
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
+  const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
 
   const vscode = getVsCodeApi();
 
@@ -101,6 +102,10 @@ function createChatStore() {
 
   function handleSkillsLoaded(skills: { name: string; description: string }[]): void {
     setAvailableSkills(skills);
+  }
+
+  function setAutonomousModeFromMessage(value: boolean) {
+    setAutonomousModeSignal(value);
   }
 
   function resolveToolApproval(requestId: string, approved: boolean) {
@@ -226,6 +231,8 @@ function createChatStore() {
     handleSkillsLoaded,
     pendingSkillChip,
     setPendingSkillChip,
+    autonomousMode,
+    setAutonomousModeFromMessage,
   };
 }
 
