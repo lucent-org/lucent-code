@@ -81,6 +81,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
   await loadSkills();
 
+  // Register chat webview
+  const chatProvider = new ChatViewProvider(context.extensionUri);
+
+  function postMcpStatus(): void {
+    const status = mcpClientManager.getStatus();
+    if (Object.keys(status).length > 0) {
+      chatProvider.postMessageToWebview({ type: 'mcpStatus', servers: status });
+    }
+  }
+
   // Initialize MCP client
   const mcpClientManager = new McpClientManager();
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -186,16 +196,6 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('Response ready');
     }
   };
-
-  // Register chat webview
-  const chatProvider = new ChatViewProvider(context.extensionUri);
-
-  function postMcpStatus(): void {
-    const status = mcpClientManager.getStatus();
-    if (Object.keys(status).length > 0) {
-      chatProvider.postMessageToWebview({ type: 'mcpStatus', servers: status });
-    }
-  }
 
   // Set up webview message handling
   const setupWebviewMessaging = () => {
