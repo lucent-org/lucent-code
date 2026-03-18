@@ -978,6 +978,46 @@ describe('MessageHandler', () => {
       expect(resolved).toEqual([false]);
       expect((handler as any).pendingApprovals.size).toBe(0);
     });
+
+    it('toolApprovalRequest for replace_range includes a diff field', async () => {
+      const toolStream = createToolCallStream([
+        {
+          id: 'call_1',
+          name: 'replace_range',
+          arguments: JSON.stringify({
+            uri: 'file:///test.ts',
+            startLine: 0, startCharacter: 0,
+            endLine: 0, endCharacter: 5,
+            code: 'hello',
+          }),
+        },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+      const postMessages: ExtensionMessage[] = [];
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'replace', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+      // After the type change, this line must typecheck (no TS error):
+      const _diff: import('../shared/types').DiffLine[] | undefined = req.diff;
+      expect(_diff).toBeUndefined(); // undefined until Task 2 sets it
+
+      await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+      await sendPromise;
+    });
   });
 
   describe('handleSendMessage with images', () => {
