@@ -36,6 +36,23 @@ function createChatStore() {
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
 
+  const MAX_RECENTS = 5;
+  const [recentConversationIds, setRecentConversationIds] = createSignal<string[]>(
+    (() => {
+      const saved = getVsCodeApi().getState() as { recentConversationIds?: string[] } | undefined;
+      return saved?.recentConversationIds ?? [];
+    })()
+  );
+
+  function pushRecent(id: string) {
+    if (!id) return;
+    setRecentConversationIds((prev) => {
+      const next = [id, ...prev.filter((x) => x !== id)].slice(0, MAX_RECENTS);
+      getVsCodeApi().setState({ ...(getVsCodeApi().getState() as object ?? {}), recentConversationIds: next });
+      return next;
+    });
+  }
+
   const vscode = getVsCodeApi();
 
   function sendMessage(content: string, images: string[] = []) {
@@ -155,6 +172,7 @@ function createChatStore() {
 
   function handleConversationLoaded(conversation: Conversation) {
     setCurrentConversationId(conversation.id);
+    pushRecent(conversation.id);
     setMessages(conversation.messages
       .filter((m): m is { role: 'user' | 'assistant'; content: string | ContentPart[]; tool_calls?: unknown; tool_call_id?: string } =>
         m.role === 'user' || m.role === 'assistant')
@@ -176,6 +194,7 @@ function createChatStore() {
 
   function handleConversationSaved(id: string) {
     setCurrentConversationId(id);
+    pushRecent(id);
   }
 
   function handleConversationTitled(id: string, title: string) {
@@ -235,6 +254,7 @@ function createChatStore() {
     setPendingSkillChip,
     autonomousMode,
     setAutonomousModeFromMessage,
+    recentConversationIds,
   };
 }
 
