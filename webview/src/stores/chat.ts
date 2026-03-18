@@ -13,6 +13,7 @@ export interface ChatMessage {
     toolName: string;
     args: Record<string, unknown>;
     status: 'pending' | 'approved' | 'denied';
+    diff?: DiffLine[];
   };
 }
 
@@ -88,14 +89,15 @@ function createChatStore() {
   function handleToolApprovalRequest(
     requestId: string,
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    diff?: DiffLine[]
   ) {
     setMessages((prev) => [
       ...prev,
       {
         role: 'tool_approval' as const,
         content: '',
-        toolApproval: { requestId, toolName, args, status: 'pending' as const },
+        toolApproval: { requestId, toolName, args, status: 'pending' as const, diff },
       },
     ]);
   }
