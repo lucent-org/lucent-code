@@ -2,6 +2,15 @@ import * as vscode from 'vscode';
 
 const SECTION = 'lucentCode';
 
+export interface SkillSourceConfig {
+  type: 'github' | 'npm' | 'marketplace' | 'local';
+  url?: string;      // github
+  package?: string;  // npm
+  slug?: string;     // marketplace
+  version?: string;  // marketplace
+  path?: string;     // local
+}
+
 export class Settings {
   private get config() {
     return vscode.workspace.getConfiguration(SECTION);
@@ -33,6 +42,10 @@ export class Settings {
 
   get completionsMaxContextLines(): number {
     return this.config.get<number>('completions.maxContextLines', 100);
+  }
+
+  get skillSources(): SkillSourceConfig[] {
+    return this.config.get<SkillSourceConfig[]>('skills.sources', []);
   }
 
   async setChatModel(modelId: string): Promise<void> {

@@ -132,6 +132,21 @@
         "command": "lucentCode.setTavilyApiKey",
         "title": "Set Tavily API Key (Premium Web Search)",
         "category": "Lucent Code"
+      },
+      {
+        "command": "lucentCode.browseSkills",
+        "title": "Browse Skills",
+        "category": "Lucent Code"
+      },
+      {
+        "command": "lucentCode.addSkillSource",
+        "title": "Add Skill Source",
+        "category": "Lucent Code"
+      },
+      {
+        "command": "lucentCode.refreshSkills",
+        "title": "Refresh Skills",
+        "category": "Lucent Code"
       }
     ],
     "configuration": {
@@ -182,6 +197,27 @@
           "minimum": 10,
           "maximum": 500,
           "description": "Maximum number of lines before/after cursor to include as context"
+        },
+        "lucentCode.skills.sources": {
+          "type": "array",
+          "default": [],
+          "description": "Skill set sources. Each entry is an object with a 'type' and type-specific fields.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["github", "npm", "marketplace", "local"],
+                "description": "Source type"
+              },
+              "url": { "type": "string", "description": "GitHub repo URL (for type: github)" },
+              "package": { "type": "string", "description": "npm package name (for type: npm)" },
+              "slug": { "type": "string", "description": "Marketplace slug (for type: marketplace)" },
+              "version": { "type": "string", "description": "Marketplace version (for type: marketplace), defaults to latest" },
+              "path": { "type": "string", "description": "Local directory path (for type: local)" }
+            },
+            "required": ["type"]
+          }
         }
       }
     },
