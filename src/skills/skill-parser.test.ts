@@ -17,7 +17,7 @@ describe('parseFrontmatter', () => {
     expect(result.body).toBe('# Just a markdown file');
   });
 
-  it('handles multi-line description via first line only', () => {
+  it('ignores unknown frontmatter fields like type', () => {
     const md = `---\nname: tdd\ndescription: Test-driven development\ntype: rigid\n---\nbody`;
     const result = parseFrontmatter(md);
     expect(result.name).toBe('tdd');
@@ -29,5 +29,19 @@ describe('parseFrontmatter', () => {
     const result = parseFrontmatter(md);
     expect(result.name).toBeUndefined();
     expect(result.description).toBe('Some desc');
+  });
+
+  it('returns empty body for frontmatter with no content', () => {
+    const md = `---\nname: foo\ndescription: bar\n---\n`;
+    const result = parseFrontmatter(md);
+    expect(result.name).toBe('foo');
+    expect(result.body).toBe('');
+  });
+
+  it('handles Windows CRLF line endings', () => {
+    const md = `---\r\nname: win\r\ndescription: Windows\r\n---\r\nbody content`;
+    const result = parseFrontmatter(md);
+    expect(result.name).toBe('win');
+    expect(result.description).toBe('Windows');
   });
 });
