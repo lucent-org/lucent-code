@@ -14,7 +14,6 @@ function stem(word: string): string {
   return word
     .replace(/ings?$/, '')
     .replace(/ures?$/, '')
-    .replace(/ures?$/, '')
     .replace(/ing$/, '')
     .replace(/tion$/, 'te')
     .replace(/ies$/, 'y')

@@ -32,6 +32,7 @@ function createChatStore() {
   const [showConversationList, setShowConversationList] = createSignal(false);
   const [diffState, setDiffState] = createSignal<DiffState | null>(null);
   const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description: string }[]>([]);
+  const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
 
   const vscode = getVsCodeApi();
 
@@ -223,6 +224,8 @@ function createChatStore() {
     resolveToolApproval,
     availableSkills,
     handleSkillsLoaded,
+    pendingSkillChip,
+    setPendingSkillChip,
   };
 }
 

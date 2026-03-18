@@ -66,6 +66,9 @@ const App: Component = () => {
         case 'skillsLoaded':
           chatStore.handleSkillsLoaded(message.skills);
           break;
+        case 'insertSkillChip':
+          chatStore.setPendingSkillChip({ name: message.name, content: message.content });
+          break;
       }
     });
 
@@ -206,6 +209,8 @@ const App: Component = () => {
         onResolveMention={handleResolveMention}
         skills={chatStore.availableSkills()}
         onResolveSkill={handleResolveSkill}
+        pendingChip={chatStore.pendingSkillChip()}
+        onPendingChipConsumed={() => chatStore.setPendingSkillChip(null)}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Component, createSignal, Show, For } from 'solid-js';
+import { Component, createSignal, createEffect, Show, For } from 'solid-js';
 
 interface MentionSource {
   id: string;
@@ -44,6 +44,8 @@ interface ChatInputProps {
   onResolveMention: (type: string) => Promise<string | null>;
   skills: { name: string; description: string }[];
   onResolveSkill: (name: string) => Promise<string | null>;
+  pendingChip?: { name: string; content: string };
+  onPendingChipConsumed?: () => void;
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
@@ -60,6 +62,16 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [skillFilter, setSkillFilter] = createSignal('');
   const [skillChips, setSkillChips] = createSignal<{ name: string; content: string }[]>([]);
   let fileInputRef: HTMLInputElement | undefined;
+
+  createEffect(() => {
+    const chip = props.pendingChip;
+    if (!chip) return;
+    setSkillChips((prev) => {
+      if (prev.some((c) => c.name === chip.name)) return prev;
+      return [...prev, chip];
+    });
+    props.onPendingChipConsumed?.();
+  });
 
   const handleFiles = (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -416,7 +428,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null)}
+              disabled={isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0)}
             >
               Send
             </button>

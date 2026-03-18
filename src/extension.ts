@@ -336,9 +336,16 @@ export async function activate(context: vscode.ExtensionContext) {
         label: s.name,
         description: s.description,
       }));
-      await vscode.window.showQuickPick(items, {
-        placeHolder: 'Select a skill to learn about (slash commands available in chat)',
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a skill to insert into chat',
       });
+      if (picked) {
+        const skill = skillRegistry.get(picked.label);
+        if (skill) {
+          await vscode.commands.executeCommand('lucentCode.chatView.focus');
+          chatProvider.postMessageToWebview({ type: 'insertSkillChip', name: skill.name, content: skill.content });
+        }
+      }
     }),
 
     vscode.commands.registerCommand('lucentCode.addSkillSource', async () => {
@@ -380,12 +387,14 @@ export async function activate(context: vscode.ExtensionContext) {
       await config.update('skills.sources', [...existing, newSource], vscode.ConfigurationTarget.Global);
       await loadSkills();
       updateSkillsStatus();
+      chatProvider.postMessageToWebview({ type: 'skillsLoaded', skills: skillRegistry.getSummaries() });
       vscode.window.showInformationMessage(`Skill source added. ${skillRegistry.getAll().length} skills loaded.`);
     }),
 
     vscode.commands.registerCommand('lucentCode.refreshSkills', async () => {
       await loadSkills();
       updateSkillsStatus();
+      chatProvider.postMessageToWebview({ type: 'skillsLoaded', skills: skillRegistry.getSummaries() });
       vscode.window.showInformationMessage(`Skills refreshed: ${skillRegistry.getAll().length} skills loaded.`);
     })
   );

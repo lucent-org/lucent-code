@@ -103,7 +103,8 @@ export type ExtensionMessage =
   | { type: 'toolApprovalRequest'; requestId: string; toolName: string; args: Record<string, unknown> }
   | { type: 'terminalOutput'; content: string | null }
   | { type: 'skillsLoaded'; skills: SkillSummary[] }
-  | { type: 'skillContent'; name: string; content: string | null };
+  | { type: 'skillContent'; name: string; content: string | null }
+  | { type: 'insertSkillChip'; name: string; content: string };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }

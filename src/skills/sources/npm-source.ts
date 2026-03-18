@@ -5,7 +5,9 @@ export async function fetchNpmSkills(packageName: string): Promise<string[]> {
     if (!listResp.ok) return [];
 
     const meta = (await listResp.json()) as { files?: Array<{ path: string }> };
-    const mdPaths = (meta.files ?? []).filter((f) => f.path.endsWith('.md')).map((f) => f.path);
+    const mdPaths = (meta.files ?? [])
+      .filter((f) => f.path.endsWith('.md') && f.path.includes('/skills/'))
+      .map((f) => f.path);
 
     const contents = await Promise.all(
       mdPaths.map(async (p) => {
