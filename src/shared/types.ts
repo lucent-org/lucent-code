@@ -101,7 +101,9 @@ export type ExtensionMessage =
   | { type: 'triggerSend'; content: string; newChat: boolean }
   | { type: 'showDiff'; lines: DiffLine[]; filename: string; fileUri: string }
   | { type: 'toolApprovalRequest'; requestId: string; toolName: string; args: Record<string, unknown> }
-  | { type: 'terminalOutput'; content: string | null };
+  | { type: 'terminalOutput'; content: string | null }
+  | { type: 'skillsLoaded'; skills: SkillSummary[] }
+  | { type: 'skillContent'; name: string; content: string | null };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }
@@ -117,7 +119,8 @@ export type WebviewMessage =
   | { type: 'applyToFile'; code: string; language: string; filename?: string }
   | { type: 'confirmApply'; fileUri: string }
   | { type: 'toolApprovalResponse'; requestId: string; approved: boolean }
-  | { type: 'getTerminalOutput' };
+  | { type: 'getTerminalOutput' }
+  | { type: 'getSkillContent'; name: string };
 
 // ---- Diff types ----
 
@@ -170,4 +173,9 @@ export interface ConversationSummary {
   model: string;
   messageCount: number;
   updatedAt: string;
+}
+
+export interface SkillSummary {
+  name: string;
+  description: string;
 }
