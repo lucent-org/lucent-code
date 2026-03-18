@@ -1,10 +1,13 @@
 import { Component, Show } from 'solid-js';
+import DiffView from './DiffView';
+import type { DiffLine } from './DiffView';
 
 export interface ToolApprovalData {
   requestId: string;
   toolName: string;
   args: Record<string, unknown>;
   status: 'pending' | 'approved' | 'denied';
+  diff?: DiffLine[];
 }
 
 interface ToolCallCardProps {
@@ -18,6 +21,11 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
     return entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n');
   };
 
+  const filename = () => {
+    const uri = props.approval.args['uri'];
+    return typeof uri === 'string' ? uri : '';
+  };
+
   return (
     <div class={`tool-call-card tool-call-card--${props.approval.status}`}>
       <div class="tool-call-header">
@@ -29,7 +37,20 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
           </span>
         </Show>
       </div>
-      <pre class="tool-call-args">{argsPreview()}</pre>
+      <Show
+        when={props.approval.diff}
+        fallback={<pre class="tool-call-args">{argsPreview()}</pre>}
+      >
+        {(diff) => (
+          <DiffView
+            lines={diff()}
+            filename={filename()}
+            fileUri={filename()}
+            onDismiss={() => {}}
+            readOnly
+          />
+        )}
+      </Show>
       <Show when={props.approval.status === 'pending'}>
         <div class="tool-call-actions">
           <button
