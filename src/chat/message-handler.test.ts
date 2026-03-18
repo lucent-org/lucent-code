@@ -1013,8 +1013,8 @@ describe('MessageHandler', () => {
       const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
       // After the type change, this line must typecheck (no TS error):
       const _diff: import('../shared/types').DiffLine[] | undefined = req.diff;
-      // diff is either defined (when readFile returns data) or undefined (graceful fallback)
-      expect(_diff === undefined || Array.isArray(_diff)).toBe(true);
+      // readFile mock returns content (default mock), so computeToolDiff produces a real diff
+      expect(_diff).toBeDefined();
 
       await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
       await sendPromise;
@@ -1165,6 +1165,39 @@ describe('MessageHandler', () => {
         const postMessages: ExtensionMessage[] = [];
         const sendPromise = handler.handleMessage(
           { type: 'sendMessage', content: 'rename', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+        expect(req.diff).toBeUndefined();
+
+        await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+        await sendPromise;
+      });
+
+      it('apply_code_action approval request does NOT include diff', async () => {
+        const toolStream = createToolCallStream([
+          {
+            id: 'call_1',
+            name: 'apply_code_action',
+            arguments: JSON.stringify({ uri: 'file:///test.ts', action: 'some-action' }),
+          },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'apply action', model: 'gpt-4' },
           (msg) => postMessages.push(msg)
         );
 
