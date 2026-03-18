@@ -1304,6 +1304,7 @@ describe('MessageHandler', () => {
       });
     });
   });
+});
 
 describe('MessageHandler — MCP tool routing', () => {
   const postMessages: ExtensionMessage[] = [];
@@ -1406,5 +1407,43 @@ describe('MessageHandler — MCP tool routing', () => {
     expect(mcpManager.callTool).toHaveBeenCalledWith('mcp__filesystem__read_file', { path: '/tmp/test.txt' });
     expect(postMessages.some((m) => m.type === 'streamEnd')).toBe(true);
   });
-});
+
+  it('includes error content in tool result when callTool returns isError:true', async () => {
+    const mcpManager = makeMcpManager({
+      callTool: vi.fn().mockResolvedValue({ content: 'Error: Permission denied', isError: true }),
+    });
+    let streamCallCount = 0;
+    const mockClient = {
+      chatStream: vi.fn().mockImplementation(() => {
+        streamCallCount++;
+        if (streamCallCount === 1) {
+          return makeStreamWithToolCall('mcp__filesystem__read_file', '{}');
+        }
+        return (async function* () {
+          yield { choices: [{ delta: { content: 'I could not read the file.' }, finish_reason: null }] };
+          yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
+        })();
+      }),
+      listModels: vi.fn().mockResolvedValue([]),
+    } as unknown as OpenRouterClient;
+
+    const mockContext = {
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      buildContext: vi.fn().mockReturnValue({}),
+      formatEnrichedPrompt: vi.fn().mockReturnValue(''),
+      getCapabilities: vi.fn().mockReturnValue({}),
+      getCustomInstructions: vi.fn().mockReturnValue(''),
+    } as unknown as ContextBuilder;
+    const mockSettings = { temperature: 0.7, maxTokens: 4096, setChatModel: vi.fn() } as unknown as Settings;
+
+    const handler = new MessageHandler(mockClient, mockContext, mockSettings, undefined, undefined, undefined, undefined, undefined, mcpManager);
+    await handler.handleMessage({ type: 'sendMessage', content: 'Read file', model: 'claude-sonnet-4-6', images: [] }, postMessage);
+
+    // The error content should NOT have a double "Error: Error:" prefix
+    const chatStreamSecondCall = (mockClient.chatStream as any).mock.calls[1][0];
+    const toolResultMsg = chatStreamSecondCall.messages.find((m: any) => m.role === 'tool');
+    expect(toolResultMsg).toBeDefined();
+    expect(toolResultMsg.content).toBe('Error: Permission denied');
+    expect(toolResultMsg.content).not.toMatch(/^Error: Error:/);
+  });
 });

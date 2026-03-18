@@ -248,7 +248,7 @@ export class MessageHandler {
               this.conversationMessages.push({
                 role: 'tool',
                 tool_call_id: tc.id,
-                content: this.truncateToolOutput(mcpResult.isError ? `Error: ${mcpResult.content}` : mcpResult.content),
+                content: this.truncateToolOutput(mcpResult.content),
               });
               continue;
             }
