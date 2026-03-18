@@ -4,6 +4,9 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [solidPlugin()],
+  server: {
+    allowedHosts: ['host.docker.internal'],
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../src/shared/types'),
