@@ -105,7 +105,8 @@ export type ExtensionMessage =
   | { type: 'skillsLoaded'; skills: SkillSummary[] }
   | { type: 'skillContent'; name: string; content: string | null }
   | { type: 'insertSkillChip'; name: string; content: string }
-  | { type: 'mcpStatus'; servers: Record<string, 'connected' | 'error'> };
+  | { type: 'mcpStatus'; servers: Record<string, 'connected' | 'error'> }
+  | { type: 'autonomousModeChanged'; enabled: boolean };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }

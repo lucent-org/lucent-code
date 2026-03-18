@@ -240,6 +240,11 @@
               "type"
             ]
           }
+        },
+        "lucentCode.chat.autonomousMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, all tool calls (editor tools and MCP tools) run without approval prompts."
         }
       }
     },
