@@ -97,9 +97,17 @@ export async function activate(context: vscode.ExtensionContext) {
     const mcpWatcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(workspaceRoot, '.mcp.json')
     );
+    let reconnecting = false;
     const reconnect = async () => {
-      mcpClientManager.dispose();
-      await connectMcpServers();
+      if (reconnecting) return;
+      reconnecting = true;
+      try {
+        mcpClientManager.dispose();
+        await connectMcpServers();
+        postMcpStatus();
+      } finally {
+        reconnecting = false;
+      }
     };
     context.subscriptions.push(
       mcpWatcher,
@@ -179,6 +187,16 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   };
 
+  // Register chat webview
+  const chatProvider = new ChatViewProvider(context.extensionUri);
+
+  function postMcpStatus(): void {
+    const status = mcpClientManager.getStatus();
+    if (Object.keys(status).length > 0) {
+      chatProvider.postMessageToWebview({ type: 'mcpStatus', servers: status });
+    }
+  }
+
   // Set up webview message handling
   const setupWebviewMessaging = () => {
     const webview = chatProvider.getWebview();
@@ -188,10 +206,11 @@ export async function activate(context: vscode.ExtensionContext) {
       const postMessage = (msg: unknown) => webview.postMessage(msg);
       await handler.handleMessage(message, postMessage);
     });
+
+    // Post MCP status to webview on setup
+    postMcpStatus();
   };
 
-  // Register chat webview
-  const chatProvider = new ChatViewProvider(context.extensionUri);
   chatProvider.onResolve = setupWebviewMessaging;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
