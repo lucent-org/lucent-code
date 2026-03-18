@@ -207,16 +207,38 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["github", "npm", "marketplace", "local"],
+                "enum": [
+                  "github",
+                  "npm",
+                  "marketplace",
+                  "local"
+                ],
                 "description": "Source type"
               },
-              "url": { "type": "string", "description": "GitHub repo URL (for type: github)" },
-              "package": { "type": "string", "description": "npm package name (for type: npm)" },
-              "slug": { "type": "string", "description": "Marketplace slug (for type: marketplace)" },
-              "version": { "type": "string", "description": "Marketplace version (for type: marketplace), defaults to latest" },
-              "path": { "type": "string", "description": "Local directory path (for type: local)" }
+              "url": {
+                "type": "string",
+                "description": "GitHub repo URL (for type: github)"
+              },
+              "package": {
+                "type": "string",
+                "description": "npm package name (for type: npm)"
+              },
+              "slug": {
+                "type": "string",
+                "description": "Marketplace slug (for type: marketplace)"
+              },
+              "version": {
+                "type": "string",
+                "description": "Marketplace version (for type: marketplace), defaults to latest"
+              },
+              "path": {
+                "type": "string",
+                "description": "Local directory path (for type: local)"
+              }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           }
         }
       }
@@ -310,6 +332,7 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "diff": "^8.0.3"
   }
 }
