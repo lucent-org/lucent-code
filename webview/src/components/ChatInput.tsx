@@ -42,6 +42,8 @@ interface ChatInputProps {
   onCancel: () => void;
   isStreaming: boolean;
   onResolveMention: (type: string) => Promise<string | null>;
+  skills: { name: string; description: string }[];
+  onResolveSkill: (name: string) => Promise<string | null>;
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
@@ -54,6 +56,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [isDragging, setIsDragging] = createSignal(false);
   const [terminalContent, setTerminalContent] = createSignal<string | null>(null);
   const [terminalError, setTerminalError] = createSignal(false);
+  const [showSkills, setShowSkills] = createSignal(false);
+  const [skillFilter, setSkillFilter] = createSignal('');
+  const [skillChips, setSkillChips] = createSignal<{ name: string; content: string }[]>([]);
   let fileInputRef: HTMLInputElement | undefined;
 
   const handleFiles = (files: FileList | File[]) => {
@@ -138,6 +143,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       setShowMentions(false);
+      setShowSkills(false);
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey && !showMentions()) {
@@ -162,6 +168,18 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       }
     }
     setShowMentions(false);
+
+    // Detect / trigger for skills
+    const lastSlash = value.lastIndexOf('/');
+    if (lastSlash !== -1 && (lastSlash === 0 || value[lastSlash - 1] === ' ')) {
+      const afterSlash = value.slice(lastSlash + 1);
+      if (!afterSlash.includes(' ')) {
+        setSkillFilter(afterSlash.toLowerCase());
+        setShowSkills(true);
+        return;
+      }
+    }
+    setShowSkills(false);
   };
 
   const filteredSources = () =>
@@ -169,6 +187,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const actionSources = () => filteredSources().filter((s) => s.kind === 'action');
   const contextSources = () => filteredSources().filter((s) => s.kind === 'context');
+
+  const filteredSkills = () =>
+    props.skills.filter((s) => s.name.toLowerCase().includes(skillFilter()));
 
   const selectMention = async (source: MentionSource) => {
     setShowMentions(false);
@@ -193,6 +214,26 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     }
   };
 
+  const selectSkill = async (skill: { name: string; description: string }) => {
+    setShowSkills(false);
+    setIsResolvingMention(true);
+    // Remove the /filter text from input
+    const value = input();
+    const lastSlash = value.lastIndexOf('/');
+    setInput(lastSlash !== -1 ? value.slice(0, lastSlash) : value);
+    try {
+      const content = await props.onResolveSkill(skill.name);
+      if (content !== null) {
+        setSkillChips((prev) => {
+          if (prev.some((c) => c.name === skill.name)) return prev; // no duplicates
+          return [...prev, { name: skill.name, content }];
+        });
+      }
+    } finally {
+      setIsResolvingMention(false);
+    }
+  };
+
   const handleSend = () => {
     if (props.isStreaming) return;
 
@@ -202,8 +243,11 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
     const terminal = terminalContent();
     const terminalPart = terminal ? `<terminal output>\n${terminal}\n</terminal output>` : null;
+    const skillBlocks = skillChips()
+      .map((c) => `<skill name="${c.name}">\n${c.content}\n</skill>`)
+      .join('\n\n');
     const textParts = textFiles.map((a) => `\`\`\`${a.name}\n${a.data}\n\`\`\``);
-    const fullContent = [terminalPart, ...textParts, input().trim()].filter(Boolean).join('\n\n');
+    const fullContent = [skillBlocks || null, terminalPart, ...textParts, input().trim()].filter(Boolean).join('\n\n');
 
     if (!fullContent && images.length === 0) return;
 
@@ -212,6 +256,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     setAttachments([]);
     setTerminalContent(null);
     setTerminalError(false);
+    setSkillChips([]);
   };
 
   return (
@@ -251,7 +296,22 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             </For>
           </div>
         </Show>
-        <Show when={attachments().length > 0 || terminalContent() !== null || terminalError()}>
+        <Show when={showSkills() && filteredSkills().length > 0}>
+          <div class="mention-dropdown">
+            <For each={filteredSkills()}>
+              {(skill) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectSkill(skill); }}
+                >
+                  <span class="mention-item-label">/{skill.name}</span>
+                  <span class="mention-item-desc">{skill.description}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={attachments().length > 0 || terminalContent() !== null || terminalError() || skillChips().length > 0}>
           <div class="attachment-chips">
             <Show when={terminalError()}>
               <div class="attachment-chip attachment-chip--empty-terminal">
@@ -277,6 +337,19 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 </div>
               )}
             </Show>
+            <For each={skillChips()}>
+              {(chip) => (
+                <div class="attachment-chip attachment-chip--skill">
+                  <span class="attachment-name">⚡ {chip.name}</span>
+                  <button
+                    class="attachment-remove"
+                    aria-label={`Remove ${chip.name} skill`}
+                    onClick={() => setSkillChips((prev) => prev.filter((c) => c.name !== chip.name))}
+                    title="Remove"
+                  >×</button>
+                </div>
+              )}
+            </For>
             <For each={attachments()}>
               {(att) => (
                 <div class={`attachment-chip${att.error ? ' attachment-chip-error' : ''}`}>
@@ -302,7 +375,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           value={input()}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about your code... Type @ for mentions"
+          placeholder="Ask about your code... Type @ for mentions, / for skills"
           rows={3}
           disabled={props.isStreaming || isResolvingMention()}
         />
@@ -330,6 +403,13 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           title="Add terminal output"
           disabled={props.isStreaming || isResolvingMention()}
         >&gt;_</button>
+        <button
+          class="attach-button"
+          aria-label="Browse skills"
+          onClick={() => { setSkillFilter(''); setShowSkills(true); }}
+          title="Browse skills (or type / in the input)"
+          disabled={props.isStreaming || props.skills.length === 0}
+        >⚡</button>
         <Show
           when={props.isStreaming}
           fallback={
