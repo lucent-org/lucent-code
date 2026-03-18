@@ -882,3 +882,59 @@ body {
   border-radius: 4px;
   border: 1px solid var(--border);
 }
+
+/* Session Strip */
+.session-strip {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+  min-height: 0;
+}
+
+.session-strip-tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.session-strip-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.session-tab {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.1s;
+}
+
+.session-tab:hover {
+  opacity: 1;
+  background: var(--bg-secondary);
+}
+
+.session-tab--active {
+  opacity: 1;
+  border-bottom-color: var(--accent);
+  color: var(--vscode-foreground);
+}
+
+.session-strip-select {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  cursor: pointer;
+}
