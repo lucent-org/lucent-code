@@ -69,6 +69,9 @@ const App: Component = () => {
         case 'insertSkillChip':
           chatStore.setPendingSkillChip({ name: message.name, content: message.content });
           break;
+        case 'autonomousModeChanged':
+          chatStore.setAutonomousModeFromMessage(message.enabled);
+          break;
       }
     });
 
@@ -152,6 +155,13 @@ const App: Component = () => {
         </button>
         <button class="new-chat-button" onClick={chatStore.newChat} title="New Chat">
           +
+        </button>
+        <button
+          class={`autonomous-button ${chatStore.autonomousMode() ? 'active' : ''}`}
+          onClick={() => vscode.postMessage({ type: 'setAutonomousMode', enabled: !chatStore.autonomousMode() })}
+          title="Autonomous mode — all tools run without approval"
+        >
+          ⚡
         </button>
       </div>
 

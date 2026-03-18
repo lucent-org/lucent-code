@@ -167,6 +167,30 @@ body {
   font-size: var(--vscode-editor-font-size);
 }
 
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4 {
+  margin: 0.6em 0 0.2em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.message-content h1 { font-size: 1.3em; }
+.message-content h2 { font-size: 1.15em; }
+.message-content h3 { font-size: 1.05em; }
+.message-content h4 { font-size: 1em; }
+
+.message-content ul,
+.message-content ol {
+  margin: 0.3em 0;
+  padding-left: 1.4em;
+}
+
+.message-content li {
+  margin: 0.1em 0;
+}
+
 .cursor-blink {
   animation: blink 1s step-end infinite;
 }
@@ -263,6 +287,7 @@ body {
   border-radius: 3px;
   font-family: var(--vscode-editor-font-family);
   font-size: var(--vscode-editor-font-size);
+  white-space: nowrap;
 }
 
 .empty-state-suggestions {
@@ -308,6 +333,27 @@ body {
   background: var(--accent);
   color: var(--accent-fg);
   border-color: var(--accent);
+}
+
+.autonomous-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+  border-radius: 3px;
+}
+
+.autonomous-button:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.autonomous-button.active {
+  opacity: 1;
+  color: var(--vscode-charts-yellow);
 }
 
 /* Conversation List */
