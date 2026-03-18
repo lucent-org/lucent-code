@@ -84,15 +84,15 @@ export async function activate(context: vscode.ExtensionContext) {
   // Register chat webview
   const chatProvider = new ChatViewProvider(context.extensionUri);
 
+  // Initialize MCP client
+  const mcpClientManager = new McpClientManager();
+
   function postMcpStatus(): void {
     const status = mcpClientManager.getStatus();
     if (Object.keys(status).length > 0) {
       chatProvider.postMessageToWebview({ type: 'mcpStatus', servers: status });
     }
   }
-
-  // Initialize MCP client
-  const mcpClientManager = new McpClientManager();
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
   async function connectMcpServers(): Promise<void> {
