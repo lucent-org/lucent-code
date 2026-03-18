@@ -31,6 +31,7 @@ function createChatStore() {
   const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
   const [showConversationList, setShowConversationList] = createSignal(false);
   const [diffState, setDiffState] = createSignal<DiffState | null>(null);
+  const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description: string }[]>([]);
 
   const vscode = getVsCodeApi();
 
@@ -95,6 +96,10 @@ function createChatStore() {
         toolApproval: { requestId, toolName, args, status: 'pending' as const },
       },
     ]);
+  }
+
+  function handleSkillsLoaded(skills: { name: string; description: string }[]): void {
+    setAvailableSkills(skills);
   }
 
   function resolveToolApproval(requestId: string, approved: boolean) {
@@ -216,6 +221,8 @@ function createChatStore() {
     setDiffState,
     handleToolApprovalRequest,
     resolveToolApproval,
+    availableSkills,
+    handleSkillsLoaded,
   };
 }
 

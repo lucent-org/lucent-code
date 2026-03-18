@@ -63,6 +63,9 @@ const App: Component = () => {
           chatStore.handleToolApprovalRequest(msg.requestId, msg.toolName, msg.args);
           break;
         }
+        case 'skillsLoaded':
+          chatStore.handleSkillsLoaded(message.skills);
+          break;
       }
     });
 
@@ -108,6 +111,24 @@ const App: Component = () => {
         window.removeEventListener('message', handler);
         resolve(null);
       }, 3000);
+    });
+  };
+
+  const handleResolveSkill = (name: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const handler = (event: MessageEvent) => {
+        const msg = event.data as { type: string; name?: string; content?: string | null };
+        if (msg.type === 'skillContent' && msg.name === name) {
+          window.removeEventListener('message', handler);
+          resolve(msg.content ?? null);
+        }
+      };
+      window.addEventListener('message', handler);
+      vscode.postMessage({ type: 'getSkillContent', name });
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        resolve(null);
+      }, 5000);
     });
   };
 
@@ -183,6 +204,8 @@ const App: Component = () => {
         onCancel={chatStore.cancelRequest}
         isStreaming={chatStore.isStreaming()}
         onResolveMention={handleResolveMention}
+        skills={chatStore.availableSkills()}
+        onResolveSkill={handleResolveSkill}
       />
     </div>
   );
