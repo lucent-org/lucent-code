@@ -15,6 +15,13 @@ import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
 import { TerminalBuffer } from './core/terminal-buffer';
 import { messageText } from './core/message-text';
+import { SkillRegistry } from './skills/skill-registry';
+import { fetchGitHubSkills } from './skills/sources/github-source';
+import { fetchNpmSkills } from './skills/sources/npm-source';
+import { fetchMarketplaceSkills } from './skills/sources/marketplace-source';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as nodePath from 'path';
 
 interface GitExtension {
   getAPI(version: 1): GitAPI;
@@ -33,6 +40,44 @@ export async function activate(context: vscode.ExtensionContext) {
   const auth = new AuthManager(context.secrets);
   const settings = new Settings();
   const client = new OpenRouterClient(() => auth.getApiKey());
+
+  // Initialize skill registry
+  const skillRegistry = new SkillRegistry();
+
+  async function loadSkills(): Promise<void> {
+    const sources = settings.skillSources;
+    const ownMarkdowns: string[] = [];
+
+    for (const src of sources) {
+      try {
+        if (src.type === 'github' && src.url) {
+          ownMarkdowns.push(...await fetchGitHubSkills(src.url));
+        } else if (src.type === 'npm' && src.package) {
+          ownMarkdowns.push(...await fetchNpmSkills(src.package));
+        } else if (src.type === 'marketplace' && src.slug) {
+          ownMarkdowns.push(...await fetchMarketplaceSkills(src.slug, src.version));
+        } else if (src.type === 'local' && src.path) {
+          const expandedPath = src.path.replace(/^~/, os.homedir());
+          const files = await fs.readdir(expandedPath).catch(() => [] as string[]);
+          for (const file of files) {
+            if (typeof file === 'string' && file.endsWith('.md')) {
+              const content = await fs.readFile(nodePath.join(expandedPath, file), 'utf8').catch(() => '');
+              if (content) ownMarkdowns.push(content);
+            }
+          }
+        }
+      } catch {
+        // skip failing source — registry still loads from other sources
+      }
+    }
+
+    const preloaded = ownMarkdowns.length > 0
+      ? [{ type: 'local' as const, content: new Map(ownMarkdowns.map((md, i) => [String(i), md])) }]
+      : [];
+    await skillRegistry.load(preloaded);
+  }
+
+  await loadSkills();
   const contextBuilder = new ContextBuilder();
 
   // Set up instructions loader
@@ -79,7 +124,23 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set initial state
   void updateAuthStatus();
 
-  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer);
+  // Skills status bar
+  const skillsStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 89);
+  context.subscriptions.push(skillsStatusBar);
+
+  function updateSkillsStatus(): void {
+    const count = skillRegistry.getAll().length;
+    if (count > 0) {
+      skillsStatusBar.text = `$(book) ${count} skills`;
+      skillsStatusBar.tooltip = `Lucent Code: ${count} skills loaded — click to browse`;
+      skillsStatusBar.command = 'lucentCode.browseSkills';
+      skillsStatusBar.show();
+      setTimeout(() => skillsStatusBar.hide(), 5000);
+    }
+  }
+  updateSkillsStatus();
+
+  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry);
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -261,6 +322,71 @@ export async function activate(context: vscode.ExtensionContext) {
       } catch (error) {
         await notifications.handleError(error instanceof Error ? error.message : String(error));
       }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.browseSkills', async () => {
+      const summaries = skillRegistry.getSummaries();
+      if (summaries.length === 0) {
+        vscode.window.showInformationMessage('No skills loaded. Add sources via "Lucent Code: Add Skill Source".');
+        return;
+      }
+      const items = summaries.map((s) => ({
+        label: s.name,
+        description: s.description,
+      }));
+      await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a skill to learn about (slash commands available in chat)',
+      });
+    }),
+
+    vscode.commands.registerCommand('lucentCode.addSkillSource', async () => {
+      const typeItem = await vscode.window.showQuickPick(
+        [
+          { label: 'github', description: 'GitHub repository URL' },
+          { label: 'npm', description: 'npm package name' },
+          { label: 'marketplace', description: 'Superpowers marketplace slug' },
+          { label: 'local', description: 'Local directory path' },
+        ],
+        { placeHolder: 'Select source type' }
+      );
+      if (!typeItem) return;
+
+      const newSource: Record<string, string> = { type: typeItem.label };
+
+      if (typeItem.label === 'github') {
+        const url = await vscode.window.showInputBox({ prompt: 'GitHub repository URL (e.g. https://github.com/gsd-build/get-shit-done)' });
+        if (!url) return;
+        newSource.url = url;
+      } else if (typeItem.label === 'npm') {
+        const pkg = await vscode.window.showInputBox({ prompt: 'npm package name (e.g. @obra/superpowers-skills)' });
+        if (!pkg) return;
+        newSource.package = pkg;
+      } else if (typeItem.label === 'marketplace') {
+        const slug = await vscode.window.showInputBox({ prompt: 'Marketplace slug (e.g. superpowers)' });
+        if (!slug) return;
+        const version = await vscode.window.showInputBox({ prompt: 'Version (leave blank for latest)', value: 'latest' });
+        newSource.slug = slug;
+        newSource.version = version ?? 'latest';
+      } else if (typeItem.label === 'local') {
+        const dirPath = await vscode.window.showInputBox({ prompt: 'Local directory path (e.g. ~/my-skills)' });
+        if (!dirPath) return;
+        newSource.path = dirPath;
+      }
+
+      const config = vscode.workspace.getConfiguration('lucentCode');
+      const existing = config.get<unknown[]>('skills.sources', []);
+      await config.update('skills.sources', [...existing, newSource], vscode.ConfigurationTarget.Global);
+      await loadSkills();
+      updateSkillsStatus();
+      vscode.window.showInformationMessage(`Skill source added. ${skillRegistry.getAll().length} skills loaded.`);
+    }),
+
+    vscode.commands.registerCommand('lucentCode.refreshSkills', async () => {
+      await loadSkills();
+      updateSkillsStatus();
+      vscode.window.showInformationMessage(`Skills refreshed: ${skillRegistry.getAll().length} skills loaded.`);
     })
   );
 
