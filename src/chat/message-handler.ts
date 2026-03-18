@@ -26,6 +26,7 @@ export class MessageHandler {
 
   private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
   private readonly skillMatcher = new SkillMatcher();
+  private _autonomousMode = false;
 
   private static readonly GATED_TOOLS = new Set([
     'rename_symbol',
@@ -44,7 +45,13 @@ export class MessageHandler {
     private readonly terminalBuffer?: TerminalBuffer,
     private readonly skillRegistry?: SkillRegistry,
     private readonly mcpClientManager?: McpClientManager
-  ) {}
+  ) {
+    this._autonomousMode = this.settings.autonomousMode ?? false;
+  }
+
+  setAutonomousMode(value: boolean): void {
+    this._autonomousMode = value;
+  }
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     switch (message.type) {
@@ -117,6 +124,9 @@ export class MessageHandler {
         postMessage({ type: 'skillContent', name: message.name, content: skill?.content ?? null });
         break;
       }
+      case 'setAutonomousMode':
+        this.setAutonomousMode(message.enabled);
+        break;
     }
   }
 
@@ -244,6 +254,17 @@ export class MessageHandler {
               continue;
             }
             if (tc.function.name.startsWith('mcp__') && this.mcpClientManager) {
+              if (!this._autonomousMode) {
+                const approved = await this.requestToolApproval(tc.function.name, args, postMessage);
+                if (!approved) {
+                  this.conversationMessages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    content: 'User denied this action.',
+                  });
+                  continue;
+                }
+              }
               const mcpResult = await this.mcpClientManager.callTool(tc.function.name, args);
               this.conversationMessages.push({
                 role: 'tool',
@@ -260,7 +281,7 @@ export class MessageHandler {
               });
               continue;
             }
-            if (MessageHandler.GATED_TOOLS.has(tc.function.name)) {
+            if (!this._autonomousMode && MessageHandler.GATED_TOOLS.has(tc.function.name)) {
               const approved = await this.requestToolApproval(tc.function.name, args, postMessage);
               if (!approved) {
                 this.conversationMessages.push({

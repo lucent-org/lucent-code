@@ -1402,6 +1402,7 @@ describe('MessageHandler — MCP tool routing', () => {
     const mockSettings = { temperature: 0.7, maxTokens: 4096, setChatModel: vi.fn() } as unknown as Settings;
 
     const handler = new MessageHandler(mockClient, mockContext, mockSettings, undefined, undefined, undefined, undefined, undefined, mcpManager);
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, postMessage);
     await handler.handleMessage({ type: 'sendMessage', content: 'Read the file', model: 'claude-sonnet-4-6', images: [] }, postMessage);
 
     expect(mcpManager.callTool).toHaveBeenCalledWith('mcp__filesystem__read_file', { path: '/tmp/test.txt' });
@@ -1437,6 +1438,7 @@ describe('MessageHandler — MCP tool routing', () => {
     const mockSettings = { temperature: 0.7, maxTokens: 4096, setChatModel: vi.fn() } as unknown as Settings;
 
     const handler = new MessageHandler(mockClient, mockContext, mockSettings, undefined, undefined, undefined, undefined, undefined, mcpManager);
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, postMessage);
     await handler.handleMessage({ type: 'sendMessage', content: 'Read file', model: 'claude-sonnet-4-6', images: [] }, postMessage);
 
     // The error content should NOT have a double "Error: Error:" prefix
@@ -1445,5 +1447,140 @@ describe('MessageHandler — MCP tool routing', () => {
     expect(toolResultMsg).toBeDefined();
     expect(toolResultMsg.content).toBe('Error: Permission denied');
     expect(toolResultMsg.content).not.toMatch(/^Error: Error:/);
+  });
+});
+
+describe('autonomous mode', () => {
+  let mcpManager: McpClientManager;
+  let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
+  let postMessages: ExtensionMessage[];
+
+  const mockClient = {
+    chatStream: vi.fn(),
+    chat: vi.fn(),
+    listModels: vi.fn().mockResolvedValue([]),
+  };
+
+  const mockContextBuilder = {
+    buildContext: vi.fn().mockReturnValue({}),
+    formatForPrompt: vi.fn().mockReturnValue(''),
+    buildEnrichedContext: vi.fn().mockResolvedValue({}),
+    formatEnrichedPrompt: vi.fn(() => ''),
+    getCapabilities: vi.fn(() => undefined),
+    getCustomInstructions: vi.fn(() => undefined),
+  };
+
+  const mockSettings = {
+    setChatModel: vi.fn().mockResolvedValue(undefined),
+    temperature: 0.7,
+    maxTokens: 4096,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.chatStream = vi.fn();
+    mockClient.listModels = vi.fn().mockResolvedValue([]);
+    mockContextBuilder.buildEnrichedContext = vi.fn().mockResolvedValue({});
+    mockContextBuilder.formatEnrichedPrompt = vi.fn(() => '');
+    mockContextBuilder.getCapabilities = vi.fn(() => undefined);
+    mockContextBuilder.getCustomInstructions = vi.fn(() => undefined);
+    mcpManager = {
+      getTools: vi.fn().mockReturnValue([]),
+      callTool: vi.fn().mockResolvedValue({ content: 'mcp result', isError: false }),
+      getStatus: vi.fn().mockReturnValue({}),
+      dispose: vi.fn(),
+    } as unknown as McpClientManager;
+    mockToolExecutor = { execute: vi.fn().mockResolvedValue({ success: true, message: 'Done' }) };
+    postMessages = [];
+  });
+
+  it('setAutonomousMode message updates _autonomousMode', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      undefined, undefined, undefined, undefined, undefined,
+      mcpManager,
+    );
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, (m) => postMessages.push(m));
+    expect(postMessages.length).toBe(0);
+  });
+
+  it('MCP tool call, autonomous mode off → requestToolApproval called', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      undefined, undefined, undefined, undefined, undefined,
+      mcpManager,
+    );
+
+    mockClient.chatStream.mockReturnValue(
+      createToolCallStream([{ id: 'call_1', name: 'mcp__fs__read', arguments: '{}' }])
+    );
+
+    const sendPromise = handler.handleMessage(
+      { type: 'sendMessage', content: 'go', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    await vi.waitFor(() => {
+      expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+    }, { timeout: 1000 });
+
+    const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+    await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+    await sendPromise;
+
+    expect(mcpManager.callTool).toHaveBeenCalledWith('mcp__fs__read', {});
+  });
+
+  it('MCP tool call, autonomous mode on → callTool runs directly, no approval', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      undefined, undefined, undefined, undefined, undefined,
+      mcpManager,
+    );
+
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    mockClient.chatStream.mockReturnValue(
+      createToolCallStream([{ id: 'call_1', name: 'mcp__fs__read', arguments: '{}' }])
+    );
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'go', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+    expect(mcpManager.callTool).toHaveBeenCalledWith('mcp__fs__read', {});
+  });
+
+  it('gated editor tool, autonomous mode on → executes directly, no approval', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      mockToolExecutor as unknown as EditorToolExecutor,
+      undefined, undefined, undefined, undefined,
+      mcpManager,
+    );
+
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    mockClient.chatStream.mockReturnValue(
+      createToolCallStream([{ id: 'call_1', name: 'rename_symbol', arguments: '{"uri":"file:///test.ts","line":0,"character":0,"newName":"foo"}' }])
+    );
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'rename it', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+    expect(mockToolExecutor.execute).toHaveBeenCalledWith('rename_symbol', expect.any(Object));
   });
 });

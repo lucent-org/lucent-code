@@ -122,7 +122,8 @@ export type WebviewMessage =
   | { type: 'confirmApply'; fileUri: string }
   | { type: 'toolApprovalResponse'; requestId: string; approved: boolean }
   | { type: 'getTerminalOutput' }
-  | { type: 'getSkillContent'; name: string };
+  | { type: 'getSkillContent'; name: string }
+  | { type: 'setAutonomousMode'; enabled: boolean };
 
 // ---- Diff types ----
 
