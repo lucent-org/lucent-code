@@ -48,6 +48,10 @@ export class Settings {
     return this.config.get<SkillSourceConfig[]>('skills.sources', []);
   }
 
+  get autonomousMode(): boolean {
+    return this.config.get<boolean>('chat.autonomousMode', false);
+  }
+
   async setChatModel(modelId: string): Promise<void> {
     await this.config.update('chat.model', modelId, vscode.ConfigurationTarget.Global);
   }

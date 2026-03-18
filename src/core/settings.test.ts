@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as vscode from 'vscode';
 
 // Mock vscode module
 vi.mock('vscode', () => {
@@ -59,5 +60,18 @@ describe('Settings', () => {
 
   it('should return default max context lines as 100', () => {
     expect(settings.completionsMaxContextLines).toBe(100);
+  });
+
+  it('should return false for autonomousMode by default', () => {
+    expect(settings.autonomousMode).toBe(false);
+  });
+
+  it('should return true for autonomousMode when config is true', () => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValueOnce({
+      get: vi.fn().mockReturnValue(true),
+      update: vi.fn(),
+    } as any);
+    const s2 = new Settings();
+    expect(s2.autonomousMode).toBe(true);
   });
 });
