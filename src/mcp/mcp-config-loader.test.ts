@@ -62,7 +62,7 @@ describe('loadMcpConfig', () => {
     const lucent = JSON.stringify({ mcpServers: { b: { command: 'cmd-b' } } });
     const local  = JSON.stringify({ mcpServers: { c: { command: 'cmd-c' } } });
     mockReadFile.mockImplementation((p: string) => {
-      if ((p as string).includes('.claude/settings'))  return Promise.resolve(claude);
+      if ((p as string).includes('.claude'))  return Promise.resolve(claude);
       if ((p as string).includes('.lucentcode'))       return Promise.resolve(lucent);
       if ((p as string).endsWith('.mcp.json'))         return Promise.resolve(local);
       return Promise.reject(new Error('ENOENT'));

@@ -11,10 +11,9 @@ export interface McpServerConfig {
 export async function loadMcpConfig(workspaceRoot?: string): Promise<Map<string, McpServerConfig>> {
   const merged = new Map<string, McpServerConfig>();
 
-  const home = os.homedir().replace(/\\/g, '/');
   const configFiles = [
-    `${home}/.claude/settings.json`,
-    `${home}/.lucentcode/settings.json`,
+    path.join(os.homedir(), '.claude', 'settings.json'),
+    path.join(os.homedir(), '.lucentcode', 'settings.json'),
     workspaceRoot ? path.join(workspaceRoot, '.mcp.json') : null,
   ].filter((p): p is string => p !== null);
 
