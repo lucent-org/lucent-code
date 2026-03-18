@@ -12,7 +12,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 |--------|---------|-------------|-------|
 | :white_check_mark: | Side panel chat UI | Solid.js webview in the activity bar side panel | 1 |
 | :white_check_mark: | Streaming responses | Real-time token-by-token response rendering via SSE | 1 |
-| :white_check_mark: | Markdown rendering | Full Markdown support in assistant messages | 1 |
+| :white_check_mark: | Markdown rendering | Full Markdown support: headings (h1–h4), lists, bold, italic, inline code, fenced code blocks | 1 |
 | :white_check_mark: | Syntax-highlighted code blocks | Code blocks with language-aware syntax highlighting | 1 |
 | :white_check_mark: | Copy code button | One-click copy on code blocks | 1 |
 | :white_check_mark: | Insert at cursor | Insert code block content at the current editor cursor | 1 |
@@ -95,7 +95,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Tool-use: search web | LLM can search the web via DuckDuckGo (no API key required) | - |
 | :white_check_mark: | Tool-use: fetch URL | LLM can fetch any URL as Markdown via Jina AI reader (no API key required) | - |
 | :white_check_mark: | Tool-use: HTTP request | LLM can make GET/POST/PUT/DELETE requests to local or remote APIs | - |
-| :white_check_mark: | HITL tool approval | Destructive tool calls show inline approval card in chat; user allows or denies | - |
+| :white_check_mark: | HITL tool approval | Destructive editor tool calls and all MCP tool calls show inline approval card; user allows or denies | - |
+| :white_check_mark: | Autonomous mode | `⚡` toolbar toggle (per-session) + `lucentCode.chat.autonomousMode` setting (persistent default) bypass all approval gates | - |
 | :white_check_mark: | Large output offloading | Tool results over 8,000 chars are truncated; full result saved to tmpfile | - |
 | :white_check_mark: | Language-aware advertising | Only advertise capabilities the current language actually supports | 3 |
 
@@ -110,6 +111,21 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Max tokens setting | Configurable max tokens for responses | 1 |
 | :white_check_mark: | Trigger mode setting | Auto / manual inline completion trigger | 2 |
 | :white_check_mark: | Debounce delay setting | Configurable debounce for auto-trigger | 2 |
+| :white_check_mark: | Autonomous mode setting | `lucentCode.chat.autonomousMode` — when true all tool calls run without approval | - |
+
+## MCP (Model Context Protocol)
+
+| Status | Feature | Description | Phase |
+|--------|---------|-------------|-------|
+| :white_check_mark: | Three-tier config loading | Reads `mcpServers` from `~/.claude/settings.json` → `~/.lucentcode/settings.json` → `<workspace>/.mcp.json`; later files win on name collisions | - |
+| :white_check_mark: | Stdio subprocess transport | Each configured MCP server is spawned as a stdio subprocess via `@modelcontextprotocol/sdk` `StdioClientTransport` | - |
+| :white_check_mark: | Namespaced tool merging | MCP tools namespaced as `mcp__serverName__toolName` and merged into every OpenRouter API call | - |
+| :white_check_mark: | MCP tool call routing | `mcp__`-prefixed tool calls are routed to `McpClientManager.callTool()` instead of the editor tools handler | - |
+| :white_check_mark: | MCP tool approval gate | All MCP tool calls require HITL approval unless autonomous mode is enabled | - |
+| :white_check_mark: | Server status chip | Webview toolbar receives `mcpStatus` on activation showing connected/error state per server | - |
+| :white_check_mark: | `.mcp.json` file watcher | Changes to the workspace `.mcp.json` trigger a full MCP server reconnect | - |
+| :white_check_mark: | Error isolation | Failed servers are marked `error`, their tools excluded; a `callTool` failure returns `isError: true` to the model | - |
+
 
 ## Skill Sets
 
@@ -142,7 +158,7 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Unit tests | 175 tests across 15 test files covering all modules | 1-5 |
+| :white_check_mark: | Unit tests | 255 tests across 25 test files covering all modules | 1-5 |
 | :white_check_mark: | Visual regression | Browser-based screenshot testing at 3 viewports (desktop, tablet, mobile) | 1 |
 | :white_check_mark: | Dev mode fallback | Standalone browser testing of webview without VSCode | 1 |
 
@@ -226,6 +242,6 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | Status | Feature | Why | Effort |
 |--------|---------|-----|--------|
 | :construction: | **Multiple chat sessions** | Parallel tabbed conversations — significant UI overhaul | XL |
-| :construction: | **MCP server integration** | Register and invoke MCP servers — major extensibility surface | XL |
+| :white_check_mark: | ~~MCP server integration~~ | Implemented — three-tier config, stdio subprocess spawning, namespaced tool merging, approval gate, autonomous mode bypass | XL |
 | :construction: | **Git worktree isolation** | Per-session isolated worktree branch for safe agentic edits | L |
 | :construction: | **Semantic codebase search** | Vector-index workspace for meaning-based retrieval — needs embedding pipeline | XL |
