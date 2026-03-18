@@ -1474,6 +1474,7 @@ describe('autonomous mode', () => {
     setChatModel: vi.fn().mockResolvedValue(undefined),
     temperature: 0.7,
     maxTokens: 4096,
+    autonomousMode: false,
   };
 
   beforeEach(() => {
