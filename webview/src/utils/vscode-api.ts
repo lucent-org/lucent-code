@@ -15,7 +15,15 @@ export function getVsCodeApi(): VsCodeApi {
     } else {
       // Dev fallback for standalone browser testing
       api = {
-        postMessage: (msg: unknown) => console.log('[vscode-mock] postMessage:', msg),
+        postMessage: (msg: unknown) => {
+          console.log('[vscode-mock] postMessage:', msg);
+          const m = msg as { type: string };
+          if (m.type === 'listConversations') {
+            setTimeout(() => window.dispatchEvent(new MessageEvent('message', {
+              data: { type: 'conversationList', conversations: [] },
+            })), 0);
+          }
+        },
         getState: () => undefined,
         setState: () => {},
       };
