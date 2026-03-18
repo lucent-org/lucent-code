@@ -33,12 +33,18 @@ export class McpClientManager {
     const client = new Client({ name: 'lucent-code', version: '0.1.0' });
 
     const timeoutMs = 5000;
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Initialize timeout')), timeoutMs)
-    );
 
     try {
-      await Promise.race([client.connect(transport), timeout]);
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error('Initialize timeout')), timeoutMs);
+      });
+      try {
+        await Promise.race([client.connect(transport), timeout]);
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
+
       const { tools } = await client.listTools();
 
       for (const tool of tools) {
@@ -60,7 +66,7 @@ export class McpClientManager {
   }
 
   getTools(): ToolDefinition[] {
-    return this.toolDefs;
+    return [...this.toolDefs];
   }
 
   getStatus(): Record<string, 'connected' | 'error'> {
