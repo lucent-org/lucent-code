@@ -85,4 +85,56 @@ describe('SkillRegistry', () => {
     await registry.load([]);
     expect(registry.getAll()).toHaveLength(0);
   });
+
+  it('ingestFromSource stores skill and allows own-source to override', async () => {
+    await registry.load([]);
+
+    registry.ingestFromSource(SKILL_MD, 'github');
+    expect(registry.get('brainstorming')?.source).toBe('github');
+    expect(registry.get('brainstorming')?.description).toBe('Use before creative work');
+
+    // Override with a second source
+    const override = `---\nname: brainstorming\ndescription: Overridden brainstorming\n---\nOverridden content`;
+    registry.ingestFromSource(override, 'npm');
+    expect(registry.get('brainstorming')?.source).toBe('npm');
+    expect(registry.get('brainstorming')?.description).toBe('Overridden brainstorming');
+  });
+
+  it('ingestFromSource silently skips content exceeding 50 KB', async () => {
+    await registry.load([]);
+
+    const oversized = `---\nname: big\ndescription: Too large\n---\n${'x'.repeat(51 * 1024)}`;
+    registry.ingestFromSource(oversized, 'github');
+    expect(registry.get('big')).toBeUndefined();
+  });
+
+  it('loads skills from ~/.claude/skills flat directory (depth 1)', async () => {
+    // First stat (plugins/cache) — not found
+    mockStat.mockRejectedValueOnce(new Error('not found'));
+    // Second stat (~/.claude/skills) — found
+    mockStat.mockResolvedValueOnce({ isDirectory: () => true });
+    mockReaddir.mockResolvedValueOnce([{ name: 'tdd.md', isDirectory: () => false }]);
+    mockReadFile.mockResolvedValueOnce(SKILL_MD2);
+
+    await registry.load([]);
+
+    expect(registry.getAll()).toHaveLength(1);
+    expect(registry.get('tdd')?.description).toBe('Test-driven development');
+    expect(registry.get('tdd')?.source).toBe('claude-code');
+  });
+
+  it('own-source overrides ~/.claude/skills skill with same name', async () => {
+    // plugins/cache — not found
+    mockStat.mockRejectedValueOnce(new Error('not found'));
+    // ~/.claude/skills — found, contains tdd
+    mockStat.mockResolvedValueOnce({ isDirectory: () => true });
+    mockReaddir.mockResolvedValueOnce([{ name: 'tdd.md', isDirectory: () => false }]);
+    mockReadFile.mockResolvedValueOnce(SKILL_MD2);
+
+    const customTdd = `---\nname: tdd\ndescription: My TDD workflow\n---\nCustom TDD`;
+    await registry.load([{ type: 'local', content: new Map([['tdd', customTdd]]) }]);
+
+    expect(registry.get('tdd')?.description).toBe('My TDD workflow');
+    expect(registry.get('tdd')?.source).toBe('local');
+  });
 });
