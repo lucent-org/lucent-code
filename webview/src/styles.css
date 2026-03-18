@@ -748,6 +748,12 @@ body {
   animation: fade-out 2s forwards;
 }
 
+.attachment-chip--skill {
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  border: 1px solid var(--vscode-focusBorder);
+}
+
 @keyframes fade-out {
   0%   { opacity: 1; }
   70%  { opacity: 1; }
