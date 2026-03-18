@@ -1013,10 +1013,171 @@ describe('MessageHandler', () => {
       const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
       // After the type change, this line must typecheck (no TS error):
       const _diff: import('../shared/types').DiffLine[] | undefined = req.diff;
-      expect(_diff).toBeUndefined(); // undefined until Task 2 sets it
+      // diff is either defined (when readFile returns data) or undefined (graceful fallback)
+      expect(_diff === undefined || Array.isArray(_diff)).toBe(true);
 
       await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
       await sendPromise;
+    });
+
+    describe('computeToolDiff', () => {
+      it('replace_range approval request includes non-empty diff', async () => {
+        vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(
+          new TextEncoder().encode('line0\nline1\nline2\n') as unknown as Uint8Array
+        );
+        const toolStream = createToolCallStream([
+          {
+            id: 'call_1',
+            name: 'replace_range',
+            arguments: JSON.stringify({
+              uri: 'file:///test.ts',
+              startLine: 1, startCharacter: 0,
+              endLine: 1, endCharacter: 5,
+              code: 'REPLACED',
+            }),
+          },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'replace', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+        expect(req.diff).toBeDefined();
+        expect(req.diff!.length).toBeGreaterThan(0);
+        expect(req.diff!.some((l) => l.type === 'added')).toBe(true);
+        expect(req.diff!.some((l) => l.type === 'removed')).toBe(true);
+
+        await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+        await sendPromise;
+      });
+
+      it('insert_code approval request includes non-empty diff', async () => {
+        vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(
+          new TextEncoder().encode('line0\nline1\nline2\n') as unknown as Uint8Array
+        );
+        const toolStream = createToolCallStream([
+          {
+            id: 'call_1',
+            name: 'insert_code',
+            arguments: JSON.stringify({
+              uri: 'file:///test.ts',
+              line: 1, character: 0,
+              code: '// inserted\n',
+            }),
+          },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'insert', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+        expect(req.diff).toBeDefined();
+        expect(req.diff!.some((l) => l.type === 'added')).toBe(true);
+
+        await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+        await sendPromise;
+      });
+
+      it('file read failure → diff is undefined in approval request', async () => {
+        vi.mocked(vscode.workspace.fs.readFile).mockRejectedValueOnce(new Error('File not found'));
+
+        const toolStream = createToolCallStream([
+          {
+            id: 'call_1',
+            name: 'replace_range',
+            arguments: JSON.stringify({
+              uri: 'file:///missing.ts',
+              startLine: 0, startCharacter: 0,
+              endLine: 0, endCharacter: 3,
+              code: 'new',
+            }),
+          },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'replace', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+        expect(req.diff).toBeUndefined();
+
+        await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+        await sendPromise;
+      });
+
+      it('rename_symbol approval request does NOT include diff', async () => {
+        const toolStream = createToolCallStream([
+          {
+            id: 'call_1',
+            name: 'rename_symbol',
+            arguments: JSON.stringify({ uri: 'file:///test.ts', line: 0, character: 0, newName: 'foo' }),
+          },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'rename', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+        expect(req.diff).toBeUndefined();
+
+        await handler.handleMessage({ type: 'toolApprovalResponse', requestId: req.requestId, approved: true }, () => {});
+        await sendPromise;
+      });
     });
   });
 

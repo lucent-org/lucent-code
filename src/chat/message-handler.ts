@@ -282,7 +282,8 @@ export class MessageHandler {
               continue;
             }
             if (!this._autonomousMode && MessageHandler.GATED_TOOLS.has(tc.function.name)) {
-              const approved = await this.requestToolApproval(tc.function.name, args, postMessage);
+              const diff = await this.computeToolDiff(tc.function.name, args);
+              const approved = await this.requestToolApproval(tc.function.name, args, postMessage, diff);
               if (!approved) {
                 this.conversationMessages.push({
                   role: 'tool',
@@ -447,15 +448,109 @@ export class MessageHandler {
     }
   }
 
+  private async computeToolDiff(
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<DiffLine[] | undefined> {
+    if (toolName !== 'replace_range' && toolName !== 'insert_code') return undefined;
+
+    try {
+      const uri = args['uri'];
+      if (typeof uri !== 'string') return undefined;
+
+      const vsUri = vscode.Uri.parse(uri);
+      const bytes = await vscode.workspace.fs.readFile(vsUri);
+      const original = new TextDecoder().decode(bytes);
+      const lines = original.split('\n');
+
+      let modified: string;
+
+      if (toolName === 'replace_range') {
+        const startLine = args['startLine'] as number;
+        const startChar = args['startCharacter'] as number;
+        const endLine = args['endLine'] as number;
+        const endChar = args['endCharacter'] as number;
+        const code = args['code'] as string;
+
+        if (
+          typeof startLine !== 'number' || typeof startChar !== 'number' ||
+          typeof endLine !== 'number' || typeof endChar !== 'number' ||
+          typeof code !== 'string'
+        ) return undefined;
+
+        const beforeLines = lines.slice(0, startLine).join('\n');
+        const afterLines = lines.slice(endLine + 1).join('\n');
+        const startLineText = lines[startLine] ?? '';
+        const endLineText = lines[endLine] ?? '';
+        const prefix = startLineText.slice(0, startChar);
+        const suffix = endLineText.slice(endChar);
+        const middle = prefix + code + suffix;
+        const parts: string[] = [];
+        if (beforeLines) parts.push(beforeLines);
+        parts.push(middle);
+        if (afterLines) parts.push(afterLines);
+        modified = parts.join('\n');
+      } else {
+        // insert_code
+        const line = args['line'] as number;
+        const character = args['character'] as number;
+        const code = args['code'] as string;
+
+        if (typeof line !== 'number' || typeof character !== 'number' || typeof code !== 'string') {
+          return undefined;
+        }
+
+        const targetLine = lines[line] ?? '';
+        const newLine = targetLine.slice(0, character) + code + targetLine.slice(character);
+        const newLines = [...lines.slice(0, line), newLine, ...lines.slice(line + 1)];
+        modified = newLines.join('\n');
+      }
+
+      const rawDiff = Diff.diffLines(original, modified);
+
+      const CONTEXT = 3;
+      const result: DiffLine[] = [];
+      let contextBuf: string[] = [];
+
+      for (const part of rawDiff) {
+        const partLines = part.value.replace(/\n$/, '').split('\n');
+        if (part.added) {
+          const ctx = contextBuf.slice(-CONTEXT);
+          for (const l of ctx) result.push({ type: 'context', content: l });
+          contextBuf = [];
+          for (const l of partLines) result.push({ type: 'added', content: l });
+        } else if (part.removed) {
+          const ctx = contextBuf.slice(-CONTEXT);
+          for (const l of ctx) result.push({ type: 'context', content: l });
+          contextBuf = [];
+          for (const l of partLines) result.push({ type: 'removed', content: l });
+        } else {
+          if (result.length > 0) {
+            const leading = partLines.slice(0, CONTEXT);
+            for (const l of leading) result.push({ type: 'context', content: l });
+            contextBuf = partLines.slice(CONTEXT);
+          } else {
+            contextBuf.push(...partLines);
+          }
+        }
+      }
+
+      return result.length > 0 ? result : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private requestToolApproval(
     toolName: string,
     args: Record<string, unknown>,
-    postMessage: (msg: ExtensionMessage) => void
+    postMessage: (msg: ExtensionMessage) => void,
+    diff?: DiffLine[]
   ): Promise<boolean> {
     const requestId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve) => {
       this.pendingApprovals.set(requestId, resolve);
-      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args });
+      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args, diff });
     });
   }
 
