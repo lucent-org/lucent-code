@@ -14,6 +14,7 @@ import { NotificationService } from '../core/notifications';
 import { TerminalBuffer } from '../core/terminal-buffer';
 import { SkillRegistry } from '../skills/skill-registry';
 import { SkillMatcher } from '../skills/skill-matcher';
+import type { McpClientManager } from '../mcp/mcp-client-manager';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -41,7 +42,8 @@ export class MessageHandler {
     private readonly history?: ConversationHistory,
     private readonly notifications: NotificationService = new NotificationService(),
     private readonly terminalBuffer?: TerminalBuffer,
-    private readonly skillRegistry?: SkillRegistry
+    private readonly skillRegistry?: SkillRegistry,
+    private readonly mcpClientManager?: McpClientManager
   ) {}
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -163,10 +165,11 @@ export class MessageHandler {
     this.conversationMessages.push({ role: 'user', content: userContent });
     this.abortController = new AbortController();
 
-    const skillTools = this.skillRegistry ? [USE_SKILL_TOOL_DEFINITION] : [];
-    const editorTools = this.toolExecutor ? TOOL_DEFINITIONS : [];
-    const allTools = [...skillTools, ...editorTools];
-    const tools = allTools.length > 0 ? allTools : undefined;
+    const skillTools  = this.skillRegistry      ? [USE_SKILL_TOOL_DEFINITION]       : [];
+    const editorTools = this.toolExecutor        ? TOOL_DEFINITIONS                  : [];
+    const mcpTools    = this.mcpClientManager?.getTools() ?? [];
+    const allTools    = [...skillTools, ...editorTools, ...mcpTools];
+    const tools       = allTools.length > 0 ? allTools : undefined;
 
     try {
       const MAX_TOOL_ITERATIONS = 5;
@@ -209,7 +212,7 @@ export class MessageHandler {
           finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
         }
 
-        if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && (this.toolExecutor || this.skillRegistry)) {
+        if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && (this.toolExecutor || this.skillRegistry || this.mcpClientManager)) {
           const toolCalls: ToolCall[] = Array.from(toolCallAccumulator.values()).map((tc, i) => ({
             id: tc.id || `call_${i}`,
             type: 'function' as const,
@@ -237,6 +240,15 @@ export class MessageHandler {
                 role: 'tool',
                 tool_call_id: tc.id,
                 content: skill ? skill.content : `Skill not found: ${skillName}`,
+              });
+              continue;
+            }
+            if (tc.function.name.startsWith('mcp__') && this.mcpClientManager) {
+              const mcpResult = await this.mcpClientManager.callTool(tc.function.name, args);
+              this.conversationMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: this.truncateToolOutput(mcpResult.isError ? `Error: ${mcpResult.content}` : mcpResult.content),
               });
               continue;
             }

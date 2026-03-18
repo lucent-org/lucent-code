@@ -61,6 +61,7 @@ import type { ConversationHistory } from './history';
 import type { EditorToolExecutor } from '../lsp/editor-tools';
 import type { NotificationService } from '../core/notifications';
 import type { SkillRegistry } from '../skills/skill-registry';
+import type { McpClientManager } from '../mcp/mcp-client-manager';
 
 // Helper to create an async generator from chunks
 async function* createMockStream(chunks: Array<{ choices: Array<{ delta: { content?: string }; finish_reason: string | null }> }>) {
@@ -1221,5 +1222,189 @@ describe('MessageHandler', () => {
       expect(systemMessage.content).toContain('tdd');
       expect(systemMessage.content).toContain('use_skill');
     });
+
+    it('pre-injects matching skill content as <skill> block in user message', async () => {
+      const skillContent = 'Write tests first, then implementation.';
+      mockSkillRegistry.get.mockImplementation((name: string) => {
+        if (name === 'tdd') return { name: 'tdd', description: 'Test-driven development approach', content: skillContent, source: 'local' };
+        return undefined;
+      });
+      // SkillMatcher will score 'tdd' message against 'tdd' description — use a spy to force a match
+      const matchSpy = vi.spyOn((skillHandler as any).skillMatcher, 'match').mockReturnValue(['tdd']);
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'write some tdd tests', model: 'test-model' },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      const userMsg = callArgs.messages.find((m: { role: string }) => m.role === 'user');
+      expect(userMsg).toBeDefined();
+      expect(userMsg.content).toContain(`<skill name="tdd">`);
+      expect(userMsg.content).toContain(skillContent);
+      expect(userMsg.content).toContain('write some tdd tests');
+      matchSpy.mockRestore();
+    });
+
+    it('posts skillsLoaded when registry has skills on ready', async () => {
+      mockContextBuilder.buildEnrichedContext.mockResolvedValue(mockEnrichedContext);
+      mockClient.listModels.mockResolvedValue(mockModels);
+
+      await skillHandler.handleMessage({ type: 'ready' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'skillsLoaded',
+        skills: [{ name: 'tdd', description: 'Test-driven development approach' }],
+      });
+    });
+
+    it('does not post skillsLoaded when registry has no skills on ready', async () => {
+      mockSkillRegistry.getSummaries.mockReturnValue([]);
+      mockContextBuilder.buildEnrichedContext.mockResolvedValue(mockEnrichedContext);
+      mockClient.listModels.mockResolvedValue(mockModels);
+
+      await skillHandler.handleMessage({ type: 'ready' }, postMessage);
+
+      const skillsLoadedCalls = (postMessage as ReturnType<typeof vi.fn>).mock.calls.filter(
+        (call: any[]) => call[0]?.type === 'skillsLoaded'
+      );
+      expect(skillsLoadedCalls).toHaveLength(0);
+    });
+
+    it('responds to getSkillContent with skill content when found', async () => {
+      const skillContent = 'TDD workflow content.';
+      mockSkillRegistry.get.mockImplementation((name: string) => {
+        if (name === 'tdd') return { name: 'tdd', description: 'TDD', content: skillContent, source: 'local' };
+        return undefined;
+      });
+
+      await skillHandler.handleMessage({ type: 'getSkillContent', name: 'tdd' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'skillContent',
+        name: 'tdd',
+        content: skillContent,
+      });
+    });
+
+    it('responds to getSkillContent with null content when skill not found', async () => {
+      mockSkillRegistry.get.mockReturnValue(undefined);
+
+      await skillHandler.handleMessage({ type: 'getSkillContent', name: 'nonexistent' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'skillContent',
+        name: 'nonexistent',
+        content: null,
+      });
+    });
   });
+
+describe('MessageHandler — MCP tool routing', () => {
+  const postMessages: ExtensionMessage[] = [];
+  const postMessage = (msg: ExtensionMessage) => postMessages.push(msg);
+
+  function makeMcpManager(overrides: Partial<McpClientManager> = {}): McpClientManager {
+    return {
+      getTools: vi.fn().mockReturnValue([{
+        type: 'function' as const,
+        function: {
+          name: 'mcp__filesystem__read_file',
+          description: '[filesystem] Read a file',
+          parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+        },
+      }]),
+      callTool: vi.fn().mockResolvedValue({ content: 'file contents', isError: false }),
+      connect: vi.fn(),
+      getStatus: vi.fn().mockReturnValue({ filesystem: 'connected' }),
+      dispose: vi.fn(),
+      ...overrides,
+    } as unknown as McpClientManager;
+  }
+
+  function makeStreamWithToolCall(toolName: string, toolArgs: string): AsyncIterable<any> {
+    const chunks = [
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_mcp_1', function: { name: toolName, arguments: toolArgs } }] }, finish_reason: null }] },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+    ];
+    let i = 0;
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            if (i >= chunks.length) return { done: true as const, value: undefined };
+            return { done: false as const, value: chunks[i++] };
+          },
+        };
+      },
+    };
+  }
+
+  beforeEach(() => { postMessages.length = 0; });
+
+  it('includes MCP tools in the tool array sent to the model', async () => {
+    const mcpManager = makeMcpManager();
+    const mockClient = {
+      chatStream: vi.fn().mockReturnValue((async function* () {
+        yield { choices: [{ delta: { content: 'Hello' }, finish_reason: null }] };
+        yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
+      })()),
+      listModels: vi.fn().mockResolvedValue([]),
+    } as unknown as OpenRouterClient;
+
+    const mockContext = {
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      buildContext: vi.fn().mockReturnValue({}),
+      formatEnrichedPrompt: vi.fn().mockReturnValue(''),
+      getCapabilities: vi.fn().mockReturnValue({}),
+      getCustomInstructions: vi.fn().mockReturnValue(''),
+    } as unknown as ContextBuilder;
+    const mockSettings = { temperature: 0.7, maxTokens: 4096, setChatModel: vi.fn() } as unknown as Settings;
+
+    const handler = new MessageHandler(mockClient, mockContext, mockSettings, undefined, undefined, undefined, undefined, undefined, mcpManager);
+    await handler.handleMessage({ type: 'sendMessage', content: 'Hello', model: 'claude-sonnet-4-6', images: [] }, postMessage);
+
+    const callArgs = (mockClient.chatStream as any).mock.calls[0][0];
+    expect(callArgs.tools).toBeDefined();
+    expect(callArgs.tools.some((t: any) => t.function.name === 'mcp__filesystem__read_file')).toBe(true);
+  });
+
+  it('routes mcp__ tool calls to McpClientManager', async () => {
+    const mcpManager = makeMcpManager();
+    let streamCallCount = 0;
+    const mockClient = {
+      chatStream: vi.fn().mockImplementation(() => {
+        streamCallCount++;
+        if (streamCallCount === 1) {
+          return makeStreamWithToolCall('mcp__filesystem__read_file', '{"path":"/tmp/test.txt"}');
+        }
+        return (async function* () {
+          yield { choices: [{ delta: { content: 'Here is the file.' }, finish_reason: null }] };
+          yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
+        })();
+      }),
+      listModels: vi.fn().mockResolvedValue([]),
+    } as unknown as OpenRouterClient;
+
+    const mockContext = {
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      buildContext: vi.fn().mockReturnValue({}),
+      formatEnrichedPrompt: vi.fn().mockReturnValue(''),
+      getCapabilities: vi.fn().mockReturnValue({}),
+      getCustomInstructions: vi.fn().mockReturnValue(''),
+    } as unknown as ContextBuilder;
+    const mockSettings = { temperature: 0.7, maxTokens: 4096, setChatModel: vi.fn() } as unknown as Settings;
+
+    const handler = new MessageHandler(mockClient, mockContext, mockSettings, undefined, undefined, undefined, undefined, undefined, mcpManager);
+    await handler.handleMessage({ type: 'sendMessage', content: 'Read the file', model: 'claude-sonnet-4-6', images: [] }, postMessage);
+
+    expect(mcpManager.callTool).toHaveBeenCalledWith('mcp__filesystem__read_file', { path: '/tmp/test.txt' });
+    expect(postMessages.some((m) => m.type === 'streamEnd')).toBe(true);
+  });
+});
 });
