@@ -4,6 +4,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import ModelSelector from './components/ModelSelector';
 import ConversationList from './components/ConversationList';
+import SessionStrip from './components/SessionStrip';
 import DiffView from './components/DiffView';
 import { getVsCodeApi } from './utils/vscode-api';
 
@@ -76,6 +77,7 @@ const App: Component = () => {
     });
 
     vscode.postMessage({ type: 'ready' });
+    vscode.postMessage({ type: 'listConversations' });
 
     window.addEventListener('tool-approval', (e: Event) => {
       const { requestId, approved } = (e as CustomEvent).detail;
@@ -172,6 +174,15 @@ const App: Component = () => {
           onLoad={chatStore.loadConversation}
           onDelete={chatStore.deleteConversation}
           onExport={chatStore.exportConversation}
+        />
+      </Show>
+
+      <Show when={chatStore.recentConversationIds().length > 1}>
+        <SessionStrip
+          recentIds={chatStore.recentConversationIds()}
+          conversations={chatStore.conversations()}
+          currentId={chatStore.currentConversationId()}
+          onSelect={chatStore.loadConversation}
         />
       </Show>
 
