@@ -22,6 +22,8 @@ import { fetchMarketplaceSkills } from './skills/sources/marketplace-source';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as nodePath from 'path';
+import { McpClientManager } from './mcp/mcp-client-manager';
+import { loadMcpConfig } from './mcp/mcp-config-loader';
 
 interface GitExtension {
   getAPI(version: 1): GitAPI;
@@ -78,6 +80,35 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   await loadSkills();
+
+  // Initialize MCP client
+  const mcpClientManager = new McpClientManager();
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+  async function connectMcpServers(): Promise<void> {
+    const servers = await loadMcpConfig(workspaceRoot);
+    if (servers.size === 0) return;
+    await mcpClientManager.connect(servers);
+  }
+
+  await connectMcpServers();
+
+  if (workspaceRoot) {
+    const mcpWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, '.mcp.json')
+    );
+    const reconnect = async () => {
+      mcpClientManager.dispose();
+      await connectMcpServers();
+    };
+    context.subscriptions.push(
+      mcpWatcher,
+      mcpWatcher.onDidCreate(reconnect),
+      mcpWatcher.onDidChange(reconnect),
+      mcpWatcher.onDidDelete(reconnect),
+    );
+  }
+
   const contextBuilder = new ContextBuilder();
 
   // Set up instructions loader
@@ -140,7 +171,7 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   updateSkillsStatus();
 
-  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry);
+  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager);
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -432,6 +463,7 @@ export async function activate(context: vscode.ExtensionContext) {
       completionProvider.dispose();
       instructionsLoader.dispose();
       terminalBuffer.dispose();
+      mcpClientManager.dispose();
     },
   });
 }
