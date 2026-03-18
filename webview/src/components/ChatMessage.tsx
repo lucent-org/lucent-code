@@ -87,14 +87,38 @@ function formatText(text: string): string {
   let html = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(/>/g, '&gt;');
+
+  // Headings (h1–h4)
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Unordered lists (consecutive `- ` lines → <ul><li>…</li></ul>)
+  html = html.replace(/((?:^- .+\n?)+)/gm, (block) => {
+    const items = block.trimEnd().split('\n').map((line) =>
+      `<li>${line.replace(/^- /, '')}</li>`
+    ).join('');
+    return `<ul>${items}</ul>`;
+  });
+
+  // Ordered lists (consecutive `N. ` lines → <ol><li>…</li></ol>)
+  html = html.replace(/((?:^\d+\. .+\n?)+)/gm, (block) => {
+    const items = block.trimEnd().split('\n').map((line) =>
+      `<li>${line.replace(/^\d+\. /, '')}</li>`
+    ).join('');
+    return `<ol>${items}</ol>`;
+  });
+
+  html = html
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
 
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['code', 'strong', 'em', 'br'],
+    ALLOWED_TAGS: ['code', 'strong', 'em', 'br', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li'],
     ALLOWED_ATTR: [],
   });
 }
