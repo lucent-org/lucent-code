@@ -92,6 +92,11 @@ describe('WorktreeManager', () => {
       await manager.create('xyz');
       expect(runner).not.toHaveBeenCalled();
     });
+
+    it('worktreePath contains lucent-abc123 after successful create', async () => {
+      await manager.create('abc123');
+      expect(manager.worktreePath).toContain('lucent-abc123');
+    });
   });
 
   describe('remapUri()', () => {

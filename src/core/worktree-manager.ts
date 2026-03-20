@@ -28,10 +28,9 @@ export class WorktreeManager {
   async create(conversationId: string): Promise<void> {
     if (this._state !== 'idle') return;
 
-    this._state = 'creating';
-    this._postStatus();
-
     const branch = `lucent/${conversationId}`;
+    this._state = 'creating';
+    this._postStatus(branch);
     const worktreePath = path.join(this.workspaceRoot, '.worktrees', `lucent-${conversationId}`);
 
     try {
@@ -60,8 +59,8 @@ export class WorktreeManager {
     return vscode.Uri.file(joined).toString();
   }
 
-  private _postStatus(): void {
-    this.postMessage({ type: 'worktreeStatus', status: this._state, branch: this._branch });
+  private _postStatus(branchOverride?: string): void {
+    this.postMessage({ type: 'worktreeStatus', status: this._state, branch: branchOverride ?? this._branch });
   }
 
   private async _ensureGitignore(): Promise<void> {
