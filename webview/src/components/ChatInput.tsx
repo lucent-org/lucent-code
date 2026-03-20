@@ -200,6 +200,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const actionSources = () => filteredSources().filter((s) => s.kind === 'action');
   const contextSources = () => filteredSources().filter((s) => s.kind === 'context');
+  const searchSources = () => filteredSources().filter((s) => s.kind === 'search');
 
   const filteredSkills = () =>
     props.skills.filter((s) => s.name.toLowerCase().includes(skillFilter()));
@@ -215,6 +216,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       if (source.kind === 'search') {
         // Insert @codebase marker; user types the query after it
         setInput(`${beforeAt}@${source.id} `);
+        setIsResolvingMention(false);
         return;
       }
       const content = await props.onResolveMention(source.id);
@@ -302,6 +304,20 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               <div class="mention-group-separator" />
             </Show>
             <For each={contextSources()}>
+              {(source) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                >
+                  <span class="mention-item-label">{source.label}</span>
+                  <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
+            <Show when={contextSources().length > 0 && searchSources().length > 0}>
+              <div class="mention-group-separator" />
+            </Show>
+            <For each={searchSources()}>
               {(source) => (
                 <button
                   class="mention-item"
