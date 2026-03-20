@@ -329,9 +329,12 @@
     "dev": "concurrently \"npm run watch:ext\" \"npm run watch:webview\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:icon": "node scripts/generate-icon.mjs"
+    "build:icon": "node scripts/generate-icon.mjs",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
@@ -343,6 +346,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "better-sqlite3": "^12.8.0",
     "diff": "^8.0.3"
   }
 }
