@@ -68,6 +68,10 @@ export class MessageHandler {
     return this.currentConversation?.id;
   }
 
+  get worktreeManager(): WorktreeManager | null {
+    return this._worktreeManager;
+  }
+
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     switch (message.type) {
       case 'sendMessage':
@@ -84,6 +88,10 @@ export class MessageHandler {
         postMessage({ type: 'modelChanged', modelId: message.modelId });
         break;
       case 'newChat':
+        // Call finishSession before switching conversations so user gets the merge/PR/discard prompt
+        if (this._worktreeManager?.state === 'active') {
+          void this._worktreeManager.finishSession();
+        }
         this.conversationMessages = [];
         this.currentConversation = undefined;
         break;
@@ -142,6 +150,15 @@ export class MessageHandler {
       case 'setAutonomousMode':
         this.setAutonomousMode(message.enabled);
         break;
+      case 'startWorktree': {
+        const convId = this.currentConversation?.id ?? Date.now().toString();
+        if (this._worktreeManager) {
+          this._worktreeManager.create(convId).catch((e: Error) => {
+            console.error('[WorktreeManager] Failed to create worktree:', e.message);
+          });
+        }
+        break;
+      }
     }
   }
 

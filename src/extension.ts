@@ -470,9 +470,13 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('No workspace folder open.');
         return;
       }
+      // Reuse the existing manager if available, otherwise create one
+      let worktreeManager = messageHandler?.worktreeManager;
+      if (!worktreeManager) {
+        worktreeManager = new WorktreeManager(workspaceRoot, (msg) => chatProvider.postMessageToWebview(msg));
+        messageHandler?.setWorktreeManager(worktreeManager);
+      }
       const convId = messageHandler?.currentConversationId ?? Date.now().toString();
-      const worktreeManager = new WorktreeManager(workspaceRoot, (msg) => chatProvider.postMessageToWebview(msg));
-      messageHandler?.setWorktreeManager(worktreeManager);
       try {
         await worktreeManager.create(convId);
         vscode.window.showInformationMessage(`Worktree active on branch lucent/${convId}`);
