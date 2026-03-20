@@ -3,5 +3,6 @@ import App from './App';
 import './styles/tokens.css';
 import './styles/base.css';
 import './components/Button.css';
+import './components/NavBar.css';
 
 render(() => <App />, document.getElementById('root')!);
