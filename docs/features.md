@@ -243,5 +243,5 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 |--------|---------|-----|--------|
 | :white_check_mark: | ~~Multiple chat sessions~~ | Session strip: tab row (≥400px) or dropdown (<400px) showing last 5 conversations; switches active conversation | XL |
 | :white_check_mark: | ~~MCP server integration~~ | Implemented — three-tier config, stdio subprocess spawning, namespaced tool merging, approval gate, autonomous mode bypass | XL |
-| :construction: | **Git worktree isolation** | Per-session isolated worktree branch for safe agentic edits | L |
+| :white_check_mark: | **Git worktree isolation** | Per-session isolated worktree branch for safe agentic edits; merge/PR/discard quick-pick at session end | L |
 | :construction: | **Semantic codebase search** | Vector-index workspace for meaning-based retrieval — needs embedding pipeline | XL |
