@@ -51,6 +51,8 @@
   padding: var(--space-2);
   margin-left: auto;
   font-size: 20px;
+  min-width: 44px;
+  min-height: 44px;
 }
 .navbar__hamburger:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
 
@@ -83,7 +85,6 @@
 .navbar__close:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
 .navbar__mobile-links { list-style: none; text-align: center; }
 .navbar__mobile-link {
-  display: block;
   padding: var(--space-4);
   min-height: 44px;
   display: flex;
