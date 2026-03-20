@@ -96,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const indexer = new Indexer(() => auth.getApiKey() as Promise<string>);
+  const indexer = new Indexer(() => auth.getApiKey());
 
   async function connectMcpServers(): Promise<void> {
     const servers = await loadMcpConfig(workspaceRoot);

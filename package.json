@@ -155,7 +155,8 @@
       },
       {
         "command": "lucentCode.indexCodebase",
-        "title": "Lucent Code: Index Codebase"
+        "title": "Index Codebase",
+        "category": "Lucent Code"
       }
     ],
     "configuration": {

@@ -20,7 +20,7 @@ export class Indexer {
   private dbPath = '';
   private watcher?: vscode.Disposable;
 
-  constructor(private readonly getApiKey: () => string | Promise<string>) {}
+  constructor(private readonly getApiKey: () => string | undefined | Promise<string | undefined>) {}
 
   async start(workspaceRoot: string): Promise<void> {
     this.workspaceRoot = workspaceRoot;
@@ -94,6 +94,9 @@ export class Indexer {
     const results: Float32Array[] = [];
 
     const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      throw new Error('No API key configured');
+    }
     for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
       const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
 
