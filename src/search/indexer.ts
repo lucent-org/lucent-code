@@ -38,11 +38,12 @@ export class Indexer {
     const uris = await vscode.workspace.findFiles('**/*', '{**/node_modules/**,**/.git/**,**/dist/**,**/out/**,**/build/**,**/.lucent/**}');
     const paths = uris.map((u) => u.fsPath).filter((p) => this.shouldIndex(p));
     for (const filePath of paths) {
-      await this.indexFile(filePath);
+      await this.indexFile(filePath, { skipMemoryReload: true });
     }
+    this.vectorStore.loadIntoMemory();
   }
 
-  async indexFile(filePath: string): Promise<void> {
+  async indexFile(filePath: string, { skipMemoryReload = false } = {}): Promise<void> {
     if (!this.shouldIndex(filePath)) return;
 
     try {
@@ -59,7 +60,9 @@ export class Indexer {
       const chunksWithEmbeddings = chunks.map((c, i) => ({ ...c, embedding: embeddings[i] }));
 
       this.vectorStore.upsertChunks(filePath, chunksWithEmbeddings, stat.mtimeMs);
-      this.vectorStore.loadIntoMemory();
+      if (!skipMemoryReload) {
+        this.vectorStore.loadIntoMemory();
+      }
     } catch {
       // Skip unreadable files silently
     }
@@ -79,7 +82,7 @@ export class Indexer {
     const normalized = filePath.replace(/\\/g, '/');
 
     for (const dir of SKIP_DIRS) {
-      if (normalized.includes(`/${dir}/`) || normalized.includes(`/${dir}`)) return false;
+      if (normalized.includes(`/${dir}/`) || normalized.endsWith(`/${dir}`)) return false;
     }
 
     for (const suffix of SKIP_SUFFIXES) {
@@ -126,7 +129,9 @@ export class Indexer {
   }
 
   private startFileWatcher(): void {
-    this.watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    this.watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(this.workspaceRoot, '**/*')
+    );
     this.watcher.onDidChange((uri) => { void this.indexFile(uri.fsPath); });
     this.watcher.onDidCreate((uri) => { void this.indexFile(uri.fsPath); });
     this.watcher.onDidDelete((uri) => {
@@ -158,7 +163,7 @@ export class Indexer {
     // Re-index modified or new files
     for (const [filePath, mtime] of current) {
       if (stored.get(filePath) !== mtime) {
-        await this.indexFile(filePath);
+        await this.indexFile(filePath, { skipMemoryReload: true });
       }
     }
 

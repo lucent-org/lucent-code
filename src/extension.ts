@@ -107,9 +107,12 @@ export async function activate(context: vscode.ExtensionContext) {
   await connectMcpServers();
 
   if (workspaceRoot) {
-    indexer.start(workspaceRoot).catch((e: Error) => {
-      console.error('[Indexer] Failed to start:', e.message);
-    });
+    indexer.start(workspaceRoot)
+      .then(() => { indexerStatusBar.text = '$(database) Indexed'; })
+      .catch((e: Error) => {
+        console.error('[Indexer] Failed to start:', e.message);
+        indexerStatusBar.text = '$(warning) Index failed';
+      });
   }
 
   if (workspaceRoot) {
@@ -201,7 +204,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Indexer status bar
   const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 88);
   indexerStatusBar.command = 'lucentCode.indexCodebase';
-  indexerStatusBar.text = '$(database) Indexed';
+  indexerStatusBar.text = '$(loading~spin) Indexing…';
   indexerStatusBar.tooltip = 'Lucent Code: Codebase index — click to re-index';
   indexerStatusBar.show();
   context.subscriptions.push(indexerStatusBar);

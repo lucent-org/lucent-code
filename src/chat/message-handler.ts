@@ -196,6 +196,7 @@ export class MessageHandler {
     let processedContent = content;
     if (content.startsWith('@codebase') && this.indexer) {
       const query = content.slice('@codebase'.length).trim();
+      processedContent = query || content; // strip @codebase prefix; fall back to original if no query
       if (query) {
         try {
           const results = await this.indexer.searchAsync(query, 10);
@@ -208,7 +209,6 @@ export class MessageHandler {
         } catch {
           // Non-fatal — send message without codebase context
         }
-        processedContent = query;
       }
     }
 
