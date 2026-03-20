@@ -421,7 +421,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           onClick={() => { setSkillFilter(''); setShowSkills(true); }}
           title="Browse skills (or type / in the input)"
           disabled={props.isStreaming || props.skills.length === 0}
-        >/</button>
+        >/…</button>
         <Show
           when={props.isStreaming}
           fallback={
