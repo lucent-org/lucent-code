@@ -58,7 +58,9 @@ export class MessageHandler {
   setAutonomousMode(value: boolean): void {
     this._autonomousMode = value;
     if (value && this._worktreeManager?.state === 'idle' && this.currentConversation) {
-      void this._worktreeManager.create(this.currentConversation.id);
+      this._worktreeManager.create(this.currentConversation.id).catch((e: Error) => {
+        console.error('[WorktreeManager] Failed to create worktree:', e.message);
+      });
     }
   }
 
@@ -259,11 +261,15 @@ export class MessageHandler {
             }
             if (tc.function.name === 'start_worktree') {
               const convId = this.currentConversation?.id ?? Date.now().toString();
-              try {
-                await this._worktreeManager?.create(convId);
-                this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: 'Worktree created.' });
-              } catch (e: any) {
-                this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: `Worktree creation failed: ${e.message}` });
+              if (!this._worktreeManager) {
+                this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: 'Worktree not available (no workspace folder open).' });
+              } else {
+                try {
+                  await this._worktreeManager.create(convId);
+                  this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: 'Worktree created.' });
+                } catch (e: any) {
+                  this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: `Worktree creation failed: ${e.message}` });
+                }
               }
               continue;
             }
