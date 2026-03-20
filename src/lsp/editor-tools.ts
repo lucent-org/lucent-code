@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import type { Indexer } from '../search/indexer';
 
 export interface ToolResult {
   success: boolean;
@@ -178,6 +179,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'semantic_search',
+      description: 'Search the codebase for code semantically related to a natural language query. Use this when grep_files would miss results because the query is conceptual rather than literal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Natural language description of what to find' },
+          limit: { type: 'number', description: 'Max results to return (default 8, max 20)' },
+        },
+        required: ['query'],
+      },
+    },
+  },
 ];
 
 export const USE_SKILL_TOOL_DEFINITION: ToolDefinition = {
@@ -210,7 +226,8 @@ export const START_WORKTREE_TOOL_DEFINITION: ToolDefinition = {
 
 export class EditorToolExecutor {
   constructor(
-    private readonly getTavilyApiKey?: () => Promise<string | undefined>
+    private readonly getTavilyApiKey?: () => Promise<string | undefined>,
+    private readonly indexer?: Indexer
   ) {}
 
   async execute(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
@@ -236,6 +253,24 @@ export class EditorToolExecutor {
           return await this.fetchUrl(args);
         case 'http_request':
           return await this.httpRequest(args);
+        case 'semantic_search': {
+          const { query, limit } = args as { query: string; limit?: number };
+          if (!this.indexer) {
+            return { success: false, error: 'Codebase index not initialised' };
+          }
+          try {
+            const results = await this.indexer.searchAsync(query, Math.min(limit ?? 8, 20));
+            if (results.length === 0) {
+              return { success: true, message: 'No results found for query.' };
+            }
+            const formatted = results
+              .map((r) => `${r.filePath}:${r.startLine}–${r.endLine}\n\`\`\`\n${r.content}\n\`\`\``)
+              .join('\n\n');
+            return { success: true, message: formatted };
+          } catch (err) {
+            return { success: false, error: String(err) };
+          }
+        }
         default:
           return { success: false, error: `Unknown tool: ${toolName}` };
       }

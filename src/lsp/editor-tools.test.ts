@@ -59,6 +59,12 @@ describe('EditorToolExecutor', () => {
     expect(names).toContain('replace_range');
   });
 
+  it('TOOL_DEFINITIONS includes semantic_search', () => {
+    const tool = TOOL_DEFINITIONS.find((t) => t.function.name === 'semantic_search');
+    expect(tool).toBeDefined();
+    expect(tool!.function.parameters.required).toContain('query');
+  });
+
   it('should execute format_document', async () => {
     mockExecuteCommand.mockResolvedValue(undefined);
     const result = await executor.execute('format_document', { uri: 'file:///test.ts' });
