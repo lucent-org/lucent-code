@@ -82,7 +82,11 @@ export class WorktreeManager {
         .then(() => true)
         .catch(() => false);
 
-      const items = [
+      interface WorktreePickItem extends vscode.QuickPickItem {
+        action: 'merge' | 'pr' | 'copy' | 'discard';
+      }
+
+      const items: WorktreePickItem[] = [
         { label: '$(git-merge) Merge into current branch', action: 'merge' },
         ghAvailable
           ? { label: '$(github) Open as PR', action: 'pr' }
@@ -94,12 +98,15 @@ export class WorktreeManager {
         title: `Worktree session: ${diff.filesChanged} file(s) changed, +${diff.insertions} -${diff.deletions}`,
       });
 
-      if (!pick) return;
-
       const branch = this._branch!;
       const worktreePath = this._worktreePath!;
 
-      switch ((pick as any).action) {
+      if (!pick) {
+        await this.runner(`git worktree remove "${worktreePath}"`, this.workspaceRoot);
+        return;
+      }
+
+      switch (pick.action) {
         case 'merge':
           await this.runner(`git merge ${branch}`, this.workspaceRoot);
           await this.runner(`git worktree remove "${worktreePath}"`, this.workspaceRoot);

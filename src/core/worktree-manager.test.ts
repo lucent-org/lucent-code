@@ -143,6 +143,15 @@ describe('WorktreeManager', () => {
       expect(vscode.window.showQuickPick).toHaveBeenCalled();
     });
 
+    it('removes worktree silently when quick-pick is dismissed', async () => {
+      runner.mockResolvedValueOnce(' 3 files changed, 10 insertions(+), 2 deletions(-)');
+      runner.mockResolvedValueOnce(''); // gh --version succeeds
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined); // dismissed
+      await manager.finishSession();
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('git worktree remove'), workspaceRoot);
+      expect(manager.state).toBe('idle');
+    });
+
     it('merges and removes worktree on Merge selection', async () => {
       runner.mockResolvedValueOnce(' 1 file changed, 5 insertions(+)');
       runner.mockResolvedValueOnce(''); // gh --version
@@ -160,6 +169,16 @@ describe('WorktreeManager', () => {
       await manager.finishSession();
       expect(runner).toHaveBeenCalledWith(expect.stringContaining('git worktree remove --force'), workspaceRoot);
       expect(runner).toHaveBeenCalledWith(expect.stringContaining('git branch -D'), workspaceRoot);
+      expect(manager.state).toBe('idle');
+    });
+
+    it('creates a PR and removes worktree on PR selection', async () => {
+      runner.mockResolvedValueOnce(' 2 files changed, 8 insertions(+), 1 deletion(-)');
+      runner.mockResolvedValueOnce(''); // gh --version succeeds
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: '$(github) Open as PR', action: 'pr' } as any);
+      await manager.finishSession();
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('gh pr create'), workspaceRoot);
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('git worktree remove'), workspaceRoot);
       expect(manager.state).toBe('idle');
     });
 
