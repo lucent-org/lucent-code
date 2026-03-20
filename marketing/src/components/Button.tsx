@@ -17,7 +17,18 @@ export default function Button(props: Props) {
   const classes = () => `btn btn--${variant()} btn--${size()}${local.class ? ` ${local.class}` : ''}`;
 
   if (local.href) {
-    return <a href={local.href} class={classes()} {...rest}>{local.children}</a>;
+    // <a> has no native disabled — omit href and add aria-disabled instead
+    const isDisabled = () => (rest as { disabled?: boolean }).disabled;
+    return (
+      <a
+        href={isDisabled() ? undefined : local.href}
+        class={classes()}
+        aria-disabled={isDisabled() ? 'true' : undefined}
+        {...rest}
+      >
+        {local.children}
+      </a>
+    );
   }
   return <button class={classes()} {...rest}>{local.children}</button>;
 }
