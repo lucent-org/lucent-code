@@ -147,6 +147,11 @@
         "command": "lucentCode.refreshSkills",
         "title": "Refresh Skills",
         "category": "Lucent Code"
+      },
+      {
+        "command": "openRouterChat.startWorktree",
+        "title": "Start Worktree Session",
+        "category": "Lucent Code"
       }
     ],
     "configuration": {

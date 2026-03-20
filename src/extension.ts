@@ -24,6 +24,7 @@ import * as os from 'os';
 import * as nodePath from 'path';
 import { McpClientManager } from './mcp/mcp-client-manager';
 import { loadMcpConfig } from './mcp/mcp-config-loader';
+import { WorktreeManager } from './core/worktree-manager';
 
 interface GitExtension {
   getAPI(version: 1): GitAPI;
@@ -206,6 +207,15 @@ export async function activate(context: vscode.ExtensionContext) {
       const postMessage = (msg: unknown) => webview.postMessage(msg);
       await handler.handleMessage(message, postMessage);
     });
+
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (wsRoot) {
+      const worktreeManager = new WorktreeManager(
+        wsRoot,
+        (msg) => chatProvider.postMessageToWebview(msg)
+      );
+      handler.setWorktreeManager(worktreeManager);
+    }
 
     // Post MCP status to webview on setup
     postMcpStatus();
@@ -450,6 +460,25 @@ export async function activate(context: vscode.ExtensionContext) {
       updateSkillsStatus();
       chatProvider.postMessageToWebview({ type: 'skillsLoaded', skills: skillRegistry.getSummaries() });
       vscode.window.showInformationMessage(`Skills refreshed: ${skillRegistry.getAll().length} skills loaded.`);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openRouterChat.startWorktree', async () => {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!workspaceRoot) {
+        vscode.window.showErrorMessage('No workspace folder open.');
+        return;
+      }
+      const convId = messageHandler?.currentConversationId ?? Date.now().toString();
+      const worktreeManager = new WorktreeManager(workspaceRoot, (msg) => chatProvider.postMessageToWebview(msg));
+      messageHandler?.setWorktreeManager(worktreeManager);
+      try {
+        await worktreeManager.create(convId);
+        vscode.window.showInformationMessage(`Worktree active on branch lucent/${convId}`);
+      } catch (e: any) {
+        vscode.window.showErrorMessage(`Failed to create worktree: ${e.message}`);
+      }
     })
   );
 
