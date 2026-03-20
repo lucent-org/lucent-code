@@ -352,7 +352,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <For each={skillChips()}>
               {(chip) => (
                 <div class="attachment-chip attachment-chip--skill">
-                  <span class="attachment-name">⚡ {chip.name}</span>
+                  <span class="attachment-name">/ {chip.name}</span>
                   <button
                     class="attachment-remove"
                     aria-label={`Remove ${chip.name} skill`}
@@ -421,7 +421,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           onClick={() => { setSkillFilter(''); setShowSkills(true); }}
           title="Browse skills (or type / in the input)"
           disabled={props.isStreaming || props.skills.length === 0}
-        >⚡</button>
+        >/</button>
         <Show
           when={props.isStreaming}
           fallback={

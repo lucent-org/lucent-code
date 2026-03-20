@@ -179,7 +179,7 @@ const App: Component = () => {
           onClick={() => vscode.postMessage({ type: 'setAutonomousMode', enabled: !chatStore.autonomousMode() })}
           title="Autonomous mode — all tools run without approval"
         >
-          ⚡
+          ⊙
         </button>
         <Show when={chatStore.worktreeStatus() !== 'idle'}>
           <button
