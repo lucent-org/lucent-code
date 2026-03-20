@@ -1,0 +1,44 @@
+.proof-strip {
+  background: var(--color-dark-elevated);
+  border-top: 1px solid var(--color-dark-border);
+  border-bottom: 1px solid var(--color-dark-border);
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+.proof-strip__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dark-fg-muted);
+  margin-bottom: var(--space-4);
+}
+.proof-strip__models {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+.proof-strip__model-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-dark-fg);
+  opacity: 0.5;
+  transition: opacity 200ms ease;
+}
+.proof-strip__model:hover .proof-strip__model-name { opacity: 0.9; }
+.proof-strip__model-name--muted {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 13px;
+}
+.proof-strip__logo {
+  height: 24px;
+  opacity: 0.5;
+  filter: grayscale(1);
+  transition: opacity 200ms ease;
+}
+.proof-strip__model:hover .proof-strip__logo { opacity: 0.9; }
