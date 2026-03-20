@@ -25,6 +25,7 @@ import * as nodePath from 'path';
 import { McpClientManager } from './mcp/mcp-client-manager';
 import { loadMcpConfig } from './mcp/mcp-config-loader';
 import { WorktreeManager } from './core/worktree-manager';
+import { Indexer } from './search/indexer';
 
 interface GitExtension {
   getAPI(version: 1): GitAPI;
@@ -95,6 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const indexer = new Indexer(() => auth.getApiKey() as Promise<string>);
 
   async function connectMcpServers(): Promise<void> {
     const servers = await loadMcpConfig(workspaceRoot);
@@ -103,6 +105,12 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   await connectMcpServers();
+
+  if (workspaceRoot) {
+    indexer.start(workspaceRoot).catch((e: Error) => {
+      console.error('[Indexer] Failed to start:', e.message);
+    });
+  }
 
   if (workspaceRoot) {
     const mcpWatcher = vscode.workspace.createFileSystemWatcher(
@@ -139,7 +147,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set up code intelligence
   const codeIntelligence = new CodeIntelligence();
   const capabilityDetector = new CapabilityDetector();
-  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey());
+  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), indexer);
   contextBuilder.setCodeIntelligence(codeIntelligence, capabilityDetector);
 
   const history = new ConversationHistory(context.globalStorageUri);
@@ -190,7 +198,15 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   updateSkillsStatus();
 
-  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager);
+  // Indexer status bar
+  const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 88);
+  indexerStatusBar.command = 'lucentCode.indexCodebase';
+  indexerStatusBar.text = '$(database) Indexed';
+  indexerStatusBar.tooltip = 'Lucent Code: Codebase index — click to re-index';
+  indexerStatusBar.show();
+  context.subscriptions.push(indexerStatusBar);
+
+  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer);
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -321,6 +337,15 @@ export async function activate(context: vscode.ExtensionContext) {
         await auth.signOut();
         vscode.window.showInformationMessage('Signed out of OpenRouter.');
       }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.indexCodebase', () => {
+      indexerStatusBar.text = '$(loading~spin) Indexing…';
+      indexer.indexAll()
+        .then(() => { indexerStatusBar.text = '$(database) Indexed'; })
+        .catch(() => { indexerStatusBar.text = '$(warning) Index failed'; });
     })
   );
 
@@ -522,6 +547,7 @@ export async function activate(context: vscode.ExtensionContext) {
       mcpClientManager.dispose();
     },
   });
+  context.subscriptions.push({ dispose: () => indexer.dispose() });
 }
 
 export function deactivate() {

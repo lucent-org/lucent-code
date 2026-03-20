@@ -152,6 +152,10 @@
         "command": "openRouterChat.startWorktree",
         "title": "Start Worktree Session",
         "category": "Lucent Code"
+      },
+      {
+        "command": "lucentCode.indexCodebase",
+        "title": "Lucent Code: Index Codebase"
       }
     ],
     "configuration": {
