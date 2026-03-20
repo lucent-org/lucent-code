@@ -28,6 +28,7 @@
 
 @media (max-width: 1279px) {
   .section-heading { font-size: 36px; }
+  .feature-grid--3 { grid-template-columns: repeat(2, 1fr); }
   .feature-grid--4 { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {

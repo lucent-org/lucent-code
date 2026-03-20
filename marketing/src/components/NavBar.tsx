@@ -11,6 +11,7 @@ interface Props {
 export default function NavBar(props: Props) {
   const [scrolled, setScrolled] = createSignal(false);
   const [menuOpen, setMenuOpen] = createSignal(false);
+  let hamburgerRef: HTMLButtonElement | undefined;
 
   const handleScroll = () => setScrolled(window.scrollY > 80);
 
@@ -41,6 +42,7 @@ export default function NavBar(props: Props) {
         </div>
 
         <button
+          ref={hamburgerRef}
           class="navbar__hamburger"
           aria-label="Open menu"
           aria-expanded={String(menuOpen())}
@@ -57,11 +59,36 @@ export default function NavBar(props: Props) {
           role="dialog"
           aria-modal="true"
           aria-label="Navigation menu"
+          ref={(el) => { setTimeout(() => el?.querySelector<HTMLElement>('button')?.focus(), 0); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setMenuOpen(false);
+              hamburgerRef?.focus();
+              return;
+            }
+            if (e.key === 'Tab') {
+              const overlay = e.currentTarget as HTMLElement;
+              const focusable = Array.from(
+                overlay.querySelectorAll<HTMLElement>(
+                  'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                )
+              ).filter(el => !el.closest('[aria-hidden="true"]'));
+              const first = focusable[0];
+              const last = focusable[focusable.length - 1];
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last?.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first?.focus();
+              }
+            }
+          }}
         >
           <button
             class="navbar__close"
             aria-label="Close menu"
-            onClick={() => setMenuOpen(false)}
+            onClick={() => { setMenuOpen(false); hamburgerRef?.focus(); }}
           >✕</button>
           <ul class="navbar__mobile-links" role="list">
             {props.links.map(link => (
