@@ -8,5 +8,6 @@ import './sections/HeroSection.css';
 import './sections/SocialProofStrip.css';
 import './components/FeatureCard.css';
 import './sections/CoreFeaturesGrid.css';
+import './sections/DemoSection.css';
 
 render(() => <App />, document.getElementById('root')!);
