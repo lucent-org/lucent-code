@@ -195,6 +195,19 @@ export const USE_SKILL_TOOL_DEFINITION: ToolDefinition = {
   },
 };
 
+export const START_WORKTREE_TOOL_DEFINITION: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'start_worktree',
+    description: 'Create an isolated git worktree for this session. Call this when a skill instructs worktree isolation or before making broad agentic edits.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+};
+
 export class EditorToolExecutor {
   constructor(
     private readonly getTavilyApiKey?: () => Promise<string | undefined>

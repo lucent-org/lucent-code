@@ -1684,6 +1684,217 @@ describe('MessageHandler — MCP tool routing', () => {
   });
 });
 
+describe('worktree integration', () => {
+  let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };
+  let postMessages: ExtensionMessage[];
+
+  const mockClient = {
+    chatStream: vi.fn(),
+    chat: vi.fn(),
+    listModels: vi.fn().mockResolvedValue([]),
+  };
+
+  const mockContextBuilder = {
+    buildContext: vi.fn().mockReturnValue({}),
+    formatForPrompt: vi.fn().mockReturnValue(''),
+    buildEnrichedContext: vi.fn().mockResolvedValue({}),
+    formatEnrichedPrompt: vi.fn(() => ''),
+    getCapabilities: vi.fn(() => undefined),
+    getCustomInstructions: vi.fn(() => undefined),
+  };
+
+  const mockSettings = {
+    setChatModel: vi.fn().mockResolvedValue(undefined),
+    temperature: 0.7,
+    maxTokens: 4096,
+    autonomousMode: false,
+  };
+
+  const mockWorktreeManager = {
+    create: vi.fn().mockResolvedValue(undefined),
+    remapUri: vi.fn((u: string) => u),
+    state: 'idle' as 'idle' | 'creating' | 'active' | 'finishing',
+    finishSession: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.chatStream = vi.fn();
+    mockClient.listModels = vi.fn().mockResolvedValue([]);
+    mockContextBuilder.buildEnrichedContext = vi.fn().mockResolvedValue({});
+    mockContextBuilder.formatEnrichedPrompt = vi.fn(() => '');
+    mockContextBuilder.getCapabilities = vi.fn(() => undefined);
+    mockContextBuilder.getCustomInstructions = vi.fn(() => undefined);
+    mockToolExecutor = { execute: vi.fn().mockResolvedValue({ success: true, message: 'Done' }) };
+    postMessages = [];
+
+    // Reset mockWorktreeManager
+    mockWorktreeManager.create.mockReset().mockResolvedValue(undefined);
+    mockWorktreeManager.remapUri.mockReset().mockImplementation((u: string) => u);
+    mockWorktreeManager.state = 'idle';
+    mockWorktreeManager.finishSession.mockReset();
+  });
+
+  it('start_worktree tool call invokes worktreeManager.create() without approval gate', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      mockToolExecutor as unknown as EditorToolExecutor,
+    );
+    handler.setWorktreeManager(mockWorktreeManager as any);
+
+    const toolStream = createToolCallStream([
+      { id: 'call_wt_1', name: 'start_worktree', arguments: '{}' },
+    ]);
+    const stopStream = createMockStream([
+      { choices: [{ delta: { content: 'Worktree ready.' }, finish_reason: 'stop' }] },
+    ]);
+    mockClient.chatStream
+      .mockReturnValueOnce(toolStream)
+      .mockReturnValueOnce(stopStream);
+
+    const msgs: ExtensionMessage[] = [];
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'start worktree', model: 'gpt-4' },
+      (m) => msgs.push(m)
+    );
+
+    expect(mockWorktreeManager.create).toHaveBeenCalledOnce();
+    // No approval gate — no toolApprovalRequest posted
+    expect(msgs.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+    // Tool result pushed back to conversation
+    const secondCallMessages = mockClient.chatStream.mock.calls[1][0].messages;
+    const toolResultMsg = secondCallMessages.find((m: any) => m.role === 'tool');
+    expect(toolResultMsg).toBeDefined();
+    expect(toolResultMsg.content).toContain('Worktree created');
+  });
+
+  it('active worktree: replace_range uri arg is remapped before execution', async () => {
+    mockWorktreeManager.state = 'active';
+    mockWorktreeManager.remapUri.mockImplementation((u: string) => u.replace('file:///workspace', 'file:///workspace/.worktrees/lucent-123'));
+
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      mockToolExecutor as unknown as EditorToolExecutor,
+    );
+    handler.setWorktreeManager(mockWorktreeManager as any);
+    // Put handler in autonomous mode so no approval gate blocks execution
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    const toolStream = createToolCallStream([
+      {
+        id: 'call_rr_1',
+        name: 'replace_range',
+        arguments: JSON.stringify({
+          uri: 'file:///workspace/src/foo.ts',
+          startLine: 0, startCharacter: 0,
+          endLine: 0, endCharacter: 5,
+          code: 'hello',
+        }),
+      },
+    ]);
+    const stopStream = createMockStream([
+      { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+    ]);
+    mockClient.chatStream
+      .mockReturnValueOnce(toolStream)
+      .mockReturnValueOnce(stopStream);
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'replace code', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    // remapUri was called with the original uri
+    expect(mockWorktreeManager.remapUri).toHaveBeenCalledWith('file:///workspace/src/foo.ts');
+    // toolExecutor received the remapped uri
+    const executedArgs = mockToolExecutor.execute.mock.calls[0][1];
+    expect(executedArgs.uri).toContain('.worktrees');
+  });
+
+  it('no active worktree: uri args pass through unchanged', async () => {
+    // state remains 'idle' — no remapping
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      mockToolExecutor as unknown as EditorToolExecutor,
+    );
+    handler.setWorktreeManager(mockWorktreeManager as any);
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    const toolStream = createToolCallStream([
+      {
+        id: 'call_rr_2',
+        name: 'replace_range',
+        arguments: JSON.stringify({
+          uri: 'file:///workspace/src/bar.ts',
+          startLine: 0, startCharacter: 0,
+          endLine: 0, endCharacter: 3,
+          code: 'new',
+        }),
+      },
+    ]);
+    const stopStream = createMockStream([
+      { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+    ]);
+    mockClient.chatStream
+      .mockReturnValueOnce(toolStream)
+      .mockReturnValueOnce(stopStream);
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'replace', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    // remapUri should NOT have been called since state is 'idle'
+    expect(mockWorktreeManager.remapUri).not.toHaveBeenCalled();
+    // toolExecutor received the original uri
+    const executedArgs = mockToolExecutor.execute.mock.calls[0][1];
+    expect(executedArgs.uri).toBe('file:///workspace/src/bar.ts');
+  });
+
+  it('setAutonomousMode(true) triggers worktreeManager.create() when a current conversation exists', async () => {
+    const mockHistory = {
+      create: vi.fn().mockResolvedValue({ id: 'conv-auto-1', title: 'New conversation', model: 'gpt-4', messages: [], createdAt: '', updatedAt: '' }),
+      save: vi.fn().mockResolvedValue(undefined),
+      load: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
+      delete: vi.fn(),
+      exportAsJson: vi.fn(),
+      exportAsMarkdown: vi.fn(),
+    };
+
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      undefined,
+      mockHistory as unknown as import('./history').ConversationHistory,
+    );
+    handler.setWorktreeManager(mockWorktreeManager as any);
+
+    // Send a message first so currentConversation gets set
+    mockClient.chatStream.mockReturnValueOnce(
+      createMockStream([
+        { choices: [{ delta: { content: 'hi' }, finish_reason: 'stop' }] },
+      ])
+    );
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'hello', model: 'gpt-4' },
+      () => {}
+    );
+
+    // Now enable autonomous mode — should trigger create() because currentConversation is set
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    expect(mockWorktreeManager.create).toHaveBeenCalledOnce();
+  });
+});
+
 describe('autonomous mode', () => {
   let mcpManager: McpClientManager;
   let mockToolExecutor: { execute: ReturnType<typeof vi.fn> };

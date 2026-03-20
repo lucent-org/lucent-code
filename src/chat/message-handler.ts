@@ -8,7 +8,8 @@ import { messageText } from '../core/message-text';
 import { OpenRouterClient } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
-import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION } from '../lsp/editor-tools';
+import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION, START_WORKTREE_TOOL_DEFINITION } from '../lsp/editor-tools';
+import { WorktreeManager } from '../core/worktree-manager';
 import { ConversationHistory } from './history';
 import { NotificationService } from '../core/notifications';
 import { TerminalBuffer } from '../core/terminal-buffer';
@@ -27,6 +28,7 @@ export class MessageHandler {
   private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
   private readonly skillMatcher = new SkillMatcher();
   private _autonomousMode = false;
+  private _worktreeManager: WorktreeManager | null = null;
 
   private static readonly GATED_TOOLS = new Set([
     'rename_symbol',
@@ -49,8 +51,19 @@ export class MessageHandler {
     this._autonomousMode = this.settings.autonomousMode ?? false;
   }
 
+  setWorktreeManager(manager: WorktreeManager): void {
+    this._worktreeManager = manager;
+  }
+
   setAutonomousMode(value: boolean): void {
     this._autonomousMode = value;
+    if (value && this._worktreeManager?.state === 'idle' && this.currentConversation) {
+      void this._worktreeManager.create(this.currentConversation.id);
+    }
+  }
+
+  get currentConversationId(): string | undefined {
+    return this.currentConversation?.id;
   }
 
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
@@ -175,11 +188,12 @@ export class MessageHandler {
     this.conversationMessages.push({ role: 'user', content: userContent });
     this.abortController = new AbortController();
 
-    const skillTools  = this.skillRegistry      ? [USE_SKILL_TOOL_DEFINITION]       : [];
-    const editorTools = this.toolExecutor        ? TOOL_DEFINITIONS                  : [];
-    const mcpTools    = this.mcpClientManager?.getTools() ?? [];
-    const allTools    = [...skillTools, ...editorTools, ...mcpTools];
-    const tools       = allTools.length > 0 ? allTools : undefined;
+    const skillTools    = this.skillRegistry      ? [USE_SKILL_TOOL_DEFINITION]       : [];
+    const editorTools   = this.toolExecutor        ? TOOL_DEFINITIONS                  : [];
+    const mcpTools      = this.mcpClientManager?.getTools() ?? [];
+    const worktreeTools = [START_WORKTREE_TOOL_DEFINITION];
+    const allTools      = [...editorTools, ...skillTools, ...mcpTools, ...worktreeTools];
+    const tools         = allTools.length > 0 ? allTools : undefined;
 
     try {
       const MAX_TOOL_ITERATIONS = 5;
@@ -243,6 +257,16 @@ export class MessageHandler {
               });
               continue;
             }
+            if (tc.function.name === 'start_worktree') {
+              const convId = this.currentConversation?.id ?? Date.now().toString();
+              try {
+                await this._worktreeManager?.create(convId);
+                this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: 'Worktree created.' });
+              } catch (e: any) {
+                this.conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: `Worktree creation failed: ${e.message}` });
+              }
+              continue;
+            }
             if (tc.function.name === 'use_skill') {
               const skillName = (args.name as string) ?? '';
               const skill = this.skillRegistry?.get(skillName);
@@ -252,6 +276,10 @@ export class MessageHandler {
                 content: skill ? skill.content : `Skill not found: ${skillName}`,
               });
               continue;
+            }
+            // Remap uri to worktree if active
+            if (this._worktreeManager?.state === 'active' && typeof args['uri'] === 'string') {
+              args = { ...args, uri: this._worktreeManager.remapUri(args['uri'] as string) };
             }
             if (tc.function.name.startsWith('mcp__') && this.mcpClientManager) {
               if (!this._autonomousMode) {
