@@ -41,6 +41,22 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+}
+
+.toolbar-brand__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
 .new-chat-button {
   background: var(--accent);
   color: var(--accent-fg);

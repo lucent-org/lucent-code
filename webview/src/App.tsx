@@ -146,6 +146,19 @@ const App: Component = () => {
   return (
     <div class="app">
       <div class="toolbar">
+        <div class="toolbar-brand">
+          <svg class="toolbar-brand__mark" width="14" height="14" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="toolbar-beam" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#6366F1"/>
+                <stop offset="50%"  stop-color="#8B5CF6"/>
+                <stop offset="100%" stop-color="#22D3EE"/>
+              </linearGradient>
+            </defs>
+            <line x1="40" y1="100" x2="88" y2="28" stroke="url(#toolbar-beam)" stroke-width="14" stroke-linecap="round"/>
+          </svg>
+          <span class="toolbar-brand__name">Lucent Code</span>
+        </div>
         <ModelSelector
           models={chatStore.models()}
           selectedModel={chatStore.selectedModel()}
