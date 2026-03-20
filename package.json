@@ -43,7 +43,7 @@
         {
           "id": "lucent-code",
           "title": "Lucent Code",
-          "icon": "$(comment-discussion)"
+          "icon": "media/icon.svg"
         }
       ]
     },
