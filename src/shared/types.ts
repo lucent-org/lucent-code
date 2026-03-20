@@ -106,7 +106,8 @@ export type ExtensionMessage =
   | { type: 'skillContent'; name: string; content: string | null }
   | { type: 'insertSkillChip'; name: string; content: string }
   | { type: 'mcpStatus'; servers: Record<string, 'connected' | 'error'> }
-  | { type: 'autonomousModeChanged'; enabled: boolean };
+  | { type: 'autonomousModeChanged'; enabled: boolean }
+  | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }
@@ -124,7 +125,8 @@ export type WebviewMessage =
   | { type: 'toolApprovalResponse'; requestId: string; approved: boolean }
   | { type: 'getTerminalOutput' }
   | { type: 'getSkillContent'; name: string }
-  | { type: 'setAutonomousMode'; enabled: boolean };
+  | { type: 'setAutonomousMode'; enabled: boolean }
+  | { type: 'startWorktree' };
 
 // ---- Diff types ----
 
@@ -182,4 +184,12 @@ export interface ConversationSummary {
 export interface SkillSummary {
   name: string;
   description: string;
+}
+
+export interface WorktreeDiff {
+  branch: string;
+  worktreePath: string;
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
 }
