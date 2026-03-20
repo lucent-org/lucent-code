@@ -170,7 +170,7 @@ const App: Component = () => {
         </button>
         <Show when={chatStore.worktreeStatus() !== 'idle'}>
           <button
-            class={`toolbar-btn worktree-badge worktree-badge--${chatStore.worktreeStatus()}`}
+            class={`worktree-badge worktree-badge--${chatStore.worktreeStatus()}`}
             title={`Worktree ${chatStore.worktreeStatus()}`}
             onClick={() => vscode.postMessage({ type: 'startWorktree' })}
           >

@@ -941,7 +941,17 @@ body {
 
 /* Worktree badge */
 .worktree-badge {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
   font-size: 14px;
+  color: var(--fg-muted);
   opacity: 0.6;
   transition: opacity 0.15s;
 }
