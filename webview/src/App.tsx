@@ -147,7 +147,7 @@ const App: Component = () => {
     <div class="app">
       <div class="toolbar">
         <div class="toolbar-brand">
-          <svg class="toolbar-brand__mark" width="14" height="14" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+          <svg class="toolbar-brand__mark" aria-hidden="true" width="14" height="14" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="toolbar-beam" x1="0%" y1="100%" x2="100%" y2="0%">
                 <stop offset="0%"   stop-color="#6366F1"/>
