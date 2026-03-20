@@ -18,6 +18,7 @@ export class Indexer {
   private readonly vectorStore = new VectorStore();
   private workspaceRoot = '';
   private dbPath = '';
+  private watcher?: vscode.Disposable;
 
   constructor(private readonly getApiKey: () => string | Promise<string>) {}
 
@@ -70,6 +71,7 @@ export class Indexer {
   }
 
   dispose(): void {
+    this.watcher?.dispose();
     this.vectorStore.close();
   }
 
@@ -91,9 +93,9 @@ export class Indexer {
   private async embedChunks(chunks: { content: string }[]): Promise<Float32Array[]> {
     const results: Float32Array[] = [];
 
+    const apiKey = await this.getApiKey();
     for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
       const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
-      const apiKey = await this.getApiKey();
 
       const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
         method: 'POST',
@@ -121,10 +123,10 @@ export class Indexer {
   }
 
   private startFileWatcher(): void {
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-    watcher.onDidChange((uri) => { void this.indexFile(uri.fsPath); });
-    watcher.onDidCreate((uri) => { void this.indexFile(uri.fsPath); });
-    watcher.onDidDelete((uri) => {
+    this.watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    this.watcher.onDidChange((uri) => { void this.indexFile(uri.fsPath); });
+    this.watcher.onDidCreate((uri) => { void this.indexFile(uri.fsPath); });
+    this.watcher.onDidDelete((uri) => {
       this.vectorStore.deleteFile(uri.fsPath);
       this.vectorStore.loadIntoMemory();
     });
