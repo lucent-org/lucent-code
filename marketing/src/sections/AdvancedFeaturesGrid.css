@@ -1,0 +1,3 @@
+.advanced-features { background: var(--color-background); }
+.advanced-features .section-heading { color: var(--color-text); }
+.advanced-features .section-subtext { color: var(--color-text-muted); }

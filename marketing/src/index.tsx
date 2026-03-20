@@ -9,6 +9,7 @@ import './sections/SocialProofStrip.css';
 import './components/FeatureCard.css';
 import './sections/CoreFeaturesGrid.css';
 import './sections/DemoSection.css';
+import './sections/AdvancedFeaturesGrid.css';
 import './sections/CtaBanner.css';
 import './sections/Footer.css';
 
