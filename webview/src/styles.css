@@ -281,15 +281,21 @@ body {
   gap: 12px;
 }
 
-.empty-state-icon {
-  font-size: 48px;
-  opacity: 0.5;
+.empty-state__logo {
+  opacity: 0.9;
 }
 
 .empty-state-title {
   font-size: 1.2em;
   font-weight: bold;
   color: var(--fg-primary);
+}
+
+.empty-state-tagline {
+  font-size: 0.85em;
+  color: var(--fg-secondary);
+  margin-top: -6px;
+  margin-bottom: 4px;
 }
 
 .empty-state-hint {

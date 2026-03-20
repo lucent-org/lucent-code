@@ -214,8 +214,18 @@ const App: Component = () => {
       <div class="messages">
         <Show when={chatStore.messages().length > 0} fallback={
           <div class="empty-state">
-            <div class="empty-state-icon">&#x1F4AC;</div>
+            <svg class="empty-state__logo" aria-hidden="true" width="56" height="56" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="empty-beam" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%"   stop-color="#6366F1"/>
+                  <stop offset="50%"  stop-color="#8B5CF6"/>
+                  <stop offset="100%" stop-color="#22D3EE"/>
+                </linearGradient>
+              </defs>
+              <line x1="40" y1="100" x2="88" y2="28" stroke="url(#empty-beam)" stroke-width="14" stroke-linecap="round"/>
+            </svg>
             <div class="empty-state-title">Lucent Code</div>
+            <div class="empty-state-tagline">Write code in a new light.</div>
             <div class="empty-state-hint">
               <Show when={chatStore.models().length > 0} fallback={
                 <span>Set your API key to get started.<br/>Use the command palette: <code>Lucent Code: Set API Key</code></span>
