@@ -73,6 +73,9 @@ const App: Component = () => {
         case 'autonomousModeChanged':
           chatStore.setAutonomousModeFromMessage(message.enabled);
           break;
+        case 'worktreeStatus':
+          chatStore.handleWorktreeStatus(message.status);
+          break;
       }
     });
 
@@ -165,6 +168,15 @@ const App: Component = () => {
         >
           ⚡
         </button>
+        <Show when={chatStore.worktreeStatus() !== 'idle'}>
+          <button
+            class={`toolbar-btn worktree-badge worktree-badge--${chatStore.worktreeStatus()}`}
+            title={`Worktree ${chatStore.worktreeStatus()}`}
+            onClick={() => vscode.postMessage({ type: 'startWorktree' })}
+          >
+            ⎇
+          </button>
+        </Show>
       </div>
 
       <Show when={chatStore.showConversationList()}>

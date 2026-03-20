@@ -37,6 +37,7 @@ function createChatStore() {
   const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description: string }[]>([]);
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
+  const [worktreeStatus, setWorktreeStatus] = createSignal<'idle' | 'creating' | 'active' | 'finishing'>('idle');
 
   const [recentConversationIds, setRecentConversationIds] = createSignal<string[]>(
     (() => {
@@ -126,6 +127,10 @@ function createChatStore() {
 
   function setAutonomousModeFromMessage(value: boolean) {
     setAutonomousModeSignal(value);
+  }
+
+  function handleWorktreeStatus(status: 'idle' | 'creating' | 'active' | 'finishing') {
+    setWorktreeStatus(status);
   }
 
   function resolveToolApproval(requestId: string, approved: boolean) {
@@ -255,6 +260,8 @@ function createChatStore() {
     setPendingSkillChip,
     autonomousMode,
     setAutonomousModeFromMessage,
+    worktreeStatus,
+    handleWorktreeStatus,
     recentConversationIds,
   };
 }

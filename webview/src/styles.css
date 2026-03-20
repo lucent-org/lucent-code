@@ -938,3 +938,23 @@ body {
   font-size: 12px;
   cursor: pointer;
 }
+
+/* Worktree badge */
+.worktree-badge {
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.worktree-badge--active {
+  opacity: 1;
+  color: var(--accent);
+}
+.worktree-badge--creating,
+.worktree-badge--finishing {
+  opacity: 0.8;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.4; }
+}
