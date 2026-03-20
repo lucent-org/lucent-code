@@ -4,7 +4,7 @@ interface MentionSource {
   id: string;
   label: string;
   description: string;
-  kind: 'context' | 'action';
+  kind: 'context' | 'action' | 'search';
 }
 
 const MENTION_SOURCES: MentionSource[] = [
@@ -12,6 +12,7 @@ const MENTION_SOURCES: MentionSource[] = [
   { id: 'explain', label: '@explain', description: 'Explain code at cursor',           kind: 'action'  },
   { id: 'test',    label: '@test',    description: 'Write tests for code at cursor',   kind: 'action'  },
   { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
+  { id: 'codebase', label: '@codebase', description: 'Semantic search across all indexed files', kind: 'search' },
 ];
 
 interface Attachment {
@@ -211,6 +212,11 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     const beforeAt = lastAt !== -1 ? value.slice(0, lastAt) : value;
 
     try {
+      if (source.kind === 'search') {
+        // Insert @codebase marker; user types the query after it
+        setInput(`${beforeAt}@${source.id} `);
+        return;
+      }
       const content = await props.onResolveMention(source.id);
       if (content) {
         if (source.kind === 'action') {

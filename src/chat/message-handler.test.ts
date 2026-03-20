@@ -2059,3 +2059,111 @@ describe('autonomous mode', () => {
     expect(mockToolExecutor.execute).toHaveBeenCalledWith('rename_symbol', expect.any(Object));
   });
 });
+
+describe('@codebase mention', () => {
+  const mockClient = {
+    chatStream: vi.fn(),
+    chat: vi.fn(),
+    listModels: vi.fn().mockResolvedValue([]),
+  };
+
+  const mockContextBuilder = {
+    buildContext: vi.fn().mockReturnValue({}),
+    formatForPrompt: vi.fn().mockReturnValue(''),
+    buildEnrichedContext: vi.fn().mockResolvedValue({}),
+    formatEnrichedPrompt: vi.fn(() => ''),
+    getCapabilities: vi.fn(() => undefined),
+    getCustomInstructions: vi.fn(() => undefined),
+  };
+
+  const mockSettings = {
+    setChatModel: vi.fn().mockResolvedValue(undefined),
+    temperature: 0.7,
+    maxTokens: 4096,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.chatStream = vi.fn().mockImplementation(async function* () {
+      yield { choices: [{ delta: { content: 'result' }, finish_reason: 'stop' }] };
+    });
+    mockContextBuilder.buildEnrichedContext = vi.fn().mockResolvedValue({});
+    mockContextBuilder.formatEnrichedPrompt = vi.fn(() => '');
+    mockContextBuilder.getCapabilities = vi.fn(() => undefined);
+    mockContextBuilder.getCustomInstructions = vi.fn(() => undefined);
+  });
+
+  it('injects codebase-context into system message when indexer returns results', async () => {
+    const mockIndexer = {
+      searchAsync: vi.fn(() =>
+        Promise.resolve([
+          { filePath: 'src/auth.ts', startLine: 0, endLine: 10, content: 'export class AuthManager {}', score: 0.9 },
+        ])
+      ),
+    };
+
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      undefined, undefined, undefined, undefined, undefined, undefined,
+      mockIndexer as any
+    );
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: '@codebase find auth logic', images: [], model: 'gpt-4o' },
+      vi.fn()
+    );
+
+    expect(mockIndexer.searchAsync).toHaveBeenCalledWith('find auth logic', 10);
+
+    const callArgs = mockClient.chatStream.mock.calls[0][0];
+    const systemMessage = callArgs.messages.find((m: any) => m.role === 'system');
+    expect(systemMessage).toBeDefined();
+    expect(systemMessage.content).toContain('<codebase-context');
+    expect(systemMessage.content).toContain('src/auth.ts');
+  });
+
+  it('sends query as user message content (strips @codebase prefix)', async () => {
+    const mockIndexer = {
+      searchAsync: vi.fn(() => Promise.resolve([])),
+    };
+
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      undefined, undefined, undefined, undefined, undefined, undefined,
+      mockIndexer as any
+    );
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: '@codebase find auth logic', images: [], model: 'gpt-4o' },
+      vi.fn()
+    );
+
+    const callArgs = mockClient.chatStream.mock.calls[0][0];
+    const userMessage = callArgs.messages.find((m: any) => m.role === 'user');
+    expect(userMessage.content).toBe('find auth logic');
+  });
+
+  it('does not crash when indexer is undefined', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+    );
+
+    await expect(
+      handler.handleMessage(
+        { type: 'sendMessage', content: '@codebase find something', images: [], model: 'gpt-4o' },
+        vi.fn()
+      )
+    ).resolves.not.toThrow();
+
+    const callArgs = mockClient.chatStream.mock.calls[0][0];
+    const userMessage = callArgs.messages.find((m: any) => m.role === 'user');
+    // Without indexer, processedContent stays as original content
+    expect(userMessage.content).toBe('@codebase find something');
+  });
+});

@@ -16,6 +16,7 @@ import { TerminalBuffer } from '../core/terminal-buffer';
 import { SkillRegistry } from '../skills/skill-registry';
 import { SkillMatcher } from '../skills/skill-matcher';
 import type { McpClientManager } from '../mcp/mcp-client-manager';
+import type { Indexer } from '../search/indexer';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -46,7 +47,8 @@ export class MessageHandler {
     private readonly notifications: NotificationService = new NotificationService(),
     private readonly terminalBuffer?: TerminalBuffer,
     private readonly skillRegistry?: SkillRegistry,
-    private readonly mcpClientManager?: McpClientManager
+    private readonly mcpClientManager?: McpClientManager,
+    private readonly indexer?: Indexer
   ) {
     this._autonomousMode = this.settings.autonomousMode ?? false;
   }
@@ -190,6 +192,26 @@ export class MessageHandler {
       systemMessage.content += advertisement;
     }
 
+    // Handle @codebase semantic search
+    let processedContent = content;
+    if (content.startsWith('@codebase') && this.indexer) {
+      const query = content.slice('@codebase'.length).trim();
+      if (query) {
+        try {
+          const results = await this.indexer.searchAsync(query, 10);
+          if (results.length > 0) {
+            const contextBlock = results
+              .map((r) => `${r.filePath}:${r.startLine}-${r.endLine}\n\`\`\`\n${r.content}\n\`\`\``)
+              .join('\n\n');
+            systemMessage.content += `\n\n<codebase-context query="${query}">\n${contextBlock}\n</codebase-context>`;
+          }
+        } catch {
+          // Non-fatal — send message without codebase context
+        }
+        processedContent = query;
+      }
+    }
+
     const skillMatches = this.skillRegistry
       ? this.skillMatcher.match(content, this.skillRegistry.getSummaries())
       : [];
@@ -199,7 +221,7 @@ export class MessageHandler {
       .map((s) => `<skill name="${s.name}">\n${s.content}\n</skill>`)
       .join('\n\n');
 
-    const baseContent = skillBlocks ? `${skillBlocks}\n\n${content}` : content;
+    const baseContent = skillBlocks ? `${skillBlocks}\n\n${processedContent}` : processedContent;
     const userContent = images.length > 0
       ? [
           { type: 'text' as const, text: baseContent },
