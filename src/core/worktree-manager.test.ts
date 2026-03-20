@@ -25,6 +25,7 @@ vi.mock('fs', () => ({
 
 import { WorktreeManager } from './worktree-manager';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 
 describe('WorktreeManager', () => {
   let runner: ReturnType<typeof vi.fn>;
@@ -114,6 +115,60 @@ describe('WorktreeManager', () => {
     it('returns URI unchanged when it does not start with workspace root', () => {
       const external = 'file:///other/path/file.ts';
       expect(manager.remapUri(external)).toBe(external);
+    });
+  });
+
+  describe('finishSession()', () => {
+    beforeEach(async () => {
+      vi.mocked(vscode.window.showQuickPick).mockReset();
+      await manager.create('abc123');
+    });
+
+    it('removes worktree silently when there are no changes', async () => {
+      runner.mockResolvedValueOnce(''); // git diff returns empty
+      await manager.finishSession();
+      expect(runner).toHaveBeenCalledWith(
+        expect.stringContaining('git worktree remove'),
+        workspaceRoot
+      );
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+      expect(manager.state).toBe('idle');
+    });
+
+    it('shows quick-pick when there are changes', async () => {
+      runner.mockResolvedValueOnce(' 3 files changed, 10 insertions(+), 2 deletions(-)');
+      runner.mockResolvedValueOnce(''); // gh --version succeeds
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined); // dismissed
+      await manager.finishSession();
+      expect(vscode.window.showQuickPick).toHaveBeenCalled();
+    });
+
+    it('merges and removes worktree on Merge selection', async () => {
+      runner.mockResolvedValueOnce(' 1 file changed, 5 insertions(+)');
+      runner.mockResolvedValueOnce(''); // gh --version
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: '$(git-merge) Merge into current branch', action: 'merge' } as any);
+      await manager.finishSession();
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('git merge'), workspaceRoot);
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('git worktree remove'), workspaceRoot);
+      expect(manager.state).toBe('idle');
+    });
+
+    it('force-removes worktree and deletes branch on Discard selection', async () => {
+      runner.mockResolvedValueOnce(' 1 file changed, 5 insertions(+)');
+      runner.mockResolvedValueOnce(''); // gh --version
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: '$(trash) Discard changes', action: 'discard' } as any);
+      await manager.finishSession();
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('git worktree remove --force'), workspaceRoot);
+      expect(runner).toHaveBeenCalledWith(expect.stringContaining('git branch -D'), workspaceRoot);
+      expect(manager.state).toBe('idle');
+    });
+
+    it('copies branch name to clipboard when gh is not available', async () => {
+      runner.mockResolvedValueOnce(' 1 file changed, 5 insertions(+)');
+      runner.mockRejectedValueOnce(new Error('gh not found')); // gh --version fails
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: '$(clippy) Copy branch name to clipboard', action: 'copy' } as any);
+      await manager.finishSession();
+      expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('lucent/'));
     });
   });
 });

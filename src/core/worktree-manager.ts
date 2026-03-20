@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import type { ExtensionMessage } from '../shared/types';
+import type { ExtensionMessage, WorktreeDiff } from '../shared/types';
 
 export type WorktreeState = 'idle' | 'creating' | 'active' | 'finishing';
 export type Runner = (cmd: string, cwd?: string) => Promise<string>;
@@ -57,6 +57,88 @@ export class WorktreeManager {
     const rel = uri.slice(prefix.length).replace(/\\/g, '/');
     const joined = path.join(this._worktreePath, rel).replace(/\\/g, '/');
     return vscode.Uri.file(joined).toString();
+  }
+
+  async finishSession(): Promise<void> {
+    if (this._state !== 'active' || !this._worktreePath || !this._branch) return;
+
+    this._state = 'finishing';
+    this._postStatus();
+
+    try {
+      const diffStat = await this.runner(
+        `git diff main...HEAD --shortstat`,
+        this._worktreePath
+      ).catch(() => '');
+
+      if (!diffStat.trim()) {
+        await this.runner(`git worktree remove "${this._worktreePath}"`, this.workspaceRoot);
+        this._reset();
+        return;
+      }
+
+      const diff = this._parseDiffStat(diffStat);
+      const ghAvailable = await this.runner('gh --version', this.workspaceRoot)
+        .then(() => true)
+        .catch(() => false);
+
+      const items = [
+        { label: '$(git-merge) Merge into current branch', action: 'merge' },
+        ghAvailable
+          ? { label: '$(github) Open as PR', action: 'pr' }
+          : { label: '$(clippy) Copy branch name to clipboard', action: 'copy' },
+        { label: '$(trash) Discard changes', action: 'discard' },
+      ];
+
+      const pick = await vscode.window.showQuickPick(items, {
+        title: `Worktree session: ${diff.filesChanged} file(s) changed, +${diff.insertions} -${diff.deletions}`,
+      });
+
+      if (!pick) return;
+
+      const branch = this._branch!;
+      const worktreePath = this._worktreePath!;
+
+      switch ((pick as any).action) {
+        case 'merge':
+          await this.runner(`git merge ${branch}`, this.workspaceRoot);
+          await this.runner(`git worktree remove "${worktreePath}"`, this.workspaceRoot);
+          break;
+        case 'pr':
+          await this.runner(`gh pr create --head ${branch} --fill`, this.workspaceRoot);
+          await this.runner(`git worktree remove "${worktreePath}"`, this.workspaceRoot);
+          break;
+        case 'copy':
+          await vscode.env.clipboard.writeText(branch);
+          break;
+        case 'discard':
+          await this.runner(`git worktree remove --force "${worktreePath}"`, this.workspaceRoot);
+          await this.runner(`git branch -D ${branch}`, this.workspaceRoot);
+          break;
+      }
+    } finally {
+      this._reset();
+    }
+  }
+
+  private _reset(): void {
+    this._state = 'idle';
+    this._worktreePath = undefined;
+    this._branch = undefined;
+    this._postStatus();
+  }
+
+  private _parseDiffStat(stat: string): WorktreeDiff {
+    const filesMatch = stat.match(/(\d+) file/);
+    const insertMatch = stat.match(/(\d+) insertion/);
+    const deleteMatch = stat.match(/(\d+) deletion/);
+    return {
+      branch: this._branch ?? '',
+      worktreePath: this._worktreePath ?? '',
+      filesChanged: parseInt(filesMatch?.[1] ?? '0'),
+      insertions: parseInt(insertMatch?.[1] ?? '0'),
+      deletions: parseInt(deleteMatch?.[1] ?? '0'),
+    };
   }
 
   private _postStatus(branchOverride?: string): void {
