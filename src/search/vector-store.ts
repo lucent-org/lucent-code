@@ -109,7 +109,9 @@ export class VectorStore {
     for (let i = 0; i < this.metadata.length; i++) {
       const offset = i * this.dim;
       const chunk = this.embeddingsMatrix.subarray(offset, offset + this.dim);
-      const score = dot(queryEmbedding, chunk) / (qNorm * norm(chunk));
+      const chunkNorm = norm(chunk);
+      if (chunkNorm === 0) continue;
+      const score = dot(queryEmbedding, chunk) / (qNorm * chunkNorm);
       scores.push({ index: i, score });
     }
 

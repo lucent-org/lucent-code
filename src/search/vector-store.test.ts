@@ -14,6 +14,7 @@ vi.mock('better-sqlite3', () => {
       prepare: mockPrepare,
       exec: mockExec,
       close: mockClose,
+      transaction: vi.fn((fn: () => void) => fn),  // returns the fn itself (calling tx() calls fn())
     })),
   };
 });
@@ -74,6 +75,21 @@ describe('VectorStore', () => {
     expect(results).toHaveLength(1);
     expect(results[0].filePath).toBe('test.ts');
     expect(results[0].score).toBeCloseTo(1.0);
+  });
+
+  it('upsertChunks deletes old chunks and inserts new ones', () => {
+    const embedding = new Float32Array([1, 0, 0]);
+    store.upsertChunks('src/foo.ts', [{ startLine: 0, endLine: 5, content: 'hello', embedding }], 1000);
+    // deleteStmt.run called with filePath
+    expect(mockRun).toHaveBeenCalledWith('src/foo.ts');
+    // insertStmt.run called with chunk data
+    expect(mockRun).toHaveBeenCalledWith('src/foo.ts', 0, 5, 'hello', expect.any(Buffer), 1000);
+  });
+
+  it('deleteFile removes all chunks for a file', () => {
+    store.deleteFile('src/bar.ts');
+    expect(mockPrepare).toHaveBeenCalledWith('DELETE FROM chunks WHERE file_path = ?');
+    expect(mockRun).toHaveBeenCalledWith('src/bar.ts');
   });
 
   it('close calls db.close()', () => {
