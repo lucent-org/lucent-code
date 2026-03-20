@@ -1857,6 +1857,35 @@ describe('worktree integration', () => {
     expect(executedArgs.uri).toBe('file:///workspace/src/bar.ts');
   });
 
+  it('startWorktree WebviewMessage triggers worktreeManager.create()', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+    );
+    handler.setWorktreeManager(mockWorktreeManager as any);
+
+    await handler.handleMessage({ type: 'startWorktree' }, (m) => postMessages.push(m));
+
+    expect(mockWorktreeManager.create).toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('newChat calls finishSession() when worktree is active', async () => {
+    mockWorktreeManager.state = 'active';
+    mockWorktreeManager.finishSession.mockResolvedValue(undefined);
+
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+    );
+    handler.setWorktreeManager(mockWorktreeManager as any);
+
+    await handler.handleMessage({ type: 'newChat' }, (m) => postMessages.push(m));
+
+    expect(mockWorktreeManager.finishSession).toHaveBeenCalled();
+  });
+
   it('setAutonomousMode(true) triggers worktreeManager.create() when a current conversation exists', async () => {
     const mockHistory = {
       create: vi.fn().mockResolvedValue({ id: 'conv-auto-1', title: 'New conversation', model: 'gpt-4', messages: [], createdAt: '', updatedAt: '' }),

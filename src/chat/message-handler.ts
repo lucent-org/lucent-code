@@ -90,7 +90,9 @@ export class MessageHandler {
       case 'newChat':
         // Call finishSession before switching conversations so user gets the merge/PR/discard prompt
         if (this._worktreeManager?.state === 'active') {
-          void this._worktreeManager.finishSession();
+          this._worktreeManager.finishSession().catch((e: Error) => {
+            console.error('[WorktreeManager] finishSession failed:', e.message);
+          });
         }
         this.conversationMessages = [];
         this.currentConversation = undefined;
