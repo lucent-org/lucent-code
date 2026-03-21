@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import * as http from 'http';
 import { OpenRouterClient } from './openrouter-client';
 
 let server: http.Server;
 let baseUrl: string;
 let requestHandler: ((req: http.IncomingMessage, res: http.ServerResponse) => void) | null = null;
+let originalFetch: typeof globalThis.fetch;
 
 beforeAll(async () => {
   server = http.createServer((req, res) => {
@@ -15,16 +16,20 @@ beforeAll(async () => {
   const addr = server.address() as { port: number };
   baseUrl = `http://127.0.0.1:${addr.port}`;
 
-  // Redirect openrouter.ai fetch calls to our local server
-  const originalFetch = globalThis.fetch;
+  originalFetch = globalThis.fetch;
   globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
     const urlStr = url.toString().replace('https://openrouter.ai', baseUrl);
     return originalFetch(urlStr, init);
   }) as typeof fetch;
 });
 
+afterEach(() => {
+  requestHandler = null;
+});
+
 afterAll(() => {
-  server.close();
+  globalThis.fetch = originalFetch;
+  return new Promise<void>(resolve => server.close(() => resolve()));
 });
 
 function makeSSEBody(chunks: object[], done = true): string {
