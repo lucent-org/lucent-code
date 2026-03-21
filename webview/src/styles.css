@@ -77,6 +77,81 @@ body {
   white-space: nowrap;
 }
 
+/* Toolbar chat tabs */
+.chat-tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.chat-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.chat-tab {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  max-width: 140px;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.6;
+  font-size: 12px;
+  transition: opacity 0.1s;
+}
+
+.chat-tab:hover {
+  opacity: 1;
+  background: var(--bg-secondary);
+}
+
+.chat-tab--active {
+  opacity: 1;
+  border-bottom-color: var(--accent);
+}
+
+.chat-tab__label {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px 4px 8px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.chat-tab__close {
+  flex-shrink: 0;
+  padding: 2px 5px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.chat-tab:hover .chat-tab__close,
+.chat-tab--active .chat-tab__close {
+  opacity: 0.7;
+}
+
+.chat-tab__close:hover {
+  opacity: 1 !important;
+  color: var(--vscode-editorError-foreground, #f44747);
+}
+
 .new-chat-button {
   background: var(--accent);
   color: var(--accent-fg);
@@ -120,6 +195,47 @@ body {
   max-height: 300px;
   display: flex;
   flex-direction: column;
+}
+
+/* Model selector inside chat input bar */
+.chat-input-actions .model-selector {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.chat-input-actions .model-selector-toggle {
+  width: auto;
+  padding: 3px 7px;
+  font-size: 11px;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dropdown opens upward */
+.model-selector-dropdown--up {
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 4px;
+}
+
+/* Context fill indicator */
+.context-fill {
+  font-size: 0.9em;
+}
+
+.context-fill--ok {
+  color: var(--vscode-foreground);
+  opacity: 0.5;
+}
+
+.context-fill--warn {
+  color: var(--vscode-editorWarning-foreground, #e2c08d);
+}
+
+.context-fill--danger {
+  color: var(--vscode-editorError-foreground, #f44747);
 }
 
 .model-search {
@@ -962,62 +1078,6 @@ body {
   object-fit: contain;
   border-radius: 4px;
   border: 1px solid var(--border);
-}
-
-/* Session Strip */
-.session-strip {
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-primary);
-  min-height: 0;
-}
-
-.session-strip-tabs {
-  display: flex;
-  overflow-x: auto;
-  scrollbar-width: none; /* Firefox */
-}
-
-.session-strip-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.session-tab {
-  flex-shrink: 0;
-  padding: 6px 12px;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--vscode-foreground);
-  opacity: 0.6;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.1s;
-}
-
-.session-tab:hover {
-  opacity: 1;
-  background: var(--bg-secondary);
-}
-
-.session-tab--active {
-  opacity: 1;
-  border-bottom-color: var(--accent);
-  color: var(--vscode-foreground);
-}
-
-.session-strip-select {
-  width: 100%;
-  padding: 6px 8px;
-  background: var(--bg-secondary);
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--vscode-foreground);
-  font-size: 12px;
-  cursor: pointer;
 }
 
 /* Worktree badge */
