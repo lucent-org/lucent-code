@@ -19,11 +19,11 @@ jobs:
           cache: 'npm'
 
       - name: Install root dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install webview dependencies
         working-directory: webview
-        run: npm ci
+        run: npm install
 
       - name: Build
         run: npm run build
@@ -45,7 +45,7 @@ jobs:
           node-version: 24
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm install
 
       - name: Validate PR commits
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
