@@ -57,6 +57,14 @@ function createChatStore() {
     });
   }
 
+  function removeFromRecents(id: string) {
+    setRecentConversationIds((prev) => {
+      const next = prev.filter((x) => x !== id);
+      vscode.setState({ ...(vscode.getState() as object ?? {}), recentConversationIds: next });
+      return next;
+    });
+  }
+
   function sendMessage(content: string, images: string[] = []) {
     if (!content.trim() && images.length === 0) return;
     if (isStreaming()) return;
@@ -263,6 +271,7 @@ function createChatStore() {
     worktreeStatus,
     handleWorktreeStatus,
     recentConversationIds,
+    removeFromRecents,
   };
 }
 
