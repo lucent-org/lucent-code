@@ -6,26 +6,32 @@ import { VectorStore } from './vector-store';
 
 // NOTE: No vi.mock — uses real better-sqlite3 against a temp file
 
-let store: VectorStore;
-let dbPath: string;
-
-beforeEach(() => {
-  dbPath = path.join(os.tmpdir(), `lucent-test-${Date.now()}.db`);
-  store = new VectorStore();
-  store.open(dbPath);
-});
-
-afterEach(() => {
-  store.close();
-  try { fs.unlinkSync(dbPath); } catch { /* already deleted */ }
-});
-
 describe('VectorStore integration', () => {
+  let store: VectorStore;
+  let dbPath: string;
+
+  beforeEach(() => {
+    dbPath = path.join(os.tmpdir(), `lucent-test-${Date.now()}.db`);
+    store = new VectorStore();
+    store.open(dbPath);
+  });
+
+  afterEach(() => {
+    store.close();
+    try { fs.unlinkSync(dbPath); } catch { /* already deleted */ }
+  });
+
   it('creates schema on open', () => {
-    const embedding = new Float32Array(3).fill(0.5);
-    expect(() =>
-      store.upsertChunks('a.ts', [{ startLine: 0, endLine: 5, content: 'hello', embedding }], 1000)
-    ).not.toThrow();
+    const tables = (store as any).db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chunks'")
+      .all() as { name: string }[];
+    expect(tables).toHaveLength(1);
+    expect(tables[0].name).toBe('chunks');
+
+    const indexes = (store as any).db
+      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_file_path'")
+      .all() as { name: string }[];
+    expect(indexes).toHaveLength(1);
   });
 
   it('upsert then loadIntoMemory then search returns correct result', () => {
@@ -40,7 +46,7 @@ describe('VectorStore integration', () => {
     expect(results[0].content).toBe('alpha');
     expect(results[0].score).toBeCloseTo(1.0, 4);
     expect(results[1].filePath).toBe('b.ts');
-    expect(results[1].score).toBeCloseTo(0, 4);
+    expect(results[1].score).toBe(0);
   });
 
   it('upsert replaces previous chunks for same file', () => {
@@ -62,7 +68,7 @@ describe('VectorStore integration', () => {
     store.loadIntoMemory();
 
     const results = store.search(new Float32Array([1, 0, 0]), 5);
-    expect(results.find(r => r.filePath === 'a.ts')).toBeUndefined();
+    expect(results).toHaveLength(0);
   });
 
   it('getAllFileMtimes returns correct mtimes after upsert', () => {
