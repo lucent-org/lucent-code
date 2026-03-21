@@ -409,7 +409,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           value={input()}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about your code... Type @ for mentions, / for skills"
+          placeholder="Ask about your code..."
           rows={3}
           disabled={props.isStreaming || isResolvingMention()}
         />
