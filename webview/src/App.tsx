@@ -2,9 +2,8 @@ import { Component, For, Show, createEffect, onMount } from 'solid-js';
 import { chatStore } from './stores/chat';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
-import ModelSelector from './components/ModelSelector';
+import ChatTabs from './components/ChatTabs';
 import ConversationList from './components/ConversationList';
-import SessionStrip from './components/SessionStrip';
 import DiffView from './components/DiffView';
 import { getVsCodeApi } from './utils/vscode-api';
 
@@ -159,10 +158,12 @@ const App: Component = () => {
           </svg>
           <span class="toolbar-brand__name">Lucent Code</span>
         </div>
-        <ModelSelector
-          models={chatStore.models()}
-          selectedModel={chatStore.selectedModel()}
-          onSelect={chatStore.selectModel}
+        <ChatTabs
+          recentIds={chatStore.recentConversationIds()}
+          conversations={chatStore.conversations()}
+          currentId={chatStore.currentConversationId()}
+          onSelect={chatStore.loadConversation}
+          onClose={chatStore.removeFromRecents}
         />
         <button
           class={`history-button ${chatStore.showConversationList() ? 'active' : ''}`}
@@ -199,15 +200,6 @@ const App: Component = () => {
           onLoad={chatStore.loadConversation}
           onDelete={chatStore.deleteConversation}
           onExport={chatStore.exportConversation}
-        />
-      </Show>
-
-      <Show when={chatStore.recentConversationIds().length > 1}>
-        <SessionStrip
-          recentIds={chatStore.recentConversationIds()}
-          conversations={chatStore.conversations()}
-          currentId={chatStore.currentConversationId()}
-          onSelect={chatStore.loadConversation}
         />
       </Show>
 
@@ -267,6 +259,10 @@ const App: Component = () => {
         onResolveSkill={handleResolveSkill}
         pendingChip={chatStore.pendingSkillChip()}
         onPendingChipConsumed={() => chatStore.setPendingSkillChip(null)}
+        models={chatStore.models()}
+        selectedModel={chatStore.selectedModel()}
+        onSelectModel={chatStore.selectModel}
+        messages={chatStore.messages()}
       />
     </div>
   );
