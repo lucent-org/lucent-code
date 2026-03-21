@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.2...lucent-code-v0.2.3) (2026-03-21)
+
+
+### Documentation
+
+* add regression test report and screenshots for webview (2026-03-21) ([70d5f6d](https://github.com/lucent-org/lucent-code/commit/70d5f6d0f1b48006803dc4a0a3ed10f69322d68c))
+* webview regression test report — 2026-03-21 ([b2e40ff](https://github.com/lucent-org/lucent-code/commit/b2e40ff5061263ae8935d88ace6880db1af58807))
+
 ## [0.2.2](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.1...lucent-code-v0.2.2) (2026-03-21)
 
 
