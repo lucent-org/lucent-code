@@ -2,7 +2,7 @@
   "name": "lucent-code",
   "displayName": "Lucent Code",
   "description": "The only VS Code AI that uses your language server — not text search. Chat, completions, and code intelligence in one.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "lucentcode",
   "license": "MIT",
   "repository": {

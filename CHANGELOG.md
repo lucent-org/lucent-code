@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.1...lucent-code-v0.2.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* move chat panel to secondary sidebar ([ee65e04](https://github.com/lucent-org/lucent-code/commit/ee65e049bd17b6534005b06e074ff069f2873f4a))
+* move chat panel to secondarySidebar to dock with other chat extensions ([7890c3a](https://github.com/lucent-org/lucent-code/commit/7890c3a4be5576bfd43267b4e206bc44f6340a23))
+
 ## [0.2.1](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.0...lucent-code-v0.2.1) (2026-03-21)
 
 
