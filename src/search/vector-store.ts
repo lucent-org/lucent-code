@@ -1,4 +1,14 @@
-import Database from 'better-sqlite3';
+// Load better-sqlite3 in a module-level try-catch so that an ABI mismatch
+// (the .node binary was compiled for a different Node/Electron version) does not
+// crash the extension host before the webview registers.
+// vi.mock() hoisting in tests also intercepts this require correctly.
+type DatabaseConstructor = typeof import('better-sqlite3');
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+let Database: DatabaseConstructor | null = (() => {
+  try { const m = require('better-sqlite3'); return m.default ?? m; }
+  catch { return null; }
+})();
 
 export interface SearchResult {
   filePath: string;
@@ -38,13 +48,19 @@ CREATE INDEX IF NOT EXISTS idx_file_path ON chunks(file_path);
 `;
 
 export class VectorStore {
-  private db!: Database.Database;
+  private db: import('better-sqlite3').Database | null = null;
   private embeddingsMatrix: Float32Array = new Float32Array(0);
   private metadata: ChunkMeta[] = [];
   private dim = 1536; // text-embedding-3-small dimension
 
+  constructor(private readonly DatabaseCtor: DatabaseConstructor | null = Database) {}
+
   open(dbPath: string): void {
-    this.db = new Database(dbPath);
+    if (!this.DatabaseCtor) {
+      console.warn('[VectorStore] better-sqlite3 unavailable — codebase indexing disabled');
+      return;
+    }
+    this.db = new this.DatabaseCtor(dbPath);
     this.db.exec(SCHEMA);
   }
 
@@ -53,6 +69,7 @@ export class VectorStore {
     chunks: { startLine: number; endLine: number; content: string; embedding: Float32Array }[],
     mtime: number
   ): void {
+    if (!this.db) return;
     const deleteStmt = this.db.prepare('DELETE FROM chunks WHERE file_path = ?');
     const insertStmt = this.db.prepare(
       'INSERT INTO chunks (file_path, start_line, end_line, content, embedding, mtime) VALUES (?, ?, ?, ?, ?, ?)'
@@ -68,10 +85,12 @@ export class VectorStore {
   }
 
   deleteFile(filePath: string): void {
+    if (!this.db) return;
     this.db.prepare('DELETE FROM chunks WHERE file_path = ?').run(filePath);
   }
 
   loadIntoMemory(): void {
+    if (!this.db) return;
     const rows = this.db
       .prepare('SELECT file_path, start_line, end_line, content, embedding FROM chunks')
       .all() as ChunkRow[];
@@ -124,6 +143,7 @@ export class VectorStore {
   }
 
   getAllFileMtimes(): Map<string, number> {
+    if (!this.db) return new Map();
     const rows = this.db
       .prepare('SELECT file_path, mtime FROM chunks GROUP BY file_path')
       .all() as { file_path: string; mtime: number }[];
@@ -135,7 +155,7 @@ export class VectorStore {
   }
 
   close(): void {
-    this.db.close();
+    this.db?.close();
   }
 }
 

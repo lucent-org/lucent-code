@@ -1,25 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { VectorStore } from './vector-store';
 
-// Mock better-sqlite3 — no native binary needed in CI
+// Inject a mock Database constructor so no native binary is needed in CI
 const mockRun = vi.fn();
 const mockGet = vi.fn();
 const mockAll = vi.fn(() => []);
 const mockPrepare = vi.fn(() => ({ run: mockRun, get: mockGet, all: mockAll }));
 const mockExec = vi.fn();
 const mockClose = vi.fn();
-
-vi.mock('better-sqlite3', () => {
-  return {
-    default: vi.fn(() => ({
-      prepare: mockPrepare,
-      exec: mockExec,
-      close: mockClose,
-      transaction: vi.fn((fn: () => void) => fn),  // returns the fn itself (calling tx() calls fn())
-    })),
-  };
-});
-
-import { VectorStore } from './vector-store';
+const MockDatabase = vi.fn(() => ({
+  prepare: mockPrepare,
+  exec: mockExec,
+  close: mockClose,
+  transaction: vi.fn((fn: () => void) => fn),  // returns the fn itself (calling tx() calls fn())
+}));
 
 describe('VectorStore', () => {
   let store: VectorStore;
@@ -27,7 +21,7 @@ describe('VectorStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAll.mockReturnValue([]);
-    store = new VectorStore();
+    store = new VectorStore(MockDatabase as unknown as typeof import('better-sqlite3'));
     store.open(':memory:');
   });
 
