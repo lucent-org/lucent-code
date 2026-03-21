@@ -316,12 +316,7 @@
           "group": "3_improve@2"
         }
       ],
-      "scm/inputBox": [
-        {
-          "command": "lucentCode.generateCommitMessage",
-          "group": "navigation"
-        }
-      ]
+      "scm/inputBox": []
     }
   },
   "scripts": {
