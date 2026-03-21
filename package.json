@@ -39,7 +39,7 @@
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "lucent-code",
           "title": "Lucent Code",
