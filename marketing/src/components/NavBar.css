@@ -41,7 +41,10 @@
 }
 .navbar__link:hover { color: var(--color-dark-fg); }
 .navbar__link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
-.navbar__actions { margin-left: auto; }
+.navbar__actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+.navbar__github { display: flex; align-items: center; color: var(--color-dark-fg-muted); transition: color 0.15s; }
+.navbar__github:hover { color: var(--color-dark-fg); }
+.navbar__github:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: var(--radius-sm); }
 .navbar__hamburger {
   display: none;
   background: none;

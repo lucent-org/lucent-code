@@ -13,8 +13,9 @@ const MARKETPLACE_URL = 'https://marketplace.visualstudio.com/items?itemName=luc
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'How it works', href: '#demo' },
-  { label: 'GitHub', href: 'https://github.com/lucentcode/lucent-code' },
 ];
+
+const GITHUB_URL = 'https://github.com/lucent-org/lucent-code';
 
 const MODELS = [
   { name: 'Claude' },
@@ -27,7 +28,7 @@ const MODELS = [
 export default function App() {
   return (
     <>
-      <NavBar links={NAV_LINKS} ctaHref={MARKETPLACE_URL} />
+      <NavBar links={NAV_LINKS} ctaHref={MARKETPLACE_URL} githubHref={GITHUB_URL} />
       <main id="main-content">
         <HeroSection ctaHref={MARKETPLACE_URL} />
         <SocialProofStrip models={MODELS} />
