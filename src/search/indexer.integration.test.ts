@@ -24,6 +24,7 @@ vi.stubGlobal('fetch', mockFetch);
 import { Indexer } from './indexer';
 import { VectorStore } from './vector-store';
 
+// dim=3 is a test convenience; real embeddings use 1536 dimensions
 function makeFakeEmbedding(dim = 3): number[] {
   return Array.from({ length: dim }, (_, i) => (i === 0 ? 1 : 0));
 }
@@ -45,6 +46,10 @@ beforeEach(async () => {
   tmpDir = path.join(os.tmpdir(), `lucent-indexer-test-${Date.now()}`);
   await fs.mkdir(tmpDir, { recursive: true });
   indexer = new Indexer(async () => 'test-key');
+  // NOTE: vscode.workspace.findFiles is mocked to return [] above.
+  // This means indexer.start() -> reconcileOnStartup() is a no-op (no files to re-index).
+  // This is intentional: it keeps start() fast and avoids consuming queued mockFetch
+  // responses before individual tests can set them up.
 });
 
 afterEach(async () => {
@@ -75,7 +80,7 @@ describe('Indexer integration', () => {
     await fs.writeFile(filePath, 'fake png data');
 
     await indexer.start(tmpDir);
-    mockFetch.mockClear();
+    mockFetch.mockClear(); // clear any fetch calls made during start() so assertions below are clean
 
     await indexer.indexFile(filePath);
 
@@ -89,7 +94,7 @@ describe('Indexer integration', () => {
     await fs.writeFile(filePath, 'export {}');
 
     await indexer.start(tmpDir);
-    mockFetch.mockClear();
+    mockFetch.mockClear(); // clear any fetch calls made during start() so assertions below are clean
 
     await indexer.indexFile(filePath);
 
@@ -102,7 +107,7 @@ describe('Indexer integration', () => {
     await fs.writeFile(filePath, buf);
 
     await indexer.start(tmpDir);
-    mockFetch.mockClear();
+    mockFetch.mockClear(); // clear any fetch calls made during start() so assertions below are clean
 
     await indexer.indexFile(filePath);
 
