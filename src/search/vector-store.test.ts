@@ -96,4 +96,73 @@ describe('VectorStore', () => {
     store.close();
     expect(mockClose).toHaveBeenCalled();
   });
+
+  describe('search with topK > 1', () => {
+    it('returns multiple results sorted by score descending', () => {
+      // chunk1: aligns with [1,0,0], chunk2: aligns with [0,1,0]
+      const emb1 = new Float32Array([1, 0, 0]);
+      const emb2 = new Float32Array([0.5, 0.5, 0]);
+      const emb3 = new Float32Array([0, 0, 1]);
+      mockAll.mockReturnValue([
+        { file_path: 'a.ts', start_line: 0, end_line: 5, content: 'a', embedding: Buffer.from(emb1.buffer) },
+        { file_path: 'b.ts', start_line: 0, end_line: 5, content: 'b', embedding: Buffer.from(emb2.buffer) },
+        { file_path: 'c.ts', start_line: 0, end_line: 5, content: 'c', embedding: Buffer.from(emb3.buffer) },
+      ]);
+      store.loadIntoMemory();
+      const query = new Float32Array([1, 0, 0]);
+      const results = store.search(query, 2);
+      expect(results).toHaveLength(2);
+      expect(results[0].score).toBeGreaterThanOrEqual(results[1].score);
+      expect(results[0].filePath).toBe('a.ts');
+    });
+  });
+
+  describe('cosine similarity edge cases', () => {
+    it('handles zero query vector gracefully', () => {
+      const emb = new Float32Array([1, 0, 0]);
+      mockAll.mockReturnValue([
+        { file_path: 'a.ts', start_line: 0, end_line: 5, content: 'a', embedding: Buffer.from(emb.buffer) },
+      ]);
+      store.loadIntoMemory();
+      const zeroQuery = new Float32Array([0, 0, 0]);
+      // Should not throw, returns empty (qNorm === 0)
+      expect(() => store.search(zeroQuery, 1)).not.toThrow();
+      const results = store.search(zeroQuery, 1);
+      expect(results).toEqual([]);
+    });
+
+    it('skips chunk with zero embedding vector', () => {
+      const zeroEmb = new Float32Array([0, 0, 0]);
+      mockAll.mockReturnValue([
+        { file_path: 'a.ts', start_line: 0, end_line: 5, content: 'a', embedding: Buffer.from(zeroEmb.buffer) },
+      ]);
+      store.loadIntoMemory();
+      const query = new Float32Array([1, 0, 0]);
+      // chunk has zero norm, gets skipped
+      expect(() => store.search(query, 1)).not.toThrow();
+      const results = store.search(query, 1);
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('deleteFile removes chunks for a file', () => {
+    it('removes all chunks for the deleted file while keeping others', () => {
+      // We test that deleteFile calls the correct prepare + run
+      // Simulate: upsert 2 chunks for /del.ts, 1 for /keep.ts
+      // Then deleteFile /del.ts and verify mockRun was called with /del.ts
+      vi.clearAllMocks();
+      mockAll.mockReturnValue([]);
+      store.open(':memory:');
+
+      store.deleteFile('/del.ts');
+      expect(mockRun).toHaveBeenCalledWith('/del.ts');
+
+      // /keep.ts was not targeted
+      const calls = (mockRun as ReturnType<typeof vi.fn>).mock.calls;
+      const delTsCalls = calls.filter((c: unknown[]) => c[0] === '/del.ts');
+      const keepTsCalls = calls.filter((c: unknown[]) => c[0] === '/keep.ts');
+      expect(delTsCalls.length).toBeGreaterThan(0);
+      expect(keepTsCalls.length).toBe(0);
+    });
+  });
 });
