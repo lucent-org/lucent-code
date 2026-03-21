@@ -157,6 +157,39 @@ describe('AuthManager', () => {
     });
   });
 
+  describe('handleOAuthCallback — success path', () => {
+    it('exchanges code for token and stores API key', async () => {
+      (auth as any).pendingOAuth = { state: 'state-abc', codeVerifier: 'verifier' };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ key: 'sk-or-new-key' }),
+      });
+      const uri = { query: 'code=auth-code-xyz&state=state-abc' };
+      await auth.handleOAuthCallback(uri as any);
+      expect(mockSecretStorage.store).toHaveBeenCalledWith(
+        expect.stringContaining('apiKey'),
+        'sk-or-new-key',
+      );
+    });
+  });
+
+  describe('promptForTavilyApiKey', () => {
+    it('stores entered key', async () => {
+      mockWindow.showInputBox.mockResolvedValueOnce('tvly-testkey');
+      await auth.promptForTavilyApiKey();
+      expect(mockSecretStorage.store).toHaveBeenCalledWith(
+        expect.stringContaining('tavilyApiKey'),
+        'tvly-testkey',
+      );
+    });
+
+    it('does nothing when user cancels', async () => {
+      mockWindow.showInputBox.mockResolvedValueOnce(undefined);
+      await auth.promptForTavilyApiKey();
+      expect(mockSecretStorage.store).not.toHaveBeenCalled();
+    });
+  });
+
   describe('signOut', () => {
     it('clears the stored key', async () => {
       mockSecretStorage.get.mockResolvedValue('sk-test');

@@ -95,6 +95,40 @@ describe('CodeIntelligence', () => {
       expect(result!.uri).toBe('file:///other.ts');
       expect(result!.line).toBe(10);
     });
+
+    it('should return undefined when no definitions', async () => {
+      mockExecuteCommand.mockResolvedValue([]);
+      const result = await ci.getDefinition('file:///test.ts', 5, 15);
+      expect(result).toBeUndefined();
+    });
+
+    it('should cache second call and not re-fetch', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { uri: { toString: () => 'file:///other.ts' }, range: { start: { line: 10, character: 0 } } },
+      ]);
+      await ci.getDefinition('file:///test.ts', 5, 15);
+      await ci.getDefinition('file:///test.ts', 5, 15);
+      expect(mockExecuteCommand).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getReferences', () => {
+    it('should return reference locations', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { uri: { toString: () => 'file:///test.ts' }, range: { start: { line: 2, character: 4 } } },
+        { uri: { toString: () => 'file:///other.ts' }, range: { start: { line: 7, character: 0 } } },
+      ]);
+      const result = await ci.getReferences('file:///test.ts', 1, 5);
+      expect(result).toHaveLength(2);
+      expect(result[0].uri).toBe('file:///test.ts');
+      expect(result[1].uri).toBe('file:///other.ts');
+    });
+
+    it('should return empty array when no references', async () => {
+      mockExecuteCommand.mockResolvedValue(undefined);
+      const result = await ci.getReferences('file:///test.ts', 1, 5);
+      expect(result).toEqual([]);
+    });
   });
 
   describe('getSymbols', () => {
@@ -148,6 +182,44 @@ describe('CodeIntelligence', () => {
       // One more — should succeed, not throw
       const result = await ci.getHover('file:///test.ts', 100, 0);
       expect(result).toBe('result');
+    });
+  });
+
+  describe('cache TTL expiration', () => {
+    it('should re-fetch after TTL expires', async () => {
+      vi.useFakeTimers();
+      mockExecuteCommand.mockResolvedValue([
+        { contents: [{ value: 'hover1' }] },
+      ]);
+
+      await ci.getHover('file:///test.ts', 0, 0);
+      vi.advanceTimersByTime(6000); // past 5s TTL
+      await ci.getHover('file:///test.ts', 0, 0);
+
+      expect(mockExecuteCommand).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
+    });
+  });
+
+  describe('LRU eviction at 100 entries', () => {
+    it('should evict oldest entry when cache exceeds 100 and require re-fetch', async () => {
+      mockExecuteCommand.mockResolvedValue([
+        { contents: [{ value: 'x' }] },
+      ]);
+
+      // Fill 100 unique entries: file0.ts through file99.ts
+      for (let i = 0; i < 100; i++) {
+        await ci.getHover(`file:///file${i}.ts`, 0, 0);
+      }
+
+      mockExecuteCommand.mockClear();
+
+      // Insert entry 101 — file0.ts should be evicted (it was the oldest)
+      await ci.getHover('file:///file100.ts', 0, 0);
+      // file0.ts was evicted, so this should be a cache miss (re-fetch)
+      await ci.getHover('file:///file0.ts', 0, 0);
+
+      expect(mockExecuteCommand).toHaveBeenCalledTimes(2);
     });
   });
 });

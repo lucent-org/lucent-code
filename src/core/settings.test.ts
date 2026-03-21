@@ -74,4 +74,59 @@ describe('Settings', () => {
     const s2 = new Settings();
     expect(s2.autonomousMode).toBe(true);
   });
+
+  describe('setChatModel', () => {
+    it('updates workspace configuration', async () => {
+      const mockUpdate = vi.fn();
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((key: string, defaultValue?: unknown) => defaultValue),
+        update: mockUpdate,
+      } as any);
+      const s = new Settings();
+      await s.setChatModel('anthropic/claude-3-5-sonnet');
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'chat.model',
+        'anthropic/claude-3-5-sonnet',
+        vscode.ConfigurationTarget.Global,
+      );
+    });
+  });
+
+  describe('onDidChange', () => {
+    it('fires callback when configuration changes', () => {
+      const callback = vi.fn();
+      let changeHandler: ((e: { affectsConfiguration: (s: string) => boolean }) => void) | undefined;
+      vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementationOnce((cb: any) => {
+        changeHandler = cb;
+        return { dispose: vi.fn() };
+      });
+      settings.onDidChange(callback);
+      expect(changeHandler).toBeDefined();
+      changeHandler!({ affectsConfiguration: () => true });
+      expect(callback).toHaveBeenCalled();
+    });
+  });
+
+  describe('skillSources', () => {
+    it('returns configured skill sources array', () => {
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValueOnce({
+        get: vi.fn((key: string) => {
+          if (key === 'skills.sources') return [{ type: 'github', url: 'https://github.com/org/repo' }];
+          return undefined;
+        }),
+        update: vi.fn(),
+      } as any);
+      const s = new Settings();
+      expect(s.skillSources).toEqual([{ type: 'github', url: 'https://github.com/org/repo' }]);
+    });
+
+    it('returns empty array when not configured', () => {
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValueOnce({
+        get: vi.fn().mockReturnValue([]),
+        update: vi.fn(),
+      } as any);
+      const s = new Settings();
+      expect(s.skillSources).toEqual([]);
+    });
+  });
 });

@@ -191,6 +191,46 @@ describe('InlineCompletionProvider', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('should return empty list when isCancellationRequested before API call', async () => {
+    const document = {
+      getText: () => 'code',
+      languageId: 'typescript',
+      uri: { toString: () => 'file:///test.ts' },
+    };
+    // triggerMode is 'auto' (from mock), so it awaits the debounce trigger
+    // but if cancelled before the API call, should return empty and not call fetch
+    const token = { isCancellationRequested: true, onCancellationRequested: vi.fn() };
+
+    // Override triggerMode to 'manual' so we skip the debounce await and test the
+    // post-debounce cancellation check directly
+    vi.mocked(vscodeModule.workspace.getConfiguration).mockReturnValueOnce({
+      get: vi.fn((key: string) => {
+        const vals: Record<string, unknown> = {
+          'completions.model': 'test/model',
+          'completions.triggerMode': 'manual',
+          'completions.debounceMs': 0,
+          'completions.maxContextLines': 100,
+          'chat.model': 'fallback/model',
+          'chat.temperature': 0.7,
+          'chat.maxTokens': 4096,
+        };
+        return vals[key];
+      }),
+    } as any);
+    const manualSettings = new Settings();
+    const manualProvider = new InlineCompletionProvider(client, manualSettings);
+
+    const result = await manualProvider.provideInlineCompletionItems(
+      document as any,
+      { line: 0, character: 4 } as any,
+      { triggerKind: 0 } as any,
+      token as any
+    );
+
+    expect(result.items).toHaveLength(0);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('should return empty when no model configured', async () => {
     // Override settings mock to return empty model
     vi.mocked(vscodeModule.workspace.getConfiguration).mockReturnValue({
