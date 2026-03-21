@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lucentcode/lucent-code"
+    "url": "https://github.com/lucent-org/lucent-code"
   },
   "keywords": [
     "ai",
@@ -335,9 +335,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:icon": "node scripts/generate-icon.mjs",
-    "rebuild": "electron-rebuild -f -w better-sqlite3"
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "package": "vsce package",
+    "publish:marketplace": "vsce publish"
   },
   "devDependencies": {
+    "@vscode/vsce": "^3.0.0",
     "@electron/rebuild": "^4.0.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",

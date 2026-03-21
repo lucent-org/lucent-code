@@ -9,3 +9,6 @@ tsconfig.json
 esbuild.config.mjs
 vitest.config.ts
 scripts/**
+marketing/**
+docs/**
+.github/**

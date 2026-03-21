@@ -1,0 +1,55 @@
+name: Publish VS Code extension
+
+on:
+  # Auto-publish when a version tag is pushed: git tag v1.2.3 && git push --tags
+  push:
+    tags:
+      - 'v*'
+
+  # Manual publish from the Actions tab (optionally bump version first)
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump (patch / minor / major) — leave empty to publish as-is'
+        required: false
+        default: ''
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    name: Build & publish to VS Code Marketplace
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install webview dependencies
+        working-directory: webview
+        run: npm ci
+
+      - name: Bump version (manual trigger only)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.bump != '' }}
+        run: |
+          npm version ${{ github.event.inputs.bump }} --no-git-tag-version
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump version to $(node -p "require('./package.json').version")"
+          git push
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Package
+        run: npx vsce package
+
+      - name: Publish to Marketplace
+        run: npx vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
