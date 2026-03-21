@@ -5,6 +5,7 @@ interface ModelSelectorProps {
   models: OpenRouterModel[];
   selectedModel: string;
   onSelect: (modelId: string) => void;
+  contextFillPct?: number;  // 0-100, undefined = hide
 }
 
 const ModelSelector: Component<ModelSelectorProps> = (props) => {
@@ -24,13 +25,24 @@ const ModelSelector: Component<ModelSelectorProps> = (props) => {
     return model ? model.name : props.selectedModel || 'Select a model';
   });
 
+  const fillClass = () => {
+    const pct = props.contextFillPct;
+    if (pct === undefined) return '';
+    if (pct >= 80) return 'context-fill--danger';
+    if (pct >= 60) return 'context-fill--warn';
+    return 'context-fill--ok';
+  };
+
   return (
     <div class="model-selector">
       <button class="model-selector-toggle" onClick={() => setIsOpen(!isOpen())}>
         {selectedModelName()}
+        <Show when={props.contextFillPct !== undefined}>
+          <span class={`context-fill ${fillClass()}`}>{' · '}{props.contextFillPct}%</span>
+        </Show>
       </button>
       <Show when={isOpen()}>
-        <div class="model-selector-dropdown">
+        <div class="model-selector-dropdown model-selector-dropdown--up">
           <input
             class="model-search"
             type="text"

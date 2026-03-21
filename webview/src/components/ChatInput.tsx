@@ -1,4 +1,6 @@
-import { Component, createSignal, createEffect, Show, For } from 'solid-js';
+import { Component, createSignal, createEffect, createMemo, Show, For } from 'solid-js';
+import ModelSelector from './ModelSelector';
+import type { OpenRouterModel } from '@shared';
 
 interface MentionSource {
   id: string;
@@ -47,6 +49,10 @@ interface ChatInputProps {
   onResolveSkill: (name: string) => Promise<string | null>;
   pendingChip?: { name: string; content: string };
   onPendingChipConsumed?: () => void;
+  models: OpenRouterModel[];
+  selectedModel: string;
+  onSelectModel: (modelId: string) => void;
+  messages: { role: string; content: string }[];
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
@@ -63,6 +69,14 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [skillFilter, setSkillFilter] = createSignal('');
   const [skillChips, setSkillChips] = createSignal<{ name: string; content: string }[]>([]);
   let fileInputRef: HTMLInputElement | undefined;
+
+  const contextFillPct = createMemo(() => {
+    const model = props.models.find((m) => m.id === props.selectedModel);
+    if (!model?.context_length || props.messages.length === 0) return undefined;
+    const totalChars = props.messages.reduce((sum, m) => sum + m.content.length, 0);
+    const estimated = Math.round(totalChars / 4);
+    return Math.min(100, Math.round((estimated / model.context_length) * 100));
+  });
 
   createEffect(() => {
     const chip = props.pendingChip;
@@ -444,6 +458,12 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           title="Browse skills (or type / in the input)"
           disabled={props.isStreaming || props.skills.length === 0}
         >/…</button>
+        <ModelSelector
+          models={props.models}
+          selectedModel={props.selectedModel}
+          onSelect={props.onSelectModel}
+          contextFillPct={contextFillPct()}
+        />
         <Show
           when={props.isStreaming}
           fallback={
