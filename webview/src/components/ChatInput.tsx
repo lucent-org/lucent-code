@@ -437,33 +437,35 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           multiple
           onChange={handleFileInputChange}
         />
-        <button
-          class="attach-button"
-          aria-label="Attach files"
-          onClick={() => fileInputRef?.click()}
-          title="Attach files"
-          disabled={props.isStreaming}
-        ><svg aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05L12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-        <button
-          class="attach-button"
-          aria-label="Add terminal output"
-          onClick={() => void handleTerminalButton()}
-          title="Add terminal output"
-          disabled={props.isStreaming || isResolvingMention()}
-        >&gt;_</button>
-        <button
-          class="attach-button"
-          aria-label="Browse skills"
-          onClick={() => { setSkillFilter(''); setShowSkills(true); }}
-          title="Browse skills (or type / in the input)"
-          disabled={props.isStreaming || props.skills.length === 0}
-        >/…</button>
-        <ModelSelector
-          models={props.models}
-          selectedModel={props.selectedModel}
-          onSelect={props.onSelectModel}
-          contextFillPct={contextFillPct()}
-        />
+        <div class="chat-input-actions__left">
+          <button
+            class="attach-button"
+            aria-label="Attach files"
+            onClick={() => fileInputRef?.click()}
+            title="Attach files"
+            disabled={props.isStreaming}
+          ><svg aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05L12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+          <button
+            class="attach-button"
+            aria-label="Add terminal output"
+            onClick={() => void handleTerminalButton()}
+            title="Add terminal output"
+            disabled={props.isStreaming || isResolvingMention()}
+          >&gt;_</button>
+          <button
+            class="attach-button"
+            aria-label="Browse skills"
+            onClick={() => { setSkillFilter(''); setShowSkills(true); }}
+            title="Browse skills (or type / in the input)"
+            disabled={props.isStreaming || props.skills.length === 0}
+          >/…</button>
+          <ModelSelector
+            models={props.models}
+            selectedModel={props.selectedModel}
+            onSelect={props.onSelectModel}
+            contextFillPct={contextFillPct()}
+          />
+        </div>
         <Show
           when={props.isStreaming}
           fallback={

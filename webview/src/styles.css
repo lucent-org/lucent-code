@@ -205,12 +205,13 @@ body {
 
 .chat-input-actions .model-selector-toggle {
   width: auto;
-  padding: 3px 7px;
+  padding: 4px 8px;
   font-size: 11px;
   white-space: nowrap;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: inherit;
 }
 
 /* Dropdown opens upward */
@@ -718,8 +719,15 @@ body {
 
 .chat-input-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 4px;
+}
+
+.chat-input-actions__left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .send-button,
