@@ -85,4 +85,52 @@ describe('InstructionsLoader', () => {
     loader.dispose();
     expect(loader.getInstructions()).toBeUndefined();
   });
+
+  describe('watcher callbacks', () => {
+    it('reloads instructions when file changes', async () => {
+      let onDidChangeCallback: (() => void) | undefined;
+      const mockWatcher = {
+        onDidCreate: vi.fn(),
+        onDidChange: vi.fn((cb: () => void) => { onDidChangeCallback = cb; }),
+        onDidDelete: vi.fn(),
+        dispose: vi.fn(),
+      };
+      mockCreateFileSystemWatcher.mockReturnValueOnce(mockWatcher);
+
+      loader.watch();
+
+      // First load
+      mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('# Original'));
+      await loader.load();
+      expect(loader.getInstructions()).toBe('# Original');
+
+      // Simulate file change
+      mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('# Updated'));
+      await onDidChangeCallback!();
+      expect(loader.getInstructions()).toBe('# Updated');
+    });
+
+    it('clears instructions when file is deleted', async () => {
+      let onDidDeleteCallback: (() => void) | undefined;
+      const mockWatcher = {
+        onDidCreate: vi.fn(),
+        onDidChange: vi.fn(),
+        onDidDelete: vi.fn((cb: () => void) => { onDidDeleteCallback = cb; }),
+        dispose: vi.fn(),
+      };
+      mockCreateFileSystemWatcher.mockReturnValueOnce(mockWatcher);
+
+      loader.watch();
+
+      // Load instructions first
+      mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('# Instructions'));
+      await loader.load();
+      expect(loader.getInstructions()).toBe('# Instructions');
+
+      // Simulate file deletion: both files return not found
+      mockReadFile.mockRejectedValue(new Error('not found'));
+      await onDidDeleteCallback!();
+      expect(loader.getInstructions()).toBeUndefined();
+    });
+  });
 });
