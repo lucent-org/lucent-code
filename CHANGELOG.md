@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.0...lucent-code-v0.2.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* **ci:** remove npm cache config that requires missing lock file ([28de64e](https://github.com/lucent-org/lucent-code/commit/28de64e12885a49e709800ada707dc6dc980c243))
+* **ci:** remove platform-specific package-lock.json, use npm install in CI ([6b651b2](https://github.com/lucent-org/lucent-code/commit/6b651b2b3845a3cc27026b1f72041d3bd19fad0c))
+
 ## [0.2.0](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.1.0...lucent-code-v0.2.0) (2026-03-21)
 
 
