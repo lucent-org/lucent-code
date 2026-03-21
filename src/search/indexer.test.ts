@@ -47,6 +47,7 @@ vi.mock('vscode', () => ({
 }));
 
 import { Indexer } from './indexer';
+import * as vscode from 'vscode';
 
 describe('Indexer.shouldIndex', () => {
   it('indexes .ts files', () => {
@@ -108,5 +109,112 @@ describe('Indexer.embedChunks', () => {
     const indexer = new Indexer(() => 'bad-key');
     await expect((indexer as any).embedChunks([{ content: 'x', startLine: 0, endLine: 0 }]))
       .rejects.toThrow('Embeddings API error: 401');
+  });
+});
+
+describe('Indexer.indexAll', () => {
+  const embedding = Array.from({ length: 1536 }, () => 0.1);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ embedding }] }),
+    });
+  });
+
+  it('indexes all eligible files returned by findFiles', async () => {
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValue([
+      { fsPath: '/workspace/src/foo.ts' } as any,
+      { fsPath: '/workspace/src/bar.ts' } as any,
+    ]);
+
+    const indexer = new Indexer(() => 'test-key');
+    const upsertChunks = (indexer as any).vectorStore.upsertChunks as ReturnType<typeof vi.fn>;
+
+    await indexer.indexAll();
+
+    expect(upsertChunks).toHaveBeenCalledTimes(2);
+    expect(upsertChunks).toHaveBeenCalledWith('/workspace/src/foo.ts', expect.any(Array), expect.any(Number));
+    expect(upsertChunks).toHaveBeenCalledWith('/workspace/src/bar.ts', expect.any(Array), expect.any(Number));
+  });
+
+  it('skips files in node_modules even if returned by findFiles', async () => {
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValue([
+      { fsPath: '/workspace/node_modules/pkg/index.ts' } as any,
+      { fsPath: '/workspace/src/app.ts' } as any,
+    ]);
+
+    const indexer = new Indexer(() => 'test-key');
+    const upsertChunks = (indexer as any).vectorStore.upsertChunks as ReturnType<typeof vi.fn>;
+
+    await indexer.indexAll();
+
+    expect(upsertChunks).toHaveBeenCalledTimes(1);
+    expect(upsertChunks).toHaveBeenCalledWith('/workspace/src/app.ts', expect.any(Array), expect.any(Number));
+  });
+});
+
+describe('Indexer.searchAsync', () => {
+  const embedding = Array.from({ length: 1536 }, () => 0.5);
+
+  it('returns search results from vector store', async () => {
+    const mockResults = [
+      { filePath: '/workspace/src/foo.ts', startLine: 0, endLine: 5, content: 'export function foo() {}', score: 0.9 },
+    ];
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ embedding }] }),
+    });
+
+    const indexer = new Indexer(() => 'test-key');
+    const searchFn = (indexer as any).vectorStore.search as ReturnType<typeof vi.fn>;
+    searchFn.mockReturnValue(mockResults);
+
+    const results = await indexer.searchAsync('find foo function', 5);
+
+    expect(results).toEqual(mockResults);
+    expect(searchFn).toHaveBeenCalledWith(expect.any(Float32Array), 5);
+  });
+});
+
+describe('Indexer.startFileWatcher', () => {
+  it('registers a file watcher and re-indexes on change events', async () => {
+    const onDidChangeCb: Array<(uri: { fsPath: string }) => void> = [];
+    const mockWatcher = {
+      onDidChange: vi.fn((cb: (uri: { fsPath: string }) => void) => { onDidChangeCb.push(cb); }),
+      onDidCreate: vi.fn(),
+      onDidDelete: vi.fn(),
+      dispose: vi.fn(),
+    };
+    vi.mocked(vscode.workspace.createFileSystemWatcher).mockReturnValue(mockWatcher as any);
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ embedding: Array.from({ length: 1536 }, () => 0.1) }] }),
+    });
+
+    const indexer = new Indexer(() => 'test-key');
+    // start() sets up the watcher
+    await indexer.start('/workspace');
+
+    expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalled();
+    expect(mockWatcher.onDidChange).toHaveBeenCalled();
+
+    // Simulate a file change event for an eligible file
+    const upsertChunks = (indexer as any).vectorStore.upsertChunks as ReturnType<typeof vi.fn>;
+    upsertChunks.mockClear();
+
+    // Trigger the registered onChange callback
+    const changeUri = { fsPath: '/workspace/src/changed.ts' };
+    for (const cb of onDidChangeCb) {
+      cb(changeUri);
+    }
+
+    // Allow microtasks/promises to settle
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(upsertChunks).toHaveBeenCalledWith('/workspace/src/changed.ts', expect.any(Array), expect.any(Number));
   });
 });

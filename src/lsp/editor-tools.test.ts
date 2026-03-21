@@ -105,6 +105,44 @@ describe('EditorToolExecutor', () => {
     expect(result.error).toContain('format failed');
   });
 
+  describe('apply_code_action', () => {
+    it('executes action command when action has a command', async () => {
+      const action = {
+        title: 'Fix lint error',
+        command: { command: 'eslint.fix', arguments: ['arg1'] },
+      };
+      mockExecuteCommand
+        .mockResolvedValueOnce([action])   // executeCodeActionProvider
+        .mockResolvedValueOnce(undefined); // eslint.fix
+
+      const result = await executor.execute('apply_code_action', {
+        uri: 'file:///test.ts',
+        line: 0,
+        character: 0,
+        actionTitle: 'Fix lint error',
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockExecuteCommand).toHaveBeenCalledWith('eslint.fix', 'arg1');
+    });
+
+    it('returns error when action title not found', async () => {
+      mockExecuteCommand.mockResolvedValueOnce([
+        { title: 'Some other action' },
+      ]);
+
+      const result = await executor.execute('apply_code_action', {
+        uri: 'file:///test.ts',
+        line: 0,
+        character: 0,
+        actionTitle: 'Nonexistent',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Nonexistent');
+    });
+  });
+
   describe('rename_symbol', () => {
     it('should apply a WorkspaceEdit returned by executeDocumentRenameProvider', async () => {
       const mockEdit = { size: 1 };
