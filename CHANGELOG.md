@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.5](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.4...lucent-code-v0.2.5) (2026-03-21)
+
+
+### Bug Fixes
+
+* guard proposed APIs to prevent blank webview panel ([f3aa678](https://github.com/lucent-org/lucent-code/commit/f3aa6781f5b5cd61505ec306a540cb9aa5b04e0e))
+* guard proposed APIs to prevent extension activation failure ([45d76ae](https://github.com/lucent-org/lucent-code/commit/45d76ae843507ef14d7d71f150ce029234096623))
+
 ## [0.2.4](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.3...lucent-code-v0.2.4) (2026-03-21)
 
 
