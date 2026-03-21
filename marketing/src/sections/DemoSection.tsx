@@ -39,7 +39,7 @@ export default function DemoSection() {
                 <span class="code-showcase__title">Lucent Code</span>
               </div>
               <div class="code-showcase__content">
-                <p class="code-showcase__placeholder-text">Chat panel screenshot</p>
+                <img src="/screenshot-fix.png" alt="Lucent Code fixing a TypeScript type error with syntax-highlighted code blocks" class="code-showcase__screenshot" />
               </div>
             </div>
           </div>

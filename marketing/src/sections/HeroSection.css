@@ -83,9 +83,18 @@
 }
 .code-showcase__content {
   min-height: 320px;
+  max-height: 420px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow: hidden;
+}
+.code-showcase__screenshot {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  object-position: top;
 }
 .code-showcase__placeholder-text {
   color: var(--color-dark-fg-muted);

@@ -38,7 +38,7 @@ export default function HeroSection(props: Props) {
               <span class="code-showcase__title">Lucent Code</span>
             </div>
             <div class="code-showcase__content">
-              <p class="code-showcase__placeholder-text">Chat panel screenshot</p>
+              <img src="/screenshot-lsp.png" alt="Lucent Code explaining a TypeScript method using live language server data" class="code-showcase__screenshot" />
             </div>
           </div>
         </div>
