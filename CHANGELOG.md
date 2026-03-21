@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.3...lucent-code-v0.2.4) (2026-03-21)
+
+
+### Bug Fixes
+
+* lazy-load better-sqlite3 to prevent blank webview panel ([ed8ed0f](https://github.com/lucent-org/lucent-code/commit/ed8ed0f039fdcbfbcb1fb2712681ebc5dac72b4a))
+* lazy-load better-sqlite3 to prevent blank webview panel ([9b9928f](https://github.com/lucent-org/lucent-code/commit/9b9928f807d2b0260808b4ce18334aa457fd381c))
+
 ## [0.2.3](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.2...lucent-code-v0.2.3) (2026-03-21)
 
 
