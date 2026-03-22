@@ -82,8 +82,8 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Non-critical: don't let skill loading crash activation
-  await loadSkills().catch((e: Error) =>
-    console.warn('[Lucent Code] Failed to load skills:', e.message)
+  await loadSkills().catch((e: unknown) =>
+    console.warn('[Lucent Code] Failed to load skills:', e instanceof Error ? e.message : String(e))
   );
 
   // Register chat webview
@@ -108,15 +108,15 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Non-critical: don't let MCP connection crash activation
-  await connectMcpServers().catch((e: Error) =>
-    console.warn('[Lucent Code] Failed to connect MCP servers:', e.message)
+  await connectMcpServers().catch((e: unknown) =>
+    console.warn('[Lucent Code] Failed to connect MCP servers:', e instanceof Error ? e.message : String(e))
   );
 
   if (workspaceRoot) {
     indexer.start(workspaceRoot)
       .then(() => { indexerStatusBar.text = '$(database) Indexed'; })
       .catch((e: Error) => {
-        console.error('[Indexer] Failed to start:', e.message);
+        console.error('[Indexer] Failed to start:', e instanceof Error ? e.message : String(e));
         indexerStatusBar.text = '$(warning) Index failed';
       });
   }
@@ -149,8 +149,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Set up instructions loader
   const instructionsLoader = new InstructionsLoader();
-  await instructionsLoader.load().catch((e: Error) =>
-    console.warn('[Lucent Code] Failed to load instructions:', e.message)
+  await instructionsLoader.load().catch((e: unknown) =>
+    console.warn('[Lucent Code] Failed to load instructions:', e instanceof Error ? e.message : String(e))
   );
   instructionsLoader.watch();
   contextBuilder.setInstructionsLoader(instructionsLoader);
@@ -331,12 +331,14 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register URI handler for OAuth callback (vscode://lucent-code/oauth-callback)
+  // Register URI handler for OAuth callback (vscode://lucentcode.lucent-code/oauth-callback)
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri(uri: vscode.Uri) {
         if (uri.path === '/oauth-callback') {
-          auth.handleOAuthCallback(uri);
+          auth.handleOAuthCallback(uri).catch((e: unknown) =>
+            console.error('[Lucent Code] OAuth callback failed:', e instanceof Error ? e.message : String(e))
+          );
         }
       },
     })
