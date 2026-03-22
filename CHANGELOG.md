@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.8](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.7...lucent-code-v0.2.8) (2026-03-22)
+
+
+### Bug Fixes
+
+* remove duplicate API key notification on startup ([eb10d83](https://github.com/lucent-org/lucent-code/commit/eb10d83a9473171f80a806199e3d801479ec898f))
+* remove duplicate API key notification on startup ([14689c8](https://github.com/lucent-org/lucent-code/commit/14689c8ef1503451e07398603ae805f1643de225))
+
 ## [0.2.7](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.6...lucent-code-v0.2.7) (2026-03-22)
 
 
