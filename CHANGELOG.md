@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.6](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.5...lucent-code-v0.2.6) (2026-03-22)
+
+
+### Bug Fixes
+
+* **auth:** register URI handler for OAuth callback ([80db915](https://github.com/lucent-org/lucent-code/commit/80db915d9559345596705e9e056f5d8c3c438736))
+* guard all activate() awaits to prevent activation failure ([60dce9c](https://github.com/lucent-org/lucent-code/commit/60dce9cb5248954fcc6c167e64e1965f6a129e2b))
+* register OAuth handler and guard activation awaits ([b5d2e0e](https://github.com/lucent-org/lucent-code/commit/b5d2e0e2846844c5d3e2e3ff665ab5507ff4bb80))
+
 ## [0.2.5](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.4...lucent-code-v0.2.5) (2026-03-21)
 
 
