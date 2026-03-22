@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.7](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.6...lucent-code-v0.2.7) (2026-03-22)
+
+
+### Bug Fixes
+
+* address code review findings ([875aa71](https://github.com/lucent-org/lucent-code/commit/875aa71fe3a5483593ed49357e14877b0268cd74))
+* **auth:** OAuth callback URI and review hardening ([a1e5f8b](https://github.com/lucent-org/lucent-code/commit/a1e5f8b8297ac6da5a48183372b6bb3f0298f1a4))
+* **auth:** use correct publisher.extensionId in OAuth callback URI ([5ec8b19](https://github.com/lucent-org/lucent-code/commit/5ec8b199e0a12fb51606dd01d1c304769ac21bed))
+
 ## [0.2.6](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.5...lucent-code-v0.2.6) (2026-03-22)
 
 
