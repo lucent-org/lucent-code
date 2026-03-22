@@ -535,21 +535,8 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Prompt for API key on first activation if not set
-  auth.getApiKey().then((key) => {
-    if (!key) {
-      vscode.window
-        .showInformationMessage(
-          'Welcome to Lucent Code! Set your API key to get started.',
-          'Set API Key'
-        )
-        .then((selection) => {
-          if (selection === 'Set API Key') {
-            auth.promptForApiKey();
-          }
-        });
-    }
-  });
+  // The webview empty state and status bar already prompt for API key —
+  // no extra notification needed on activation.
 
   // Detect capabilities when active editor changes
   context.subscriptions.push(
