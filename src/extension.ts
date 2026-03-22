@@ -81,7 +81,10 @@ export async function activate(context: vscode.ExtensionContext) {
     await skillRegistry.load(preloaded);
   }
 
-  await loadSkills();
+  // Non-critical: don't let skill loading crash activation
+  await loadSkills().catch((e: Error) =>
+    console.warn('[Lucent Code] Failed to load skills:', e.message)
+  );
 
   // Register chat webview
   const chatProvider = new ChatViewProvider(context.extensionUri);
@@ -104,7 +107,10 @@ export async function activate(context: vscode.ExtensionContext) {
     await mcpClientManager.connect(servers);
   }
 
-  await connectMcpServers();
+  // Non-critical: don't let MCP connection crash activation
+  await connectMcpServers().catch((e: Error) =>
+    console.warn('[Lucent Code] Failed to connect MCP servers:', e.message)
+  );
 
   if (workspaceRoot) {
     indexer.start(workspaceRoot)
@@ -143,7 +149,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Set up instructions loader
   const instructionsLoader = new InstructionsLoader();
-  await instructionsLoader.load();
+  await instructionsLoader.load().catch((e: Error) =>
+    console.warn('[Lucent Code] Failed to load instructions:', e.message)
+  );
   instructionsLoader.watch();
   contextBuilder.setInstructionsLoader(instructionsLoader);
 
