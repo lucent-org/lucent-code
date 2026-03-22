@@ -323,6 +323,17 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Register URI handler for OAuth callback (vscode://lucent-code/oauth-callback)
+  context.subscriptions.push(
+    vscode.window.registerUriHandler({
+      handleUri(uri: vscode.Uri) {
+        if (uri.path === '/oauth-callback') {
+          auth.handleOAuthCallback(uri);
+        }
+      },
+    })
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand('lucentCode.authMenu', async () => {
       const isAuthed = await auth.isAuthenticated();
