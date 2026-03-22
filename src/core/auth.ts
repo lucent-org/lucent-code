@@ -96,7 +96,7 @@ export class AuthManager {
     this.pendingOAuth = { state, codeVerifier };
 
     const callbackUri = await vscode.env.asExternalUri(
-      vscode.Uri.parse('vscode://lucent-code/oauth-callback')
+      vscode.Uri.parse('vscode://lucentcode.lucent-code/oauth-callback')
     );
 
     const params = new URLSearchParams({
