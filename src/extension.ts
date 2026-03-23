@@ -15,7 +15,7 @@ import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
 import { TerminalBuffer } from './core/terminal-buffer';
 import { messageText } from './core/message-text';
-import { SkillRegistry } from './skills/skill-registry';
+import { SkillRegistry, PreloadedSource } from './skills/skill-registry';
 import { fetchGitHubSkills } from './skills/sources/github-source';
 import { fetchNpmSkills } from './skills/sources/npm-source';
 import { fetchMarketplaceSkills } from './skills/sources/marketplace-source';
@@ -78,7 +78,27 @@ export async function activate(context: vscode.ExtensionContext) {
     const preloaded = ownMarkdowns.length > 0
       ? [{ type: 'local' as const, content: new Map(ownMarkdowns.map((md, i) => [String(i), md])) }]
       : [];
-    await skillRegistry.load(preloaded);
+
+    // Load built-in skills from extension install directory
+    const builtinDir = nodePath.join(context.extensionUri.fsPath, 'src', 'skills', 'builtin');
+    const builtinMarkdowns: string[] = [];
+    try {
+      const files = await fs.readdir(builtinDir);
+      for (const file of files) {
+        if (typeof file === 'string' && file.endsWith('.md')) {
+          const content = await fs.readFile(nodePath.join(builtinDir, file), 'utf8').catch(() => '');
+          if (content) builtinMarkdowns.push(content);
+        }
+      }
+    } catch {
+      // builtin dir not found (e.g. packaged differently) — skip silently
+    }
+
+    const builtinSource: PreloadedSource[] = builtinMarkdowns.length > 0
+      ? [{ type: 'local' as const, content: new Map(builtinMarkdowns.map((md, i) => [String(i), md])) }]
+      : [];
+
+    await skillRegistry.load([...builtinSource, ...preloaded]);
   }
 
   // Non-critical: don't let skill loading crash activation
