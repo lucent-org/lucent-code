@@ -19,6 +19,7 @@ import { SkillRegistry, PreloadedSource } from './skills/skill-registry';
 import { fetchGitHubSkills } from './skills/sources/github-source';
 import { fetchNpmSkills } from './skills/sources/npm-source';
 import { fetchMarketplaceSkills } from './skills/sources/marketplace-source';
+import { BUILTIN_SKILLS } from './skills/builtin/index';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as nodePath from 'path';
@@ -79,23 +80,9 @@ export async function activate(context: vscode.ExtensionContext) {
       ? [{ type: 'local' as const, content: new Map(ownMarkdowns.map((md, i) => [String(i), md])) }]
       : [];
 
-    // Load built-in skills from extension install directory
-    const builtinDir = nodePath.join(context.extensionUri.fsPath, 'src', 'skills', 'builtin');
-    const builtinMarkdowns: string[] = [];
-    try {
-      const files = await fs.readdir(builtinDir);
-      for (const file of files) {
-        if (typeof file === 'string' && file.endsWith('.md')) {
-          const content = await fs.readFile(nodePath.join(builtinDir, file), 'utf8').catch(() => '');
-          if (content) builtinMarkdowns.push(content);
-        }
-      }
-    } catch {
-      // builtin dir not found (e.g. packaged differently) — skip silently
-    }
-
-    const builtinSource: PreloadedSource[] = builtinMarkdowns.length > 0
-      ? [{ type: 'local' as const, content: new Map(builtinMarkdowns.map((md, i) => [String(i), md])) }]
+    // Built-in skills are inlined as module text by esbuild — no runtime file I/O needed.
+    const builtinSource: PreloadedSource[] = BUILTIN_SKILLS.length > 0
+      ? [{ type: 'local' as const, content: new Map(BUILTIN_SKILLS.map((md, i) => [String(i), md])) }]
       : [];
 
     await skillRegistry.load([...builtinSource, ...preloaded]);
