@@ -969,13 +969,13 @@ describe('MessageHandler', () => {
     });
 
     it('clears pending approvals when abort() is called', () => {
-      const resolved: boolean[] = [];
+      const resolved: { approved: boolean; scope: string }[] = [];
       const requestId = 'test-id';
-      (handler as any).pendingApprovals.set(requestId, (v: boolean) => resolved.push(v));
+      (handler as any).pendingApprovals.set(requestId, (v: { approved: boolean; scope: string }) => resolved.push(v));
 
       handler.abort();
 
-      expect(resolved).toEqual([false]);
+      expect(resolved).toEqual([{ approved: false, scope: 'once' }]);
       expect((handler as any).pendingApprovals.size).toBe(0);
     });
 
@@ -2128,7 +2128,7 @@ describe('@codebase mention', () => {
       vi.fn()
     );
 
-    expect(mockIndexer.searchAsync).toHaveBeenCalledWith('find auth logic', 10);
+    expect(mockIndexer.searchAsync).toHaveBeenCalledWith('find auth logic', 8);
 
     const callArgs = mockClient.chatStream.mock.calls[0][0];
     const systemMessage = callArgs.messages.find((m: any) => m.role === 'system');

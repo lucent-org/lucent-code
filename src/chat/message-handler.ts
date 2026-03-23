@@ -17,6 +17,7 @@ import { SkillRegistry } from '../skills/skill-registry';
 import { SkillMatcher } from '../skills/skill-matcher';
 import type { McpClientManager } from '../mcp/mcp-client-manager';
 import type { Indexer } from '../search/indexer';
+import { ToolApprovalManager } from './tool-approval-manager';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -27,7 +28,13 @@ export class MessageHandler {
   onStreamEnd?: () => void;
   onAuthInvalid?: () => void;
 
-  private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
+  resetConversation(): void {
+    this.conversationMessages = [];
+    this.currentConversation = undefined;
+    this.sessionCost = 0;
+  }
+
+  private readonly pendingApprovals = new Map<string, (result: { approved: boolean; scope: 'once' | 'workspace' | 'global' }) => void>();
   private readonly skillMatcher = new SkillMatcher();
   private _autonomousMode = false;
   private _worktreeManager: WorktreeManager | null = null;
@@ -42,6 +49,14 @@ export class MessageHandler {
     'apply_code_action',
   ]);
 
+  private static readonly APPROVAL_GATED_TOOLS = new Set([
+    'write_file',
+    'delete_file',
+    'run_terminal_command',
+  ]);
+
+  private readonly approvalManager: ToolApprovalManager;
+
   constructor(
     private readonly client: OpenRouterClient,
     private readonly contextBuilder: ContextBuilder,
@@ -55,6 +70,8 @@ export class MessageHandler {
     private readonly indexer?: Indexer
   ) {
     this._autonomousMode = this.settings.autonomousMode ?? false;
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    this.approvalManager = new ToolApprovalManager(wsRoot);
   }
 
   setWorktreeManager(manager: WorktreeManager): void {
@@ -147,7 +164,7 @@ export class MessageHandler {
         const resolve = this.pendingApprovals.get(message.requestId);
         if (resolve) {
           this.pendingApprovals.delete(message.requestId);
-          resolve(message.approved);
+          resolve({ approved: message.approved, scope: message.scope ?? 'once' });
         }
         break;
       }
@@ -209,12 +226,20 @@ export class MessageHandler {
       processedContent = query || content; // strip @codebase prefix; fall back to original if no query
       if (query) {
         try {
-          const results = await this.indexer.searchAsync(query, 10);
+          const results = await this.indexer.searchAsync(query, 8);
           if (results.length > 0) {
-            const contextBlock = results
-              .map((r) => `${r.filePath}:${r.startLine}-${r.endLine}\n\`\`\`\n${r.content}\n\`\`\``)
-              .join('\n\n');
-            systemMessage.content += `\n\n<codebase-context query="${query}">\n${contextBlock}\n</codebase-context>`;
+            const MAX_CONTEXT_CHARS = 40_000;
+            let used = 0;
+            const parts: string[] = [];
+            for (const r of results) {
+              const entry = `${r.filePath}:${r.startLine}-${r.endLine}\n\`\`\`\n${r.content}\n\`\`\``;
+              if (used + entry.length > MAX_CONTEXT_CHARS) break;
+              parts.push(entry);
+              used += entry.length;
+            }
+            if (parts.length > 0) {
+              systemMessage.content += `\n\n<codebase-context query="${query}">\n${parts.join('\n\n')}\n</codebase-context>`;
+            }
           }
         } catch {
           // Non-fatal — send message without codebase context
@@ -374,7 +399,7 @@ export class MessageHandler {
             }
             if (tc.function.name.startsWith('mcp__') && this.mcpClientManager) {
               if (!this._autonomousMode) {
-                const approved = await this.requestToolApproval(tc.function.name, args, postMessage);
+                const { approved } = await this.requestToolApproval(tc.function.name, args, postMessage);
                 if (!approved) {
                   this.conversationMessages.push({
                     role: 'tool',
@@ -402,7 +427,7 @@ export class MessageHandler {
             }
             if (!this._autonomousMode && MessageHandler.GATED_TOOLS.has(tc.function.name)) {
               const diff = await this.computeToolDiff(tc.function.name, args);
-              const approved = await this.requestToolApproval(tc.function.name, args, postMessage, diff);
+              const { approved } = await this.requestToolApproval(tc.function.name, args, postMessage, diff);
               if (!approved) {
                 this.conversationMessages.push({
                   role: 'tool',
@@ -410,6 +435,26 @@ export class MessageHandler {
                   content: 'User denied this action.',
                 });
                 continue;
+              }
+            }
+            if (MessageHandler.APPROVAL_GATED_TOOLS.has(tc.function.name)) {
+              const alreadyApproved = await this.approvalManager.isApproved(tc.function.name);
+              if (!alreadyApproved) {
+                const { approved, scope } = await this.requestToolApproval(tc.function.name, args, postMessage);
+                if (!approved) {
+                  this.conversationMessages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    content: 'User denied this action.',
+                  });
+                  continue;
+                }
+                if (scope === 'workspace') {
+                  await this.approvalManager.approveForWorkspace(tc.function.name);
+                } else if (scope === 'global') {
+                  await this.approvalManager.approveGlobally(tc.function.name);
+                }
+                // 'once' scope: no persistence needed
               }
             }
             const result = await this.toolExecutor.execute(tc.function.name, args);
@@ -474,7 +519,7 @@ export class MessageHandler {
   abort(): void {
     this.abortController?.abort();
     for (const resolve of this.pendingApprovals.values()) {
-      resolve(false);
+      resolve({ approved: false, scope: 'once' });
     }
     this.pendingApprovals.clear();
   }
@@ -491,7 +536,7 @@ export class MessageHandler {
         break;
       case 402:
         postMessage({ type: 'noCredits' });
-        postMessage({ type: 'streamEnd' });
+        postMessage({ type: 'streamError', error: 'Insufficient credits. Please top up your OpenRouter balance.' });
         break;
       case 400:
         postMessage({ type: 'streamError', error: `Bad request: ${error.message}` });
@@ -706,7 +751,7 @@ export class MessageHandler {
     args: Record<string, unknown>,
     postMessage: (msg: ExtensionMessage) => void,
     diff?: DiffLine[]
-  ): Promise<boolean> {
+  ): Promise<{ approved: boolean; scope: 'once' | 'workspace' | 'global' }> {
     const requestId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve) => {
       this.pendingApprovals.set(requestId, resolve);
