@@ -5,6 +5,7 @@ import { CapabilityDetector, type EditorCapabilities } from '../lsp/capability-d
 
 interface InstructionsProvider {
   getInstructions(): string | undefined;
+  getActivatedSkills?(): string[];
 }
 
 export class ContextBuilder {
@@ -19,6 +20,10 @@ export class ContextBuilder {
 
   getCustomInstructions(): string | undefined {
     return this.instructionsLoader?.getInstructions();
+  }
+
+  getActivatedSkills(): string[] {
+    return this.instructionsLoader?.getActivatedSkills?.() ?? [];
   }
 
   setCodeIntelligence(ci: CodeIntelligence, cd: CapabilityDetector): void {
@@ -36,10 +41,20 @@ export class ContextBuilder {
 
     const document = editor.document;
 
+    // Skip output channels, debug consoles, and other non-file documents
+    const scheme = document.uri.scheme;
+    if (scheme !== 'file' && scheme !== 'untitled') {
+      return context;
+    }
+
+    const MAX_FILE_CHARS = 80_000; // ~20K tokens
+    const rawContent = document.getText();
     context.activeFile = {
       uri: document.uri.toString(),
       languageId: document.languageId,
-      content: document.getText(),
+      content: rawContent.length > MAX_FILE_CHARS
+        ? rawContent.slice(0, MAX_FILE_CHARS) + '\n// ... (truncated)'
+        : rawContent,
       cursorLine: editor.selection.active.line,
       cursorCharacter: editor.selection.active.character,
     };

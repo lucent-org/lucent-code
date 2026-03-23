@@ -14,7 +14,6 @@ import { ConversationHistory } from './history';
 import { NotificationService } from '../core/notifications';
 import { TerminalBuffer } from '../core/terminal-buffer';
 import { SkillRegistry } from '../skills/skill-registry';
-import { SkillMatcher } from '../skills/skill-matcher';
 import type { McpClientManager } from '../mcp/mcp-client-manager';
 import type { Indexer } from '../search/indexer';
 import { ToolApprovalManager } from './tool-approval-manager';
@@ -35,7 +34,6 @@ export class MessageHandler {
   }
 
   private readonly pendingApprovals = new Map<string, (result: { approved: boolean; scope: 'once' | 'workspace' | 'global' }) => void>();
-  private readonly skillMatcher = new SkillMatcher();
   private _autonomousMode = false;
   private _worktreeManager: WorktreeManager | null = null;
 
@@ -215,7 +213,11 @@ export class MessageHandler {
 
     const skillSummaries = this.skillRegistry?.getSummaries() ?? [];
     if (skillSummaries.length > 0) {
-      const advertisement = `\n\n## Available Skills\nThe following skills are available. Use the \`use_skill\` tool when a skill is relevant.\n\n${skillSummaries.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`;
+      const activatedSkills = this.contextBuilder.getActivatedSkills();
+      const activatedNote = activatedSkills.length > 0
+        ? `\n\n**Project-activated skills** (preferred for this workspace): ${activatedSkills.join(', ')}`
+        : '';
+      const advertisement = `\n\n## Available Skills\nThe following skills are available. Use the \`use_skill\` tool when relevant.${activatedNote}\n\n${skillSummaries.map((s) => `- **${s.name}**: ${s.description}`).join('\n')}`;
       systemMessage.content += advertisement;
     }
 
@@ -247,16 +249,7 @@ export class MessageHandler {
       }
     }
 
-    const skillMatches = this.skillRegistry
-      ? this.skillMatcher.match(content, this.skillRegistry.getSummaries())
-      : [];
-    const skillBlocks = skillMatches
-      .map((name) => this.skillRegistry!.get(name))
-      .filter((s): s is NonNullable<typeof s> => s !== undefined)
-      .map((s) => `<skill name="${s.name}">\n${s.content}\n</skill>`)
-      .join('\n\n');
-
-    const baseContent = skillBlocks ? `${skillBlocks}\n\n${processedContent}` : processedContent;
+    const baseContent = processedContent;
     const userContent = images.length > 0
       ? [
           { type: 'text' as const, text: baseContent },

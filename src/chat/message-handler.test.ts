@@ -122,6 +122,7 @@ describe('MessageHandler', () => {
     formatEnrichedPrompt: ReturnType<typeof vi.fn>;
     getCapabilities: ReturnType<typeof vi.fn>;
     getCustomInstructions: ReturnType<typeof vi.fn>;
+    getActivatedSkills: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     setChatModel: ReturnType<typeof vi.fn>;
@@ -180,6 +181,7 @@ describe('MessageHandler', () => {
       formatEnrichedPrompt: vi.fn(() => 'formatted context'),
       getCapabilities: vi.fn(() => undefined),
       getCustomInstructions: vi.fn(() => undefined),
+      getActivatedSkills: vi.fn(() => []),
     };
 
     mockSettings = {
@@ -1636,14 +1638,32 @@ describe('MessageHandler', () => {
       expect(systemMessage.content).toContain('use_skill');
     });
 
-    it('pre-injects matching skill content as <skill> block in user message', async () => {
+    it('shows project-activated skills note in system prompt when getActivatedSkills returns names', async () => {
+      mockContextBuilder.getActivatedSkills.mockReturnValue(['tdd']);
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'hello', model: 'test-model' },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      const systemMessage = callArgs.messages.find((m: { role: string }) => m.role === 'system');
+      expect(systemMessage).toBeDefined();
+      expect(systemMessage.content).toContain('Project-activated skills');
+      expect(systemMessage.content).toContain('tdd');
+    });
+
+    it('does not pre-inject skill content into user message content', async () => {
       const skillContent = 'Write tests first, then implementation.';
       mockSkillRegistry.get.mockImplementation((name: string) => {
         if (name === 'tdd') return { name: 'tdd', description: 'Test-driven development approach', content: skillContent, source: 'local' };
         return undefined;
       });
-      // SkillMatcher will score 'tdd' message against 'tdd' description — use a spy to force a match
-      const matchSpy = vi.spyOn((skillHandler as any).skillMatcher, 'match').mockReturnValue(['tdd']);
       mockClient.chatStream.mockReturnValue(
         createMockStream([
           { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
@@ -1658,10 +1678,10 @@ describe('MessageHandler', () => {
       const callArgs = mockClient.chatStream.mock.calls[0][0];
       const userMsg = callArgs.messages.find((m: { role: string }) => m.role === 'user');
       expect(userMsg).toBeDefined();
-      expect(userMsg.content).toContain(`<skill name="tdd">`);
-      expect(userMsg.content).toContain(skillContent);
+      // Skill content must NOT be pre-injected — baseContent is just the raw user message
+      expect(userMsg.content).not.toContain('<skill name="tdd">');
+      expect(userMsg.content).not.toContain(skillContent);
       expect(userMsg.content).toContain('write some tdd tests');
-      matchSpy.mockRestore();
     });
 
     it('posts skillsLoaded when registry has skills on ready', async () => {
