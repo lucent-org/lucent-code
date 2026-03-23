@@ -370,8 +370,11 @@ export class EditorToolExecutor {
         case 'http_request':
           return await this.httpRequest(args);
         case 'use_model': {
-          const { model_id: modelId } = args as { model_id: string };
-          return { success: true, message: `Switched to model: ${modelId}` };
+          const modelId = (args.model_id as string | undefined)?.trim();
+          if (!modelId) {
+            return { success: false, error: 'model_id must be a non-empty string' };
+          }
+          return { success: true, message: `Model switch to ${modelId} has been approved. Using this model for subsequent messages.` };
         }
         case 'semantic_search': {
           const { query, limit } = args as { query: string; limit?: number };

@@ -44,7 +44,7 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
       <Show
         when={props.approval.diff}
         fallback={
-          <Show when={!props.approval.diff && props.approval.toolName !== 'use_model'}>
+          <Show when={props.approval.toolName !== 'use_model'}>
             <pre class="tool-call-args">{argsPreview()}</pre>
           </Show>
         }
@@ -66,8 +66,8 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
             <span class="tool-call-model-switch__from">{props.approval.currentModel} →</span>
           </Show>
           <span class="tool-call-model-switch__to">{(props.approval.args.model_id as string)}</span>
-          <Show when={(props.approval.args as any).reason}>
-            <span class="tool-call-model-switch__reason">{(props.approval.args as any).reason}</span>
+          <Show when={props.approval.args.reason as string | undefined}>
+            <span class="tool-call-model-switch__reason">{props.approval.args.reason as string}</span>
           </Show>
         </div>
       </Show>

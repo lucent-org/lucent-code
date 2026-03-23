@@ -119,6 +119,11 @@ describe('EditorToolExecutor', () => {
     expect(result.message).toContain('anthropic/claude-opus-4-6');
   });
 
+  it('should return error for empty model_id', async () => {
+    const result = await executor.execute('use_model', { model_id: '' });
+    expect(result.success).toBe(false);
+  });
+
   it('should execute format_document', async () => {
     mockExecuteCommand.mockResolvedValue(undefined);
     const result = await executor.execute('format_document', { uri: 'file:///test.ts' });

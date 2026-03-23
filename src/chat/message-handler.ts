@@ -458,9 +458,26 @@ export class MessageHandler {
               }
             }
             if (tc.function.name === 'use_model') {
-              const newModelId = (args as { model_id: string }).model_id;
+              const newModelId = ((args as Record<string, unknown>).model_id as string | undefined)?.trim();
+              if (!newModelId) {
+                this.conversationMessages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: 'Error: model_id must be a non-empty string.',
+                });
+                continue;
+              }
               activeModel = newModelId;
+              const result = await this.toolExecutor.execute(tc.function.name, args);
+              this.conversationMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: this.truncateToolOutput(
+                  result.success ? (result.message ?? 'Done') : `Error: ${result.error}`
+                ),
+              });
               postMessage({ type: 'modelChanged', modelId: newModelId });
+              continue;
             }
             const result = await this.toolExecutor.execute(tc.function.name, args);
             this.conversationMessages.push({
