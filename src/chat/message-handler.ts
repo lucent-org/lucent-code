@@ -51,6 +51,7 @@ export class MessageHandler {
     'write_file',
     'delete_file',
     'run_terminal_command',
+    'use_model',
   ]);
 
   private readonly approvalManager: ToolApprovalManager;
@@ -197,6 +198,7 @@ export class MessageHandler {
     model: string,
     postMessage: (msg: ExtensionMessage) => void
   ): Promise<void> {
+    let activeModel = model;
     const context = await this.contextBuilder.buildEnrichedContext();
     const capabilities = this.contextBuilder.getCapabilities();
     const contextPrompt = this.contextBuilder.formatEnrichedPrompt(context, capabilities);
@@ -283,7 +285,7 @@ export class MessageHandler {
 
         const stream = this.client.chatStream(
           {
-            model,
+            model: activeModel,
             messages: [systemMessage, ...this.conversationMessages],
             temperature: this.settings.temperature,
             max_tokens: this.settings.maxTokens,
@@ -315,7 +317,7 @@ export class MessageHandler {
         }
 
         if (usage) {
-          const pricing = this.modelPricing.get(model);
+          const pricing = this.modelPricing.get(activeModel);
           const promptCost = pricing ? usage.prompt_tokens * parseFloat(pricing.prompt) : 0;
           const completionCost = pricing ? usage.completion_tokens * parseFloat(pricing.completion) : 0;
           const lastMessageCost = promptCost + completionCost;
@@ -435,7 +437,8 @@ export class MessageHandler {
             if (!this._autonomousMode && MessageHandler.APPROVAL_GATED_TOOLS.has(tc.function.name)) {
               const alreadyApproved = await this.approvalManager.isApproved(tc.function.name);
               if (!alreadyApproved) {
-                const { approved, scope } = await this.requestToolApproval(tc.function.name, args, postMessage);
+                const currentModelForApproval = tc.function.name === 'use_model' ? activeModel : undefined;
+                const { approved, scope } = await this.requestToolApproval(tc.function.name, args, postMessage, undefined, currentModelForApproval);
                 if (!approved) {
                   this.conversationMessages.push({
                     role: 'tool',
@@ -453,6 +456,11 @@ export class MessageHandler {
                   this.approvalManager.approveForSession(tc.function.name);
                 }
               }
+            }
+            if (tc.function.name === 'use_model') {
+              const newModelId = (args as { model_id: string }).model_id;
+              activeModel = newModelId;
+              postMessage({ type: 'modelChanged', modelId: newModelId });
             }
             const result = await this.toolExecutor.execute(tc.function.name, args);
             this.conversationMessages.push({
@@ -485,7 +493,7 @@ export class MessageHandler {
           .map((m) => ({ role: m.role, content: m.content })) as ChatMessage[];
 
         if (!this.currentConversation) {
-          this.currentConversation = await this.history.create(model);
+          this.currentConversation = await this.history.create(activeModel);
         }
         this.currentConversation.messages = savable;
         await this.history.save(this.currentConversation);
@@ -747,12 +755,13 @@ export class MessageHandler {
     toolName: string,
     args: Record<string, unknown>,
     postMessage: (msg: ExtensionMessage) => void,
-    diff?: DiffLine[]
+    diff?: DiffLine[],
+    currentModel?: string
   ): Promise<{ approved: boolean; scope: 'once' | 'workspace' | 'global' }> {
     const requestId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve) => {
       this.pendingApprovals.set(requestId, resolve);
-      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args, diff });
+      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args, diff, currentModel });
     });
   }
 

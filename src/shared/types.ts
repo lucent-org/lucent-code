@@ -114,7 +114,7 @@ export type ExtensionMessage =
   | { type: 'conversationTitled'; id: string; title: string }
   | { type: 'triggerSend'; content: string; newChat: boolean }
   | { type: 'showDiff'; lines: DiffLine[]; filename: string; fileUri: string }
-  | { type: 'toolApprovalRequest'; requestId: string; toolName: string; args: Record<string, unknown>; diff?: DiffLine[] }
+  | { type: 'toolApprovalRequest'; requestId: string; toolName: string; args: Record<string, unknown>; diff?: DiffLine[]; currentModel?: string }
   | { type: 'terminalOutput'; content: string | null }
   | { type: 'skillsLoaded'; skills: SkillSummary[] }
   | { type: 'skillContent'; name: string; content: string | null }

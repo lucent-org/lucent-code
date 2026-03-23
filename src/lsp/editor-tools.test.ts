@@ -107,6 +107,18 @@ describe('EditorToolExecutor', () => {
     expect(tool!.function.parameters.required).toContain('query');
   });
 
+  it('TOOL_DEFINITIONS includes use_model', () => {
+    const tool = TOOL_DEFINITIONS.find((t) => t.function.name === 'use_model');
+    expect(tool).toBeDefined();
+    expect(tool!.function.parameters.required).toContain('model_id');
+  });
+
+  it('should execute use_model and return success', async () => {
+    const result = await executor.execute('use_model', { model_id: 'anthropic/claude-opus-4-6' });
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('anthropic/claude-opus-4-6');
+  });
+
   it('should execute format_document', async () => {
     mockExecuteCommand.mockResolvedValue(undefined);
     const result = await executor.execute('format_document', { uri: 'file:///test.ts' });

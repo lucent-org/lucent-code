@@ -54,6 +54,15 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
           />
         )}
       </Show>
+      <Show when={props.approval.toolName === 'use_model'}>
+        <div class="tool-call-model-switch">
+          <span class="tool-call-model-switch__label">Switch model</span>
+          <span class="tool-call-model-switch__to">{(props.approval.args.model_id as string)}</span>
+          <Show when={(props.approval.args as any).reason}>
+            <span class="tool-call-model-switch__reason">{(props.approval.args as any).reason}</span>
+          </Show>
+        </div>
+      </Show>
       <Show when={props.approval.status === 'pending'}>
         <div class="tool-call-actions">
           <button

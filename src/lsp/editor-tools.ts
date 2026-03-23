@@ -282,6 +282,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'use_model',
+      description: 'Switch to a different OpenRouter model for subsequent messages. Use when the task needs stronger reasoning (upgrade) or is simple enough for a cheaper model (downgrade).',
+      parameters: {
+        type: 'object',
+        properties: {
+          model_id: { type: 'string', description: 'OpenRouter model ID, e.g. "anthropic/claude-opus-4-6"' },
+          reason:   { type: 'string', description: 'Why this model suits the current task better' },
+        },
+        required: ['model_id'],
+      },
+    },
+  },
 ];
 
 export const USE_SKILL_TOOL_DEFINITION: ToolDefinition = {
@@ -354,6 +369,10 @@ export class EditorToolExecutor {
           return await this.fetchUrl(args);
         case 'http_request':
           return await this.httpRequest(args);
+        case 'use_model': {
+          const { model_id: modelId } = args as { model_id: string };
+          return { success: true, message: `Switched to model: ${modelId}` };
+        }
         case 'semantic_search': {
           const { query, limit } = args as { query: string; limit?: number };
           if (!this.indexer) {

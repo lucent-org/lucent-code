@@ -1380,6 +1380,76 @@ describe('MessageHandler', () => {
         expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
       });
     });
+
+    it('use_model: posts toolApprovalRequest and emits modelChanged after approval', async () => {
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'Switched to model: anthropic/claude-opus-4-6' });
+
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'use_model', arguments: '{"model_id":"anthropic/claude-opus-4-6","reason":"Needs stronger reasoning"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      const postMessages: ExtensionMessage[] = [];
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'switch model', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+      expect(req.toolName).toBe('use_model');
+      expect(req.currentModel).toBe('gpt-4');
+
+      await handler.handleMessage(
+        { type: 'toolApprovalResponse', requestId: req.requestId, approved: true },
+        (msg) => postMessages.push(msg)
+      );
+
+      await sendPromise;
+
+      expect(postMessages.some((m) => m.type === 'modelChanged' && (m as any).modelId === 'anthropic/claude-opus-4-6')).toBe(true);
+    });
+
+    it('use_model: denied → no modelChanged posted', async () => {
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'use_model', arguments: '{"model_id":"anthropic/claude-opus-4-6"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      const postMessages: ExtensionMessage[] = [];
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'switch model', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+      await handler.handleMessage(
+        { type: 'toolApprovalResponse', requestId: req.requestId, approved: false },
+        (msg) => postMessages.push(msg)
+      );
+
+      await sendPromise;
+
+      expect(postMessages.some((m) => m.type === 'modelChanged')).toBe(false);
+    });
   });
 
   describe('handleSendMessage with images', () => {
