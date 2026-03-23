@@ -70,6 +70,11 @@ export interface ChatResponseChunk {
     };
     finish_reason: string | null;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export interface ChatResponse {
@@ -107,7 +112,9 @@ export type ExtensionMessage =
   | { type: 'insertSkillChip'; name: string; content: string }
   | { type: 'mcpStatus'; servers: Record<string, 'connected' | 'error'> }
   | { type: 'autonomousModeChanged'; enabled: boolean }
-  | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string };
+  | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string }
+  | { type: 'usageUpdate'; lastMessageCost: number; lastMessageTokens: number; sessionCost: number; creditsUsed: number; creditsLimit: number | null }
+  | { type: 'noCredits' };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }
