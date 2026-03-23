@@ -315,8 +315,7 @@
           "command": "lucentCode.improveCodeNew",
           "group": "3_improve@2"
         }
-      ],
-      "scm/inputBox": []
+      ]
     }
   },
   "scripts": {

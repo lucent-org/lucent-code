@@ -167,7 +167,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const terminalBuffer = new TerminalBuffer();
 
   // Auth status bar item
-  const authStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
+  const authStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
   authStatusBar.command = 'lucentCode.authMenu';
   context.subscriptions.push(authStatusBar);
 
@@ -194,7 +194,7 @@ export async function activate(context: vscode.ExtensionContext) {
   void updateAuthStatus();
 
   // Skills status bar
-  const skillsStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 89);
+  const skillsStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 89);
   context.subscriptions.push(skillsStatusBar);
 
   function updateSkillsStatus(): void {
@@ -210,7 +210,7 @@ export async function activate(context: vscode.ExtensionContext) {
   updateSkillsStatus();
 
   // Indexer status bar
-  const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 88);
+  const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 88);
   indexerStatusBar.command = 'lucentCode.indexCodebase';
   indexerStatusBar.text = '$(loading~spin) Indexing…';
   indexerStatusBar.tooltip = 'Lucent Code: Codebase index — click to re-index';
@@ -335,10 +335,13 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri(uri: vscode.Uri) {
-        if (uri.path === '/oauth-callback') {
-          auth.handleOAuthCallback(uri).catch((e: unknown) =>
-            console.error('[Lucent Code] OAuth callback failed:', e instanceof Error ? e.message : String(e))
-          );
+        console.log('[Lucent Code] URI handler called:', uri.toString(), 'path:', uri.path, 'query:', uri.query);
+        if (uri.path.startsWith('/oauth-callback')) {
+          auth.handleOAuthCallback(uri).catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error('[Lucent Code] OAuth callback failed:', msg);
+            vscode.window.showErrorMessage(`OpenRouter: OAuth callback failed — ${msg}`);
+          });
         }
       },
     })
