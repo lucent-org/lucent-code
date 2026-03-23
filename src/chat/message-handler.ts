@@ -31,6 +31,9 @@ export class MessageHandler {
   private _autonomousMode = false;
   private _worktreeManager: WorktreeManager | null = null;
 
+  private sessionCost = 0;
+  private modelPricing = new Map<string, { prompt: string; completion: string }>();
+
   private static readonly GATED_TOOLS = new Set([
     'rename_symbol',
     'insert_code',
@@ -63,6 +66,12 @@ export class MessageHandler {
       this._worktreeManager.create(this.currentConversation.id).catch((e: Error) => {
         console.error('[WorktreeManager] Failed to create worktree:', e.message);
       });
+    }
+  }
+
+  setModelPricing(models: import('../shared/types').OpenRouterModel[]): void {
+    for (const m of models) {
+      this.modelPricing.set(m.id, m.pricing);
     }
   }
 
@@ -246,6 +255,7 @@ export class MessageHandler {
         let fullContent = '';
         const toolCallAccumulator = new Map<number, { id: string; name: string; arguments: string }>();
         let finishReason: string | null = null;
+        let usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
 
         const stream = this.client.chatStream(
           {
@@ -277,6 +287,36 @@ export class MessageHandler {
             }
           }
           finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
+          if (chunk.usage) usage = chunk.usage;
+        }
+
+        if (usage) {
+          const pricing = this.modelPricing.get(model);
+          const promptCost = pricing ? usage.prompt_tokens * parseFloat(pricing.prompt) : 0;
+          const completionCost = pricing ? usage.completion_tokens * parseFloat(pricing.completion) : 0;
+          const lastMessageCost = promptCost + completionCost;
+          this.sessionCost += lastMessageCost;
+
+          let creditsUsed = 0;
+          let creditsLimit: number | null = null;
+          try {
+            const balance = await this.client.getAccountBalance();
+            creditsUsed = balance.usage;
+            creditsLimit = balance.limit;
+          } catch { /* non-fatal */ }
+
+          postMessage({
+            type: 'usageUpdate',
+            lastMessageCost,
+            lastMessageTokens: usage.total_tokens,
+            sessionCost: this.sessionCost,
+            creditsUsed,
+            creditsLimit,
+          });
+
+          if (creditsLimit !== null && creditsUsed >= creditsLimit) {
+            postMessage({ type: 'noCredits' });
+          }
         }
 
         if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && (this.toolExecutor || this.skillRegistry || this.mcpClientManager)) {
@@ -416,8 +456,13 @@ export class MessageHandler {
         postMessage({ type: 'streamEnd' });
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        postMessage({ type: 'streamError', error: errorMessage });
-        this.notifications.handleError(errorMessage);
+        if (errorMessage.includes('402') || errorMessage.toLowerCase().includes('insufficient credits')) {
+          postMessage({ type: 'noCredits' });
+          postMessage({ type: 'streamEnd' });
+        } else {
+          await this.notifications.handleError(errorMessage);
+          postMessage({ type: 'streamError', error: errorMessage });
+        }
       }
     } finally {
       this.abortController = undefined;
@@ -439,6 +484,7 @@ export class MessageHandler {
   private async handleGetModels(postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     try {
       const models = await this.client.listModels();
+      this.setModelPricing(models);
       postMessage({ type: 'modelsLoaded', models });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';

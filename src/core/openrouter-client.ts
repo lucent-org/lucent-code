@@ -174,4 +174,15 @@ export class OpenRouterClient {
       reader.releaseLock();
     }
   }
+
+  async getAccountBalance(): Promise<{ usage: number; limit: number | null }> {
+    const headers = await this.headers();
+    const response = await fetch('https://openrouter.ai/api/v1/auth/key', { headers });
+    if (!response.ok) return { usage: 0, limit: null };
+    const data = await response.json() as { data?: { usage?: number; limit?: number | null } };
+    return {
+      usage: data.data?.usage ?? 0,
+      limit: data.data?.limit ?? null,
+    };
+  }
 }
