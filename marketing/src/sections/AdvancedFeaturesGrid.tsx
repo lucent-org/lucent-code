@@ -9,8 +9,13 @@ const ADVANCED_FEATURES = [
   },
   {
     icon: '🧩',
-    title: 'Skills system',
-    description: 'Load Claude Code-style skill sets from GitHub, npm, or the marketplace.',
+    title: 'Smart skills',
+    description: 'Built-in coding skills (TDD, clean commits, debugging) plus load from GitHub, npm, or Claude Code — declared in LUCENT.md.',
+  },
+  {
+    icon: '🔀',
+    title: 'Mid-conversation model switch',
+    description: 'Type @model to pick a different model inline, or let the AI call use_model when the task needs stronger reasoning.',
   },
   {
     icon: '🔌',
@@ -34,7 +39,7 @@ export default function AdvancedFeaturesGrid() {
             Everything a modern AI assistant should be
           </h2>
         </div>
-        <ul class="feature-grid feature-grid--4" role="list">
+        <ul class="feature-grid feature-grid--3" role="list">
           {ADVANCED_FEATURES.map(f => (
             <li><FeatureCard {...f} /></li>
           ))}
