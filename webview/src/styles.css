@@ -188,6 +188,7 @@ body {
   top: 100%;
   left: 0;
   right: 0;
+  min-width: 300px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -382,6 +383,60 @@ body {
 
 @keyframes blink {
   50% { opacity: 0; }
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+  opacity: 0.6;
+}
+
+.thinking-dots span {
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+  font-size: 1.4em;
+  line-height: 1;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+.message-cost {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  text-align: right;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.chat-message:hover .message-cost {
+  opacity: 1;
+}
+
+.no-credits-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--vscode-inputValidation-warningBackground, #332b00);
+  border-top: 1px solid var(--vscode-inputValidation-warningBorder, #b89500);
+  font-size: 12px;
+  gap: 8px;
+}
+
+.no-credits-banner a {
+  color: var(--vscode-textLink-foreground);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.no-credits-banner a:hover {
+  text-decoration: underline;
 }
 
 .code-block {

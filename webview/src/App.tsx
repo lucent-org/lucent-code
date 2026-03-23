@@ -256,6 +256,17 @@ const App: Component = () => {
         )}
       </Show>
 
+      <Show when={chatStore.noCredits()}>
+        <div class="no-credits-banner">
+          <span>⚠ Insufficient credits — your account has no remaining balance.</span>
+          <a
+            href="https://openrouter.ai/settings/credits"
+            onClick={(e) => { e.preventDefault(); vscode.postMessage({ type: 'openExternal', url: 'https://openrouter.ai/settings/credits' }); }}
+          >
+            Buy credits ↗
+          </a>
+        </div>
+      </Show>
       <ChatInput
         onSend={handleSend}
         onCancel={chatStore.cancelRequest}
@@ -269,6 +280,7 @@ const App: Component = () => {
         selectedModel={chatStore.selectedModel()}
         onSelectModel={chatStore.selectModel}
         messages={chatStore.messages()}
+        noCredits={chatStore.noCredits()}
       />
     </div>
   );

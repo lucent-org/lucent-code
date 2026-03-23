@@ -133,7 +133,8 @@ export type WebviewMessage =
   | { type: 'getTerminalOutput' }
   | { type: 'getSkillContent'; name: string }
   | { type: 'setAutonomousMode'; enabled: boolean }
-  | { type: 'startWorktree' };
+  | { type: 'startWorktree' }
+  | { type: 'openExternal'; url: string };
 
 // ---- Diff types ----
 

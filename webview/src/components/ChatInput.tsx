@@ -53,6 +53,7 @@ interface ChatInputProps {
   selectedModel: string;
   onSelectModel: (modelId: string) => void;
   messages: { role: string; content: string }[];
+  noCredits?: boolean;
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
@@ -425,7 +426,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           onKeyDown={handleKeyDown}
           placeholder="Ask about your code..."
           rows={3}
-          disabled={props.isStreaming || isResolvingMention()}
+          disabled={props.isStreaming || isResolvingMention() || !!props.noCredits}
         />
       </div>
       <div class="chat-input-actions">
@@ -443,21 +444,21 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             aria-label="Attach files"
             onClick={() => fileInputRef?.click()}
             title="Attach files"
-            disabled={props.isStreaming}
+            disabled={props.isStreaming || !!props.noCredits}
           ><svg aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05L12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
           <button
             class="attach-button"
             aria-label="Add terminal output"
             onClick={() => void handleTerminalButton()}
             title="Add terminal output"
-            disabled={props.isStreaming || isResolvingMention()}
+            disabled={props.isStreaming || isResolvingMention() || !!props.noCredits}
           >&gt;_</button>
           <button
             class="attach-button"
             aria-label="Browse skills"
             onClick={() => { setSkillFilter(''); setShowSkills(true); }}
             title="Browse skills (or type / in the input)"
-            disabled={props.isStreaming || props.skills.length === 0}
+            disabled={props.isStreaming || props.skills.length === 0 || !!props.noCredits}
           >/…</button>
           <ModelSelector
             models={props.models}
@@ -472,7 +473,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0)}
+              disabled={!!props.noCredits || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0)}
             >
               Send
             </button>

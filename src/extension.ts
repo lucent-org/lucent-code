@@ -227,6 +227,10 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!webview) return;
 
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
+      if (message.type === 'openExternal') {
+        void vscode.env.openExternal(vscode.Uri.parse(message.url));
+        return;
+      }
       const postMessage = (msg: ExtensionMessage) => {
         if (msg.type === 'usageUpdate') {
           currentSessionCost = msg.sessionCost;

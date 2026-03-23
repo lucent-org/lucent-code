@@ -75,8 +75,16 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
             </Show>
           )}
         </For>
-        <Show when={props.message.isStreaming}>
+        <Show when={props.message.isStreaming && !props.message.content}>
+          <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+        </Show>
+        <Show when={props.message.isStreaming && !!props.message.content}>
           <span class="cursor-blink">|</span>
+        </Show>
+        <Show when={props.message.role === 'assistant' && props.message.cost !== undefined}>
+          <div class="message-cost">
+            · ${props.message.cost!.toFixed(4)} · {props.message.tokens?.toLocaleString()} tokens
+          </div>
         </Show>
       </div>
     </div>
