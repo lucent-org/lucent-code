@@ -19,6 +19,7 @@ import { SkillRegistry, PreloadedSource } from './skills/skill-registry';
 import { fetchGitHubSkills } from './skills/sources/github-source';
 import { fetchNpmSkills } from './skills/sources/npm-source';
 import { fetchMarketplaceSkills } from './skills/sources/marketplace-source';
+import { fetchClaudeCodeSkills } from './skills/sources/claude-code-source';
 import { BUILTIN_SKILLS } from './skills/builtin/index';
 import * as fs from 'fs/promises';
 import * as os from 'os';
@@ -75,6 +76,10 @@ export async function activate(context: vscode.ExtensionContext) {
         // skip failing source — registry still loads from other sources
       }
     }
+
+    // Auto-detect Claude Code skills from ~/.claude/skills/
+    const claudeCodeMarkdowns = await fetchClaudeCodeSkills();
+    ownMarkdowns.push(...claudeCodeMarkdowns);
 
     const preloaded = ownMarkdowns.length > 0
       ? [{ type: 'local' as const, content: new Map(ownMarkdowns.map((md, i) => [String(i), md])) }]
