@@ -60,7 +60,7 @@ const App: Component = () => {
           break;
         case 'toolApprovalRequest': {
           const msg = message as any;
-          chatStore.handleToolApprovalRequest(msg.requestId, msg.toolName, msg.args, msg.diff);
+          chatStore.handleToolApprovalRequest(msg.requestId, msg.toolName, msg.args, msg.diff, msg.currentModel);
           break;
         }
         case 'skillsLoaded':

@@ -11,6 +11,7 @@ export interface ToolApprovalData {
   args: Record<string, unknown>;
   status: 'pending' | 'approved' | 'denied';
   diff?: DiffLine[];
+  currentModel?: string;
 }
 
 interface ToolCallCardProps {
@@ -42,7 +43,11 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
       </div>
       <Show
         when={props.approval.diff}
-        fallback={<pre class="tool-call-args">{argsPreview()}</pre>}
+        fallback={
+          <Show when={!props.approval.diff && props.approval.toolName !== 'use_model'}>
+            <pre class="tool-call-args">{argsPreview()}</pre>
+          </Show>
+        }
       >
         {(diff) => (
           <DiffView
@@ -57,6 +62,9 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
       <Show when={props.approval.toolName === 'use_model'}>
         <div class="tool-call-model-switch">
           <span class="tool-call-model-switch__label">Switch model</span>
+          <Show when={props.approval.currentModel}>
+            <span class="tool-call-model-switch__from">{props.approval.currentModel} →</span>
+          </Show>
           <span class="tool-call-model-switch__to">{(props.approval.args.model_id as string)}</span>
           <Show when={(props.approval.args as any).reason}>
             <span class="tool-call-model-switch__reason">{(props.approval.args as any).reason}</span>
