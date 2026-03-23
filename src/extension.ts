@@ -351,15 +351,15 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('lucentCode.authMenu', async () => {
       const isAuthed = await auth.isAuthenticated();
       const options = isAuthed
-        ? ['Set API Key', 'Sign in with OAuth', 'Sign out']
-        : ['Set API Key', 'Sign in with OAuth'];
+        ? ['Sign out', 'Set API Key manually']
+        : ['Sign in with OpenRouter (OAuth)', 'Set API Key manually'];
 
       const choice = await vscode.window.showQuickPick(options, {
         placeHolder: isAuthed ? 'OpenRouter: Signed in' : 'OpenRouter: Not signed in',
       });
 
-      if (choice === 'Set API Key') auth.promptForApiKey();
-      else if (choice === 'Sign in with OAuth') auth.startOAuth();
+      if (choice === 'Sign in with OpenRouter (OAuth)') auth.startOAuth();
+      else if (choice === 'Set API Key manually') auth.promptForApiKey();
       else if (choice === 'Sign out') {
         await auth.signOut();
         vscode.window.showInformationMessage('Signed out of OpenRouter.');

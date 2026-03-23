@@ -1,0 +1,12 @@
+[   13898ms] TypeError: Cannot read properties of undefined (reading 'trim')
+    at Object.sendMessage (http://localhost:5177/src/stores/chat.ts:33:18)
+    at http://localhost:5177/src/App.tsx:62:21
+    at dispatch (eval at evaluate (:301:30), <anonymous>:2:37)
+    at eval (eval at evaluate (:301:30), <anonymous>:6:3)
+    at UtilityScript.evaluate (<anonymous>:303:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+[   14604ms] TypeError: Cannot read properties of undefined (reading 'trim')
+    at Object.sendMessage (http://localhost:5177/src/stores/chat.ts:33:18)
+    at http://localhost:5177/src/App.tsx:62:21
+    at dispatch (eval at evaluate (:301:30), <anonymous>:2:37)
+    at eval (eval at evaluate (:301:30), <anonymous>:13:7)

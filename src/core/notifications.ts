@@ -5,11 +5,14 @@ export class NotificationService {
     const lower = errorMessage.toLowerCase();
 
     if (lower.includes('api key') || lower.includes('no api key')) {
-      const action = await vscode.window.showErrorMessage(
-        'OpenRouter: API key not configured. Set your API key to get started.',
-        'Set API Key'
+      const action = await vscode.window.showInformationMessage(
+        'Lucent Code: No API key found. Sign in with OpenRouter to get started.',
+        'Sign in with OpenRouter',
+        'Enter API Key manually'
       );
-      if (action === 'Set API Key') {
+      if (action === 'Sign in with OpenRouter') {
+        vscode.commands.executeCommand('lucentCode.authMenu');
+      } else if (action === 'Enter API Key manually') {
         vscode.commands.executeCommand('lucentCode.setApiKey');
       }
     } else if (lower.includes('429') || lower.includes('rate limit')) {
