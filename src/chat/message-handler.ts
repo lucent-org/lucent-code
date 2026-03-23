@@ -249,7 +249,7 @@ export class MessageHandler {
     const tools         = allTools.length > 0 ? allTools : undefined;
 
     try {
-      const MAX_TOOL_ITERATIONS = 5;
+      const MAX_TOOL_ITERATIONS = 15;
       let completed = false;
 
       for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
@@ -258,6 +258,9 @@ export class MessageHandler {
         let finishReason: string | null = null;
         let usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
 
+        // On the last iteration, strip tools so the model is forced to produce a text response
+        const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
+
         const stream = this.client.chatStream(
           {
             model,
@@ -265,7 +268,7 @@ export class MessageHandler {
             temperature: this.settings.temperature,
             max_tokens: this.settings.maxTokens,
             stream: true,
-            tools,
+            tools: isLastIteration ? undefined : tools,
           },
           this.abortController.signal
         );
@@ -428,7 +431,8 @@ export class MessageHandler {
       }
 
       if (!completed) {
-        postMessage({ type: 'streamError', error: 'Tool execution loop exceeded maximum iterations' });
+        // Should not be reachable — last iteration always has tools stripped, forcing finish_reason: stop
+        postMessage({ type: 'streamEnd' });
         return;
       }
 

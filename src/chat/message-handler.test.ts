@@ -1315,22 +1315,35 @@ describe('MessageHandler', () => {
       expect(mockClient.chatStream).toHaveBeenCalledTimes(2);
     });
 
-    it('should post streamError after exceeding max tool iterations', async () => {
-      // Always return tool_calls — never resolves with 'stop'
-      // Use mockImplementation so each call gets a fresh async generator instance
-      mockClient.chatStream.mockImplementation(() =>
-        createToolCallStream([{ id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' }])
-      );
+    it('strips tools on the final iteration and produces a text response instead of an error', async () => {
+      // First 14 calls return tool_calls; the 15th (final) must return a stop response
+      // because tools are stripped on the last iteration.
+      const toolStream = () =>
+        createToolCallStream([{ id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' }]);
+      const finalStream = createMockStream([
+        { choices: [{ delta: { content: 'Here is a summary of what I did.' }, finish_reason: null }] },
+        { choices: [{ delta: {}, finish_reason: 'stop' }] },
+      ]);
+
+      let callCount = 0;
+      mockClient.chatStream.mockImplementation(() => {
+        callCount++;
+        return callCount < 15 ? toolStream() : finalStream;
+      });
 
       await toolHandler.handleMessage(
         { type: 'sendMessage', content: 'loop forever', model: 'test-model' },
         postMessage
       );
 
-      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'streamError' }));
-      expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'streamEnd' }));
-      // 5 iterations max
-      expect(mockClient.chatStream).toHaveBeenCalledTimes(5);
+      // Should resolve cleanly with streamEnd, not streamError
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'streamEnd' }));
+      expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'streamError' }));
+      // 15 iterations max
+      expect(mockClient.chatStream).toHaveBeenCalledTimes(15);
+      // Final call must NOT include tools (forces text response)
+      const lastCallArgs = mockClient.chatStream.mock.calls[14][0];
+      expect(lastCallArgs.tools).toBeUndefined();
     });
 
     it('should pass TOOL_DEFINITIONS in the API request when toolExecutor is provided', async () => {
