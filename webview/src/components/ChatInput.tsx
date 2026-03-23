@@ -177,6 +177,8 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       setShowMentions(false);
       setShowSkills(false);
       setShowModelPicker(false);
+      setModelPickerFilter('');
+      setModelPickerBeforeAt('');
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey && !showMentions() && !showModelPicker()) {
@@ -400,19 +402,23 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             </For>
           </div>
         </Show>
-        <Show when={showModelPicker() && filteredModelsForPicker().length > 0}>
+        <Show when={showModelPicker()}>
           <div class="mention-dropdown">
-            <For each={filteredModelsForPicker()}>
-              {(model) => (
-                <button
-                  class="mention-item"
-                  onMouseDown={(e) => { e.preventDefault(); selectModelFromPicker(model.id); }}
-                >
-                  <span class="mention-item-label">{model.name}</span>
-                  <span class="mention-item-desc">{model.id}</span>
-                </button>
-              )}
-            </For>
+            <Show when={filteredModelsForPicker().length > 0} fallback={
+              <div class="mention-item mention-item--disabled">No models available</div>
+            }>
+              <For each={filteredModelsForPicker()}>
+                {(model) => (
+                  <button
+                    class="mention-item"
+                    onMouseDown={(e) => { e.preventDefault(); selectModelFromPicker(model.id); }}
+                  >
+                    <span class="mention-item-label">{model.name}</span>
+                    <span class="mention-item-desc">{model.id}</span>
+                  </button>
+                )}
+              </For>
+            </Show>
           </div>
         </Show>
         <Show when={showSkills() && filteredSkills().length > 0}>
