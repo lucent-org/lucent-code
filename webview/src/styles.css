@@ -396,6 +396,32 @@ body {
   margin: 0.25em 0;
 }
 
+.message-content table {
+  border-collapse: collapse;
+  margin: 0.75em 0;
+  font-size: 0.9em;
+  width: 100%;
+  overflow-x: auto;
+  display: block;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid var(--border, rgba(255,255,255,0.15));
+  padding: 5px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.message-content th {
+  background: var(--vscode-editor-inactiveSelectionBackground, rgba(255,255,255,0.06));
+  font-weight: 600;
+}
+
+.message-content tr:nth-child(even) td {
+  background: rgba(255,255,255,0.03);
+}
+
 .cursor-blink {
   animation: blink 1s step-end infinite;
 }
@@ -626,7 +652,8 @@ body {
 
 .autonomous-button.active {
   opacity: 1;
-  color: var(--vscode-charts-yellow);
+  color: var(--vscode-charts-yellow, #e9c46a);
+  background: var(--vscode-toolbar-activeBackground, rgba(255, 200, 80, 0.15));
 }
 
 /* Conversation List */
@@ -1002,6 +1029,7 @@ body {
 
 .tool-call-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 6px 10px;
   border-top: 1px solid var(--vscode-panel-border, #555);
@@ -1033,6 +1061,22 @@ body {
 
 .tool-call-btn--deny:hover {
   background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
+}
+
+.tool-call-btn--allow-workspace,
+.tool-call-btn--allow-global {
+  padding: 3px 12px;
+  font-size: 12px;
+  border: 1px solid var(--vscode-panel-border, #555);
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.08));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #ccc));
+}
+
+.tool-call-btn--allow-workspace:hover,
+.tool-call-btn--allow-global:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.14));
 }
 
 /* Drag-and-drop highlight */
