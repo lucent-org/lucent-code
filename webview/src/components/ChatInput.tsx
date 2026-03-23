@@ -6,7 +6,7 @@ interface MentionSource {
   id: string;
   label: string;
   description: string;
-  kind: 'context' | 'action' | 'search';
+  kind: 'context' | 'action' | 'search' | 'model';
 }
 
 const MENTION_SOURCES: MentionSource[] = [
@@ -15,6 +15,7 @@ const MENTION_SOURCES: MentionSource[] = [
   { id: 'test',    label: '@test',    description: 'Write tests for code at cursor',   kind: 'action'  },
   { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
   { id: 'codebase', label: '@codebase', description: 'Semantic search across all indexed files', kind: 'search' },
+  { id: 'model',   label: '@model',   description: 'Switch the active model',          kind: 'model'   },
 ];
 
 interface Attachment {
@@ -69,6 +70,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [showSkills, setShowSkills] = createSignal(false);
   const [skillFilter, setSkillFilter] = createSignal('');
   const [skillChips, setSkillChips] = createSignal<{ name: string; content: string }[]>([]);
+  const [showModelPicker, setShowModelPicker] = createSignal(false);
+  const [modelPickerFilter, setModelPickerFilter] = createSignal('');
+  const [modelPickerBeforeAt, setModelPickerBeforeAt] = createSignal('');
   let fileInputRef: HTMLInputElement | undefined;
 
   const contextFillPct = createMemo(() => {
@@ -172,9 +176,10 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     if (e.key === 'Escape') {
       setShowMentions(false);
       setShowSkills(false);
+      setShowModelPicker(false);
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey && !showMentions()) {
+    if (e.key === 'Enter' && !e.shiftKey && !showMentions() && !showModelPicker()) {
       e.preventDefault();
       handleSend();
     }
@@ -183,6 +188,18 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const handleInput = (e: Event) => {
     const value = (e.currentTarget as HTMLTextAreaElement).value;
     setInput(value);
+
+    // If model picker is open, use typed text as filter
+    if (showModelPicker()) {
+      const base = modelPickerBeforeAt();
+      if (value.startsWith(base)) {
+        setModelPickerFilter(value.slice(base.length));
+      } else {
+        // User backspaced past the anchor — close picker
+        setShowModelPicker(false);
+      }
+      return;
+    }
 
     // Detect @ trigger — only open at start or after a space
     const lastAt = value.lastIndexOf('@');
@@ -216,17 +233,34 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const actionSources = () => filteredSources().filter((s) => s.kind === 'action');
   const contextSources = () => filteredSources().filter((s) => s.kind === 'context');
   const searchSources = () => filteredSources().filter((s) => s.kind === 'search');
+  const modelSources = () => filteredSources().filter((s) => s.kind === 'model');
+
+  const filteredModelsForPicker = () => {
+    const filter = modelPickerFilter().toLowerCase();
+    return props.models.filter((m) =>
+      m.name.toLowerCase().includes(filter) || m.id.toLowerCase().includes(filter)
+    );
+  };
 
   const filteredSkills = () =>
     props.skills.filter((s) => s.name.toLowerCase().includes(skillFilter()));
 
   const selectMention = async (source: MentionSource) => {
     setShowMentions(false);
-    setIsResolvingMention(true);
     const value = input();
     const lastAt = value.lastIndexOf('@');
     const beforeAt = lastAt !== -1 ? value.slice(0, lastAt) : value;
 
+    if (source.kind === 'model') {
+      // Open model picker secondary dropdown; clear @model text from input
+      setModelPickerBeforeAt(beforeAt);
+      setModelPickerFilter('');
+      setInput(beforeAt);
+      setShowModelPicker(true);
+      return;
+    }
+
+    setIsResolvingMention(true);
     try {
       if (source.kind === 'search') {
         // Insert @codebase marker; user types the query after it
@@ -247,6 +281,13 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     } finally {
       setIsResolvingMention(false);
     }
+  };
+
+  const selectModelFromPicker = (modelId: string) => {
+    setShowModelPicker(false);
+    props.onSelectModel(modelId);
+    // Remove the @model text — restore input to what was before @
+    setInput(modelPickerBeforeAt());
   };
 
   const selectSkill = async (skill: { name: string; description: string }) => {
@@ -340,6 +381,35 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 >
                   <span class="mention-item-label">{source.label}</span>
                   <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
+            <Show when={(actionSources().length > 0 || contextSources().length > 0 || searchSources().length > 0) && modelSources().length > 0}>
+              <div class="mention-group-separator" />
+            </Show>
+            <For each={modelSources()}>
+              {(source) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                >
+                  <span class="mention-item-label">{source.label}</span>
+                  <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={showModelPicker() && filteredModelsForPicker().length > 0}>
+          <div class="mention-dropdown">
+            <For each={filteredModelsForPicker()}>
+              {(model) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); selectModelFromPicker(model.id); }}
+                >
+                  <span class="mention-item-label">{model.name}</span>
+                  <span class="mention-item-desc">{model.id}</span>
                 </button>
               )}
             </For>
@@ -473,7 +543,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={!!props.noCredits || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0)}
+              disabled={!!props.noCredits || !props.selectedModel || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0)}
             >
               Send
             </button>
