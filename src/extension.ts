@@ -116,7 +116,7 @@ export async function activate(context: vscode.ExtensionContext) {
     indexer.start(workspaceRoot)
       .then(() => { indexerStatusBar.text = '$(database) Indexed'; })
       .catch((e: Error) => {
-        console.error('[Indexer] Failed to start:', e instanceof Error ? e.message : String(e));
+        console.error('[Lucent Indexer] Failed to start:', e instanceof Error ? e.message : String(e));
         indexerStatusBar.text = '$(warning) Index failed';
       });
   }
@@ -158,13 +158,13 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set up code intelligence
   const codeIntelligence = new CodeIntelligence();
   const capabilityDetector = new CapabilityDetector();
-  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), indexer);
   contextBuilder.setCodeIntelligence(codeIntelligence, capabilityDetector);
 
   const history = new ConversationHistory(context.globalStorageUri);
 
   const notifications = new NotificationService();
   const terminalBuffer = new TerminalBuffer();
+  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), terminalBuffer, indexer);
 
   let currentSessionCost = 0;
   let hasNoCredits = false;
@@ -271,6 +271,7 @@ export async function activate(context: vscode.ExtensionContext) {
   };
 
   chatProvider.onResolve = setupWebviewMessaging;
+  chatProvider.onDispose = () => handler.resetConversation();
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
       webviewOptions: { retainContextWhenHidden: true },

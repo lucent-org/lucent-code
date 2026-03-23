@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { Indexer } from '../search/indexer';
+import type { TerminalBuffer } from '../core/terminal-buffer';
 
 export interface ToolResult {
   success: boolean;
@@ -122,6 +123,93 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: 'function',
     function: {
+      name: 'read_file',
+      description: 'Read the contents of a file in the workspace by its path. Returns up to 2000 lines by default. For large files, use start_line and end_line to read specific sections.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Workspace-relative or absolute path to the file, e.g. "src/index.ts" or "README.md"' },
+          start_line: { type: 'number', description: '1-based line number to start reading from (default: 1)' },
+          end_line: { type: 'number', description: '1-based line number to stop reading at (inclusive, default: start_line + 1999)' },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'write_file',
+      description: 'Create or completely overwrite a file with the given content. Parent directories are created automatically. Use for creating new files or replacing entire file contents.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Workspace-relative or absolute path, e.g. "src/utils/helper.ts"' },
+          content: { type: 'string', description: 'Full content to write to the file' },
+        },
+        required: ['path', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_file',
+      description: 'Delete a file from the workspace. Returns an error if the file does not exist.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Workspace-relative or absolute path to the file to delete' },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'run_terminal_command',
+      description: 'Run a shell command in the VS Code integrated terminal and return its output. Use to run tests, builds, installs, git commands, or any CLI tool.',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The shell command to run, e.g. "npm test" or "git status"' },
+        },
+        required: ['command'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_directory',
+      description: 'List files and subdirectories in a directory. Returns each entry with a [file] or [dir] label.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Workspace-relative or absolute path to the directory (default: workspace root)' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_directory',
+      description: 'Create a directory (and any missing parent directories). Succeeds silently if the directory already exists.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Workspace-relative or absolute path to the directory to create' },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'grep_files',
       description: 'Search file contents with a regex pattern. Use as fallback when LSP reference lookup returns no results or the language has no server.',
       parameters: {
@@ -152,7 +240,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'fetch_url',
-      description: 'Fetch a URL and return its content as clean Markdown. Use to read documentation pages, READMEs, or package pages.',
+      description: 'Fetch an HTTP/HTTPS URL and return its content as clean Markdown. Use for external web pages and online documentation only — not for local files.',
       parameters: {
         type: 'object',
         properties: {
@@ -227,6 +315,7 @@ export const START_WORKTREE_TOOL_DEFINITION: ToolDefinition = {
 export class EditorToolExecutor {
   constructor(
     private readonly getTavilyApiKey?: () => Promise<string | undefined>,
+    private readonly terminalBuffer?: TerminalBuffer,
     private readonly indexer?: Indexer
   ) {}
 
@@ -243,6 +332,18 @@ export class EditorToolExecutor {
           return await this.insertCode(args);
         case 'replace_range':
           return await this.replaceRange(args);
+        case 'read_file':
+          return await this.readFile(args);
+        case 'write_file':
+          return await this.writeFile(args);
+        case 'delete_file':
+          return await this.deleteFile(args);
+        case 'run_terminal_command':
+          return await this.runTerminalCommand(args);
+        case 'list_directory':
+          return await this.listDirectory(args);
+        case 'create_directory':
+          return await this.createDirectory(args);
         case 'search_files':
           return await this.searchFiles(args);
         case 'grep_files':
@@ -354,6 +455,120 @@ export class EditorToolExecutor {
     edit.replace(uri, range, args.code as string);
     await vscode.workspace.applyEdit(edit);
     return { success: true, message: `Replaced code at lines ${args.startLine}-${args.endLine}` };
+  }
+
+  private resolveUri(filePath: string): vscode.Uri {
+    if (filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)) {
+      return vscode.Uri.file(filePath);
+    }
+    const wsFolder = vscode.workspace.workspaceFolders?.[0];
+    if (wsFolder) {
+      return vscode.Uri.joinPath(wsFolder.uri, filePath);
+    }
+    return vscode.Uri.file(filePath);
+  }
+
+  private async writeFile(args: Record<string, unknown>): Promise<ToolResult> {
+    const filePath = args.path as string;
+    const content = args.content as string;
+    const uri = this.resolveUri(filePath);
+    try {
+      const parentUri = vscode.Uri.joinPath(uri, '..');
+      await vscode.workspace.fs.createDirectory(parentUri);
+      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
+      return { success: true, message: `Wrote ${content.length} bytes to ${filePath}` };
+    } catch (err) {
+      return { success: false, error: `Could not write file: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+
+  private async deleteFile(args: Record<string, unknown>): Promise<ToolResult> {
+    const filePath = args.path as string;
+    const uri = this.resolveUri(filePath);
+    try {
+      await vscode.workspace.fs.delete(uri);
+      return { success: true, message: `Deleted ${filePath}` };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('not found') || msg.includes('FileNotFound') || msg.includes('ENOENT')) {
+        return { success: false, error: `File not found: ${filePath}` };
+      }
+      return { success: false, error: `Could not delete file: ${msg}` };
+    }
+  }
+
+  private async runTerminalCommand(args: Record<string, unknown>): Promise<ToolResult> {
+    const command = args.command as string;
+    const terminal = vscode.window.createTerminal({ name: 'Lucent' });
+    terminal.show(true);
+    terminal.sendText(command);
+    const SETTLE_MS = 8000;
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    const output = this.terminalBuffer?.getActiveTerminalOutput();
+    terminal.dispose();
+    if (!output) {
+      return {
+        success: true,
+        message: `Command sent: ${command}\n(Output capture unavailable — terminal data API requires proposed API enablement)`,
+      };
+    }
+    return { success: true, message: `$ ${command}\n\n${output}` };
+  }
+
+  private async listDirectory(args: Record<string, unknown>): Promise<ToolResult> {
+    const dirPath = (args.path as string | undefined) ?? '.';
+    const uri = this.resolveUri(dirPath);
+    try {
+      const entries = await vscode.workspace.fs.readDirectory(uri);
+      if (entries.length === 0) return { success: true, message: '(empty directory)' };
+      const lines = entries
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, type]) => `${type === 2 ? '[dir] ' : '[file]'} ${name}`);
+      return { success: true, message: lines.join('\n') };
+    } catch (err) {
+      return { success: false, error: `Could not list directory: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+
+  private async createDirectory(args: Record<string, unknown>): Promise<ToolResult> {
+    const dirPath = args.path as string;
+    const uri = this.resolveUri(dirPath);
+    try {
+      await vscode.workspace.fs.createDirectory(uri);
+      return { success: true, message: `Created directory: ${dirPath}` };
+    } catch (err) {
+      return { success: false, error: `Could not create directory: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+
+  private async readFile(args: Record<string, unknown>): Promise<ToolResult> {
+    const filePath = args.path as string;
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    let uri: vscode.Uri;
+    if (filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)) {
+      uri = vscode.Uri.file(filePath);
+    } else if (workspaceFolders && workspaceFolders.length > 0) {
+      uri = vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
+    } else {
+      return { success: false, error: 'No workspace folder open' };
+    }
+    try {
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      const content = new TextDecoder().decode(bytes);
+      const lines = content.split('\n');
+      const MAX_LINES = 2000;
+      const startLine = Math.max(1, (args.start_line as number | undefined) ?? 1);
+      const endLine = Math.min(lines.length, (args.end_line as number | undefined) ?? (startLine + MAX_LINES - 1));
+      const slice = lines.slice(startLine - 1, endLine);
+      const remaining = lines.length - endLine;
+      let result = slice.join('\n');
+      if (remaining > 0) {
+        result += `\n\n[${remaining} more lines — call read_file with start_line=${endLine + 1} to continue]`;
+      }
+      return { success: true, message: `${filePath} (lines ${startLine}–${endLine} of ${lines.length}):\n\n${result}` };
+    } catch (err) {
+      return { success: false, error: `Could not read file: ${err instanceof Error ? err.message : String(err)}` };
+    }
   }
 
   private async searchFiles(args: Record<string, unknown>): Promise<ToolResult> {

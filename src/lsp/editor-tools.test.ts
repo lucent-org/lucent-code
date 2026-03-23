@@ -1,11 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockExecuteCommand, mockApplyEdit, mockFindFiles, mockReadFile } = vi.hoisted(() => ({
-  mockExecuteCommand: vi.fn(),
-  mockApplyEdit: vi.fn(() => Promise.resolve(true)),
-  mockFindFiles: vi.fn(() => Promise.resolve([])),
-  mockReadFile: vi.fn(() => Promise.resolve(new Uint8Array())),
-}));
+const {
+  mockExecuteCommand,
+  mockApplyEdit,
+  mockFindFiles,
+  mockReadFile,
+  mockWriteFile,
+  mockDeleteFile,
+  mockReadDirectory,
+  mockCreateDirectory,
+  mockCreateTerminal,
+  mockSendText,
+} = vi.hoisted(() => {
+  const mockSendText = vi.fn();
+  const mockCreateTerminal = vi.fn(() => ({ show: vi.fn(), sendText: mockSendText, dispose: vi.fn() }));
+  return {
+    mockExecuteCommand: vi.fn(),
+    mockApplyEdit: vi.fn(() => Promise.resolve(true)),
+    mockFindFiles: vi.fn(() => Promise.resolve([])),
+    mockReadFile: vi.fn(() => Promise.resolve(new Uint8Array())),
+    mockWriteFile: vi.fn(() => Promise.resolve(undefined)),
+    mockDeleteFile: vi.fn(() => Promise.resolve(undefined)),
+    mockReadDirectory: vi.fn(() => Promise.resolve([])),
+    mockCreateDirectory: vi.fn(() => Promise.resolve(undefined)),
+    mockCreateTerminal,
+    mockSendText,
+  };
+});
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -17,10 +38,25 @@ vi.mock('vscode', () => ({
   workspace: {
     applyEdit: mockApplyEdit,
     findFiles: mockFindFiles,
-    fs: { readFile: mockReadFile },
+    fs: {
+      readFile: mockReadFile,
+      writeFile: mockWriteFile,
+      delete: mockDeleteFile,
+      readDirectory: mockReadDirectory,
+      createDirectory: mockCreateDirectory,
+    },
+    workspaceFolders: [{ uri: { fsPath: '/workspace' } }],
+  },
+  window: {
+    createTerminal: mockCreateTerminal,
   },
   Uri: {
     parse: (s: string) => ({ toString: () => s, fsPath: s }),
+    file: (s: string) => ({ toString: () => s, fsPath: s }),
+    joinPath: (base: any, ...parts: string[]) => ({
+      toString: () => [base.fsPath, ...parts].join('/'),
+      fsPath: [base.fsPath, ...parts].join('/'),
+    }),
   },
   Position: class {
     constructor(public line: number, public character: number) {}
@@ -367,6 +403,60 @@ describe('EditorToolExecutor', () => {
       });
       expect(result.success).toBe(false);
       expect(result.error).toContain('500');
+    });
+  });
+
+  describe('write_file', () => {
+    it('writes content to a workspace-relative path', async () => {
+      mockCreateDirectory.mockResolvedValue(undefined);
+      mockWriteFile.mockResolvedValue(undefined);
+      const result = await executor.execute('write_file', { path: 'src/foo.ts', content: 'export {}' });
+      expect(result.success).toBe(true);
+      expect(mockWriteFile).toHaveBeenCalled();
+    });
+  });
+
+  describe('delete_file', () => {
+    it('deletes a file and returns success', async () => {
+      mockDeleteFile.mockResolvedValue(undefined);
+      const result = await executor.execute('delete_file', { path: 'src/foo.ts' });
+      expect(result.success).toBe(true);
+    });
+
+    it('returns error if file not found', async () => {
+      mockDeleteFile.mockRejectedValue(new Error('FileNotFound'));
+      const result = await executor.execute('delete_file', { path: 'src/missing.ts' });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/not found/i);
+    });
+  });
+
+  describe('list_directory', () => {
+    it('returns sorted [file]/[dir] list', async () => {
+      mockReadDirectory.mockResolvedValue([
+        ['src', 2],
+        ['README.md', 1],
+      ]);
+      const result = await executor.execute('list_directory', { path: '.' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('[dir]  src');
+      expect(result.message).toContain('[file] README.md');
+    });
+
+    it('returns empty directory message when no entries', async () => {
+      mockReadDirectory.mockResolvedValue([]);
+      const result = await executor.execute('list_directory', { path: '.' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('empty');
+    });
+  });
+
+  describe('create_directory', () => {
+    it('creates a directory and returns success', async () => {
+      mockCreateDirectory.mockResolvedValue(undefined);
+      const result = await executor.execute('create_directory', { path: 'src/utils' });
+      expect(result.success).toBe(true);
+      expect(mockCreateDirectory).toHaveBeenCalled();
     });
   });
 });
