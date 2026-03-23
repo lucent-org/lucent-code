@@ -1326,6 +1326,57 @@ describe('MessageHandler', () => {
         expect(approveForWorkspaceSpy).not.toHaveBeenCalled();
         expect(approveGloballySpy).not.toHaveBeenCalled();
       });
+
+      it('approves for session when scope is once so second call skips approval card', async () => {
+        const toolStreamFirst = createToolCallStream([
+          { id: 'call_1', name: 'write_file', arguments: '{"path":"src/foo.ts","content":"a"}' },
+        ]);
+        const stopStreamFirst = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        const toolStreamSecond = createToolCallStream([
+          { id: 'call_2', name: 'write_file', arguments: '{"path":"src/bar.ts","content":"b"}' },
+        ]);
+        const stopStreamSecond = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStreamFirst)
+          .mockReturnValueOnce(stopStreamFirst)
+          .mockReturnValueOnce(toolStreamSecond)
+          .mockReturnValueOnce(stopStreamSecond);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        // First send — approval required
+        const postMessages1: ExtensionMessage[] = [];
+        const sendPromise1 = handler.handleMessage(
+          { type: 'sendMessage', content: 'write first file', model: 'gpt-4' },
+          (msg) => postMessages1.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages1.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req1 = postMessages1.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        // Approve with 'once' scope
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req1.requestId, approved: true, scope: 'once' },
+          () => {}
+        );
+        await sendPromise1;
+
+        // Second send — write_file should execute without another approval card
+        const postMessages2: ExtensionMessage[] = [];
+        await handler.handleMessage(
+          { type: 'sendMessage', content: 'write second file', model: 'gpt-4' },
+          (msg) => postMessages2.push(msg)
+        );
+
+        expect(postMessages2.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+        expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+      });
     });
   });
 
@@ -2185,6 +2236,31 @@ describe('autonomous mode', () => {
 
     expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
     expect(mockToolExecutor.execute).toHaveBeenCalledWith('rename_symbol', expect.any(Object));
+  });
+
+  it('approval-gated editor tool (write_file), autonomous mode on → executes directly, no approval', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      mockToolExecutor as unknown as EditorToolExecutor,
+      undefined, undefined, undefined, undefined,
+      mcpManager,
+    );
+
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    mockClient.chatStream.mockReturnValue(
+      createToolCallStream([{ id: 'call_1', name: 'write_file', arguments: '{"path":"src/foo.ts","content":"export {}"}' }])
+    );
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'write a file', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+    expect(mockToolExecutor.execute).toHaveBeenCalledWith('write_file', expect.any(Object));
   });
 });
 

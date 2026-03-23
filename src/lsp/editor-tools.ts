@@ -487,7 +487,7 @@ export class EditorToolExecutor {
     const filePath = args.path as string;
     const uri = this.resolveUri(filePath);
     try {
-      await vscode.workspace.fs.delete(uri);
+      await vscode.workspace.fs.delete(uri, { recursive: false, useTrash: true });
       return { success: true, message: `Deleted ${filePath}` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -437,7 +437,7 @@ export class MessageHandler {
                 continue;
               }
             }
-            if (MessageHandler.APPROVAL_GATED_TOOLS.has(tc.function.name)) {
+            if (!this._autonomousMode && MessageHandler.APPROVAL_GATED_TOOLS.has(tc.function.name)) {
               const alreadyApproved = await this.approvalManager.isApproved(tc.function.name);
               if (!alreadyApproved) {
                 const { approved, scope } = await this.requestToolApproval(tc.function.name, args, postMessage);
@@ -454,7 +454,9 @@ export class MessageHandler {
                 } else if (scope === 'global') {
                   await this.approvalManager.approveGlobally(tc.function.name);
                 }
-                // 'once' scope: no persistence needed
+                if (scope === 'once') {
+                  this.approvalManager.approveForSession(tc.function.name);
+                }
               }
             }
             const result = await this.toolExecutor.execute(tc.function.name, args);
