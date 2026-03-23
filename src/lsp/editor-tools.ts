@@ -169,7 +169,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'run_terminal_command',
-      description: 'Run a shell command in the VS Code integrated terminal and return its output. Use to run tests, builds, installs, git commands, or any CLI tool.',
+      description: 'Run a shell command in the VS Code integrated terminal. Waits up to 8 seconds for output and returns whatever was captured so far — output may be incomplete for long-running commands.',
       parameters: {
         type: 'object',
         properties: {
@@ -475,8 +475,9 @@ export class EditorToolExecutor {
     try {
       const parentUri = vscode.Uri.joinPath(uri, '..');
       await vscode.workspace.fs.createDirectory(parentUri);
-      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(content));
-      return { success: true, message: `Wrote ${content.length} bytes to ${filePath}` };
+      const encoded = new TextEncoder().encode(content);
+      await vscode.workspace.fs.writeFile(uri, encoded);
+      return { success: true, message: `Wrote ${encoded.length} bytes to ${filePath}` };
     } catch (err) {
       return { success: false, error: `Could not write file: ${err instanceof Error ? err.message : String(err)}` };
     }
@@ -498,12 +499,12 @@ export class EditorToolExecutor {
   }
 
   private async runTerminalCommand(args: Record<string, unknown>): Promise<ToolResult> {
+    const TERMINAL_SETTLE_MS = 8000;
     const command = args.command as string;
     const terminal = vscode.window.createTerminal({ name: 'Lucent' });
     terminal.show(true);
     terminal.sendText(command);
-    const SETTLE_MS = 8000;
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await new Promise((resolve) => setTimeout(resolve, TERMINAL_SETTLE_MS));
     const output = this.terminalBuffer?.getActiveTerminalOutput();
     terminal.dispose();
     if (!output) {
@@ -523,7 +524,7 @@ export class EditorToolExecutor {
       if (entries.length === 0) return { success: true, message: '(empty directory)' };
       const lines = entries
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, type]) => `${type === 2 ? '[dir] ' : '[file]'} ${name}`);
+        .map(([name, type]) => `${(type & vscode.FileType.Directory) !== 0 ? '[dir] ' : '[file]'} ${name}`);
       return { success: true, message: lines.join('\n') };
     } catch (err) {
       return { success: false, error: `Could not list directory: ${err instanceof Error ? err.message : String(err)}` };
@@ -543,15 +544,11 @@ export class EditorToolExecutor {
 
   private async readFile(args: Record<string, unknown>): Promise<ToolResult> {
     const filePath = args.path as string;
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    let uri: vscode.Uri;
-    if (filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)) {
-      uri = vscode.Uri.file(filePath);
-    } else if (workspaceFolders && workspaceFolders.length > 0) {
-      uri = vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
-    } else {
+    const isRelative = !filePath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(filePath);
+    if (isRelative && !vscode.workspace.workspaceFolders?.length) {
       return { success: false, error: 'No workspace folder open' };
     }
+    const uri = this.resolveUri(filePath);
     try {
       const bytes = await vscode.workspace.fs.readFile(uri);
       const content = new TextDecoder().decode(bytes);

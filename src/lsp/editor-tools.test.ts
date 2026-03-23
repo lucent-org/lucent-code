@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   mockExecuteCommand,
@@ -68,6 +68,12 @@ vi.mock('vscode', () => ({
     private edits: any[] = [];
     replace(uri: any, range: any, text: string) { this.edits.push({ uri, range, text }); }
     insert(uri: any, position: any, text: string) { this.edits.push({ uri, position, text }); }
+  },
+  FileType: {
+    Unknown: 0,
+    File: 1,
+    Directory: 2,
+    SymbolicLink: 64,
   },
 }));
 
@@ -457,6 +463,83 @@ describe('EditorToolExecutor', () => {
       const result = await executor.execute('create_directory', { path: 'src/utils' });
       expect(result.success).toBe(true);
       expect(mockCreateDirectory).toHaveBeenCalled();
+    });
+  });
+
+  describe('read_file', () => {
+    it('reads file content with default 2000-line limit', async () => {
+      const content = Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join('\n');
+      mockReadFile.mockResolvedValue(new TextEncoder().encode(content));
+      const result = await executor.execute('read_file', { path: 'src/foo.ts' });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('line 1');
+      expect(result.message).toContain('line 10');
+    });
+
+    it('paginates with start_line and end_line', async () => {
+      const content = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join('\n');
+      mockReadFile.mockResolvedValue(new TextEncoder().encode(content));
+      const result = await executor.execute('read_file', { path: 'src/foo.ts', start_line: 5, end_line: 8 });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('line 5');
+      expect(result.message).toContain('line 8');
+      expect(result.message).not.toContain('line 4');
+      expect(result.message).not.toContain('line 9');
+    });
+
+    it('includes continuation hint when there are more lines beyond end_line', async () => {
+      const content = Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join('\n');
+      mockReadFile.mockResolvedValue(new TextEncoder().encode(content));
+      const result = await executor.execute('read_file', { path: 'src/foo.ts', start_line: 1, end_line: 5 });
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('more lines');
+      expect(result.message).toContain('start_line=6');
+    });
+
+    it('returns error when file does not exist', async () => {
+      mockReadFile.mockRejectedValue(new Error('FileNotFound: src/missing.ts'));
+      const result = await executor.execute('read_file', { path: 'src/missing.ts' });
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/could not read file/i);
+    });
+  });
+
+  describe('run_terminal_command', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('calls sendText with the provided command', async () => {
+      const promise = executor.execute('run_terminal_command', { command: 'npm test' });
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(mockSendText).toHaveBeenCalledWith('npm test');
+      expect(result.success).toBe(true);
+    });
+
+    it('returns fallback message when terminalBuffer is absent', async () => {
+      const executorNoBuffer = new EditorToolExecutor();
+      const promise = executorNoBuffer.execute('run_terminal_command', { command: 'git status' });
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('git status');
+      expect(result.message).toContain('Output capture unavailable');
+    });
+
+    it('returns captured output when the buffer has data', async () => {
+      const mockBuffer = { getActiveTerminalOutput: vi.fn(() => 'build succeeded\n') };
+      const executorWithBuffer = new EditorToolExecutor(undefined, mockBuffer as any);
+      const promise = executorWithBuffer.execute('run_terminal_command', { command: 'npm run build' });
+      await vi.runAllTimersAsync();
+      const result = await promise;
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('npm run build');
+      expect(result.message).toContain('build succeeded');
     });
   });
 });
