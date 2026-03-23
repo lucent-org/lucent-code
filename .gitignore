@@ -6,3 +6,6 @@ webview/node_modules/
 webview/dist/
 .lucent/
 package-lock.json
+.playwright-mcp/
+docs/regression-screenshots/
+docs/regression-report-*.md
