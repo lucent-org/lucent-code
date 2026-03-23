@@ -218,6 +218,13 @@ function createChatStore() {
     vscode.postMessage({ type: 'setModel', modelId });
   }
 
+  // Called when the extension notifies us of a model change it already applied (e.g. use_model tool).
+  // Does NOT post setModel back — the extension is the source of truth for this change.
+  function receiveModelChange(modelId: string) {
+    setSelectedModel(modelId);
+    vscode.setState({ ...(vscode.getState() as object ?? {}), selectedModel: modelId });
+  }
+
   function handleConversationList(list: ConversationSummary[]) {
     setConversations(list);
     // Restore last active conversation on reload
@@ -302,6 +309,7 @@ function createChatStore() {
     cancelRequest,
     newChat,
     selectModel,
+    receiveModelChange,
     handleStreamChunk,
     handleStreamEnd,
     handleStreamError,
