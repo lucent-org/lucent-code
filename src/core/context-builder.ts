@@ -53,7 +53,7 @@ export class ContextBuilder {
       uri: document.uri.toString(),
       languageId: document.languageId,
       content: rawContent.length > MAX_FILE_CHARS
-        ? rawContent.slice(0, MAX_FILE_CHARS) + '\n// ... (truncated)'
+        ? rawContent.slice(0, MAX_FILE_CHARS) + '\n[... file truncated at 80 000 chars ...]'
         : rawContent,
       cursorLine: editor.selection.active.line,
       cursorCharacter: editor.selection.active.character,

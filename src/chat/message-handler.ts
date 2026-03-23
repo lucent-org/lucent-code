@@ -214,6 +214,8 @@ export class MessageHandler {
     const skillSummaries = this.skillRegistry?.getSummaries() ?? [];
     if (skillSummaries.length > 0) {
       const activatedSkills = this.contextBuilder.getActivatedSkills();
+      // "Preferred" is a soft signal — the model still decides when to call use_skill.
+      // This is intentional pull-only behaviour: no automatic injection, just a hint.
       const activatedNote = activatedSkills.length > 0
         ? `\n\n**Project-activated skills** (preferred for this workspace): ${activatedSkills.join(', ')}`
         : '';
