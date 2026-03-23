@@ -152,12 +152,11 @@ describe('InstructionsLoader', () => {
   });
 
   it('parses @skill() lines and strips them from instructions', async () => {
-    const raw = '@skill(tdd)\n# Project rules\nBe concise.';
+    const raw = 'Use small functions.\n\n@skill(tdd)\n@skill(clean-commits)\n\nEnd.';
     mockReadFile.mockResolvedValueOnce(new TextEncoder().encode(raw));
     await loader.load();
-    expect(loader.getActivatedSkills()).toEqual(['tdd']);
-    expect(loader.getInstructions()).not.toContain('@skill');
-    expect(loader.getInstructions()).toContain('# Project rules');
+    expect(loader.getActivatedSkills()).toEqual(['tdd', 'clean-commits']);
+    expect(loader.getInstructions()).toBe('Use small functions.\n\nEnd.');
   });
 
   it('returns empty activated skills when no @skill() lines', async () => {
@@ -166,11 +165,11 @@ describe('InstructionsLoader', () => {
     expect(loader.getActivatedSkills()).toEqual([]);
   });
 
-  it('handles multiple @skill() on same line or multiple lines', async () => {
+  it('handles multiple @skill() declarations', async () => {
     const raw = '@skill(tdd)\n@skill(clean-commits)\n# Rules';
     mockReadFile.mockResolvedValueOnce(new TextEncoder().encode(raw));
     await loader.load();
     expect(loader.getActivatedSkills()).toEqual(['tdd', 'clean-commits']);
-    expect(loader.getInstructions()).not.toContain('@skill');
+    expect(loader.getInstructions()).toBe('# Rules');
   });
 });
