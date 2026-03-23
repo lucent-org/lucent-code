@@ -134,7 +134,7 @@ export type WebviewMessage =
   | { type: 'exportConversation'; id: string; format: 'json' | 'markdown' }
   | { type: 'applyToFile'; code: string; language: string; filename?: string }
   | { type: 'confirmApply'; fileUri: string }
-  | { type: 'toolApprovalResponse'; requestId: string; approved: boolean }
+  | { type: 'toolApprovalResponse'; requestId: string; approved: boolean; scope?: 'once' | 'workspace' | 'global' }
   | { type: 'getTerminalOutput' }
   | { type: 'getSkillContent'; name: string }
   | { type: 'setAutonomousMode'; enabled: boolean }
