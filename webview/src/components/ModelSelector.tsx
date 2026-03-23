@@ -52,19 +52,29 @@ const ModelSelector: Component<ModelSelectorProps> = (props) => {
           />
           <div class="model-list">
             <For each={filteredModels()}>
-              {(model) => (
-                <button
-                  class={`model-item ${model.id === props.selectedModel ? 'selected' : ''}`}
-                  onClick={() => {
-                    props.onSelect(model.id);
-                    setIsOpen(false);
-                    setSearch('');
-                  }}
-                >
-                  <div class="model-name">{model.name}</div>
-                  <div class="model-id">{model.id}</div>
-                </button>
-              )}
+              {(model) => {
+                const promptPer1M = (parseFloat(model.pricing.prompt) * 1_000_000).toFixed(2);
+                const completionPer1M = (parseFloat(model.pricing.completion) * 1_000_000).toFixed(2);
+                const isFree = parseFloat(model.pricing.prompt) === 0 && parseFloat(model.pricing.completion) === 0;
+                return (
+                  <button
+                    class={`model-item ${model.id === props.selectedModel ? 'selected' : ''}`}
+                    onClick={() => {
+                      props.onSelect(model.id);
+                      setIsOpen(false);
+                      setSearch('');
+                    }}
+                  >
+                    <div class="model-item-main">
+                      <div class="model-name">{model.name}</div>
+                      <div class="model-pricing">
+                        {isFree ? 'free' : `$${promptPer1M} · $${completionPer1M} /1M`}
+                      </div>
+                    </div>
+                    <div class="model-id">{model.id}</div>
+                  </button>
+                );
+              }}
             </For>
           </div>
         </div>

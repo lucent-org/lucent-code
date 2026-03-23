@@ -276,8 +276,27 @@ body {
   color: var(--accent-fg);
 }
 
+.model-item-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .model-name {
   font-weight: bold;
+}
+
+.model-pricing {
+  font-size: 0.8em;
+  color: var(--fg-secondary);
+  white-space: nowrap;
+}
+
+.model-item:hover .model-pricing,
+.model-item.selected .model-pricing {
+  color: var(--accent-fg);
+  opacity: 0.8;
 }
 
 .model-id {
