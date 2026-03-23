@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockShowErrorMessage, mockShowWarningMessage, mockExecuteCommand } = vi.hoisted(() => ({
+const { mockShowErrorMessage, mockShowWarningMessage, mockShowInformationMessage, mockExecuteCommand } = vi.hoisted(() => ({
   mockShowErrorMessage: vi.fn(() => Promise.resolve(undefined)),
   mockShowWarningMessage: vi.fn(() => Promise.resolve(undefined)),
+  mockShowInformationMessage: vi.fn(() => Promise.resolve(undefined)),
   mockExecuteCommand: vi.fn(),
 }));
 
@@ -10,7 +11,7 @@ vi.mock('vscode', () => ({
   window: {
     showErrorMessage: mockShowErrorMessage,
     showWarningMessage: mockShowWarningMessage,
-    showInformationMessage: vi.fn(() => Promise.resolve(undefined)),
+    showInformationMessage: mockShowInformationMessage,
   },
   commands: {
     executeCommand: mockExecuteCommand,
@@ -27,14 +28,21 @@ describe('NotificationService', () => {
     notifications = new NotificationService();
   });
 
-  it('should show API key error with Set API Key action', async () => {
-    mockShowErrorMessage.mockResolvedValue('Set API Key');
+  it('shows info message with OAuth and manual API key options when no key configured', async () => {
+    mockShowInformationMessage.mockResolvedValue('Enter API Key manually');
     await notifications.handleError('No API key configured. Please set your OpenRouter API key.');
-    expect(mockShowErrorMessage).toHaveBeenCalledWith(
-      expect.stringContaining('API key'),
-      'Set API Key'
+    expect(mockShowInformationMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Sign in'),
+      'Sign in with OpenRouter',
+      'Enter API Key manually'
     );
     expect(mockExecuteCommand).toHaveBeenCalledWith('lucentCode.setApiKey');
+  });
+
+  it('triggers OAuth when user chooses Sign in with OpenRouter', async () => {
+    mockShowInformationMessage.mockResolvedValue('Sign in with OpenRouter');
+    await notifications.handleError('No API key configured. Please set your OpenRouter API key.');
+    expect(mockExecuteCommand).toHaveBeenCalledWith('lucentCode.startOAuth');
   });
 
   it('should show rate limit warning', async () => {

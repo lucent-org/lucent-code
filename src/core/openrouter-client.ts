@@ -125,7 +125,7 @@ export class OpenRouterClient {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`OpenRouter API error (${response.status}): ${body}`);
+      throw parseApiError(response.status, body);
     }
 
     const data = await response.json();
