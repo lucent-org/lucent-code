@@ -38,7 +38,7 @@ const App: Component = () => {
           chatStore.handleConversationLoaded(message.conversation);
           break;
         case 'conversationSaved':
-          chatStore.handleConversationSaved(message.id);
+          chatStore.handleConversationSaved(message.id, message.title);
           break;
         case 'conversationTitled':
           chatStore.handleConversationTitled(message.id, message.title);
@@ -88,8 +88,8 @@ const App: Component = () => {
     vscode.postMessage({ type: 'listConversations' });
 
     window.addEventListener('tool-approval', (e: Event) => {
-      const { requestId, approved } = (e as CustomEvent).detail;
-      chatStore.resolveToolApproval(requestId, approved);
+      const { requestId, approved, scope } = (e as CustomEvent).detail;
+      chatStore.resolveToolApproval(requestId, approved, scope);
     });
   });
 

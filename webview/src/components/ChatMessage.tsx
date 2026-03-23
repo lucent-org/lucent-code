@@ -45,8 +45,8 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
     return (
       <ToolCallCard
         approval={props.message.toolApproval as ToolApprovalData}
-        onRespond={(requestId, approved) => {
-          window.dispatchEvent(new CustomEvent('tool-approval', { detail: { requestId, approved } }));
+        onRespond={(requestId, approved, scope) => {
+          window.dispatchEvent(new CustomEvent('tool-approval', { detail: { requestId, approved, scope } }));
         }}
       />
     );
@@ -69,7 +69,7 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
           {(part) => (
             <Show
               when={part.type === 'code'}
-              fallback={<span innerHTML={formatText(part.content)} />}
+              fallback={<div innerHTML={formatText(part.content)} />}
             >
               <CodeBlock code={part.content} language={part.language} filename={part.filename} />
             </Show>
@@ -103,6 +103,23 @@ function formatText(text: string): string {
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
 
+  // Tables (| col | col | rows with a separator row)
+  html = html.replace(/((?:^\|.+\|\n?)+)/gm, (block) => {
+    const rows = block.trimEnd().split('\n').filter((r) => r.trim());
+    // Detect separator row (e.g. |---|---|)
+    const sepIdx = rows.findIndex((r) => /^\|[\s\-|:]+\|$/.test(r));
+    if (sepIdx === -1) return block; // not a table
+    const headerRow = rows[sepIdx - 1];
+    const bodyRows = rows.slice(sepIdx + 1);
+    const parseRow = (row: string, tag: string) =>
+      '<tr>' + row.replace(/^\||\|$/g, '').split('|').map((cell) =>
+        `<${tag}>${cell.trim()}</${tag}>`
+      ).join('') + '</tr>';
+    const thead = headerRow ? `<thead>${parseRow(headerRow, 'th')}</thead>` : '';
+    const tbody = bodyRows.length ? `<tbody>${bodyRows.map((r) => parseRow(r, 'td')).join('')}</tbody>` : '';
+    return `<table>${thead}${tbody}</table>`;
+  });
+
   // Unordered lists (consecutive `- ` lines → <ul><li>…</li></ul>)
   html = html.replace(/((?:^- .+\n?)+)/gm, (block) => {
     const items = block.trimEnd().split('\n').map((line) =>
@@ -126,7 +143,7 @@ function formatText(text: string): string {
     .replace(/\n/g, '<br>');
 
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['code', 'strong', 'em', 'br', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li'],
+    ALLOWED_TAGS: ['code', 'strong', 'em', 'br', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
     ALLOWED_ATTR: [],
   });
 }

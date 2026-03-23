@@ -2,6 +2,8 @@ import { Component, Show } from 'solid-js';
 import DiffView from './DiffView';
 import type { DiffLine } from './DiffView';
 
+export type ApprovalScope = 'once' | 'workspace' | 'global';
+
 export interface ToolApprovalData {
   requestId: string;
   toolName: string;
@@ -12,7 +14,7 @@ export interface ToolApprovalData {
 
 interface ToolCallCardProps {
   approval: ToolApprovalData;
-  onRespond: (requestId: string, approved: boolean) => void;
+  onRespond: (requestId: string, approved: boolean, scope?: ApprovalScope) => void;
 }
 
 const ToolCallCard: Component<ToolCallCardProps> = (props) => {
@@ -54,16 +56,28 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
       <Show when={props.approval.status === 'pending'}>
         <div class="tool-call-actions">
           <button
-            class="tool-call-btn tool-call-btn--allow"
-            onClick={() => props.onRespond(props.approval.requestId, true)}
-          >
-            Allow
-          </button>
-          <button
             class="tool-call-btn tool-call-btn--deny"
             onClick={() => props.onRespond(props.approval.requestId, false)}
           >
             Deny
+          </button>
+          <button
+            class="tool-call-btn tool-call-btn--once"
+            onClick={() => props.onRespond(props.approval.requestId, true, 'once')}
+          >
+            Once
+          </button>
+          <button
+            class="tool-call-btn tool-call-btn--workspace"
+            onClick={() => props.onRespond(props.approval.requestId, true, 'workspace')}
+          >
+            This workspace
+          </button>
+          <button
+            class="tool-call-btn tool-call-btn--always"
+            onClick={() => props.onRespond(props.approval.requestId, true, 'global')}
+          >
+            Always
           </button>
         </div>
       </Show>

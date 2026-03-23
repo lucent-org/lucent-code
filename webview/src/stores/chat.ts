@@ -71,6 +71,10 @@ function createChatStore() {
       vscode.setState({ ...(vscode.getState() as object ?? {}), recentConversationIds: next });
       return next;
     });
+    // If the closed tab was the active conversation, start fresh
+    if (currentConversationId() === id) {
+      newChat();
+    }
   }
 
   function sendMessage(content: string, images: string[] = []) {
@@ -96,6 +100,7 @@ function createChatStore() {
     setCurrentConversationId('');
     setShowConversationList(false);
     setNoCredits(false);
+    vscode.setState({ ...(vscode.getState() as object ?? {}), lastConversationId: undefined });
     vscode.postMessage({ type: 'newChat' });
   }
 
@@ -116,7 +121,8 @@ function createChatStore() {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last && last.role === 'assistant') {
-        updated[updated.length - 1] = { ...last, isStreaming: false };
+        const content = last.content || '_(No response received. The model may not support this request or ran out of credits.)_';
+        updated[updated.length - 1] = { ...last, content, isStreaming: false };
       }
       return updated;
     });
@@ -167,7 +173,7 @@ function createChatStore() {
     setNoCredits(true);
   }
 
-  function resolveToolApproval(requestId: string, approved: boolean) {
+  function resolveToolApproval(requestId: string, approved: boolean, scope?: 'once' | 'workspace' | 'global') {
     setMessages((prev) =>
       prev.map((m) =>
         m.toolApproval?.requestId === requestId
@@ -175,7 +181,7 @@ function createChatStore() {
           : m
       )
     );
-    vscode.postMessage({ type: 'toolApprovalResponse', requestId, approved });
+    vscode.postMessage({ type: 'toolApprovalResponse', requestId, approved, scope });
   }
 
   function handleStreamError(error: string) {
@@ -243,10 +249,23 @@ function createChatStore() {
     setShowConversationList(false);
   }
 
-  function handleConversationSaved(id: string) {
+  function handleConversationSaved(id: string, title: string) {
     setCurrentConversationId(id);
     pushRecent(id);
     vscode.setState({ ...(vscode.getState() as object ?? {}), lastConversationId: id });
+    // Keep conversations list in sync so the tab renders immediately
+    setConversations((prev) => {
+      if (prev.some((c) => c.id === id)) {
+        return prev.map((c) => c.id === id ? { ...c, title } : c);
+      }
+      return [...prev, {
+        id,
+        title,
+        model: selectedModel(),
+        messageCount: messages().filter((m) => m.role !== 'tool_approval').length,
+        updatedAt: new Date().toISOString(),
+      }];
+    });
   }
 
   function handleConversationTitled(id: string, title: string) {
