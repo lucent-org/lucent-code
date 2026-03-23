@@ -75,6 +75,12 @@ const App: Component = () => {
         case 'worktreeStatus':
           chatStore.handleWorktreeStatus(message.status);
           break;
+        case 'usageUpdate':
+          chatStore.handleUsageUpdate(message.data.lastMessageCost, message.data.lastMessageTokens);
+          break;
+        case 'noCredits':
+          chatStore.handleNoCredits();
+          break;
       }
     });
 

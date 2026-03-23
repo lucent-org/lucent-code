@@ -8,6 +8,8 @@ export interface ChatMessage {
   content: string;
   images?: string[];           // base64 data URLs for thumbnail display
   isStreaming?: boolean;
+  cost?: number;
+  tokens?: number;
   toolApproval?: {
     requestId: string;
     toolName: string;
@@ -28,7 +30,12 @@ const MAX_RECENTS = 5;
 function createChatStore() {
   const [messages, setMessages] = createSignal<ChatMessage[]>([]);
   const [models, setModels] = createSignal<OpenRouterModel[]>([]);
-  const [selectedModel, setSelectedModel] = createSignal<string>('');
+  const [selectedModel, setSelectedModel] = createSignal<string>(
+    (() => {
+      const saved = getVsCodeApi().getState() as { selectedModel?: string } | undefined;
+      return saved?.selectedModel ?? '';
+    })()
+  );
   const [isStreaming, setIsStreaming] = createSignal(false);
   const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
@@ -38,10 +45,11 @@ function createChatStore() {
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
   const [worktreeStatus, setWorktreeStatus] = createSignal<'idle' | 'creating' | 'active' | 'finishing'>('idle');
+  const [noCredits, setNoCredits] = createSignal(false);
 
   const [recentConversationIds, setRecentConversationIds] = createSignal<string[]>(
     (() => {
-      const saved = getVsCodeApi().getState() as { recentConversationIds?: string[] } | undefined;
+      const saved = getVsCodeApi().getState() as { recentConversationIds?: string[]; lastConversationId?: string } | undefined;
       return saved?.recentConversationIds ?? [];
     })()
   );
@@ -87,6 +95,7 @@ function createChatStore() {
     setMessages([]);
     setCurrentConversationId('');
     setShowConversationList(false);
+    setNoCredits(false);
     vscode.postMessage({ type: 'newChat' });
   }
 
@@ -141,6 +150,23 @@ function createChatStore() {
     setWorktreeStatus(status);
   }
 
+  function handleUsageUpdate(lastMessageCost: number, lastMessageTokens: number) {
+    setMessages((prev) => {
+      const updated = [...prev];
+      for (let i = updated.length - 1; i >= 0; i--) {
+        if (updated[i].role === 'assistant') {
+          updated[i] = { ...updated[i], cost: lastMessageCost, tokens: lastMessageTokens };
+          break;
+        }
+      }
+      return updated;
+    });
+  }
+
+  function handleNoCredits() {
+    setNoCredits(true);
+  }
+
   function resolveToolApproval(requestId: string, approved: boolean) {
     setMessages((prev) =>
       prev.map((m) =>
@@ -170,23 +196,34 @@ function createChatStore() {
 
   function handleModelsLoaded(modelList: OpenRouterModel[]) {
     setModels(modelList);
-    if (!selectedModel() && modelList.length > 0) {
+    const saved = (vscode.getState() as { selectedModel?: string } | undefined)?.selectedModel;
+    if (saved && modelList.some((m) => m.id === saved)) {
+      setSelectedModel(saved);
+    } else if (!selectedModel() && modelList.length > 0) {
       setSelectedModel(modelList[0].id);
     }
   }
 
   function selectModel(modelId: string) {
     setSelectedModel(modelId);
+    vscode.setState({ ...(vscode.getState() as object ?? {}), selectedModel: modelId });
     vscode.postMessage({ type: 'setModel', modelId });
   }
 
   function handleConversationList(list: ConversationSummary[]) {
     setConversations(list);
+    // Restore last active conversation on reload
+    const saved = vscode.getState() as { lastConversationId?: string } | undefined;
+    const lastId = saved?.lastConversationId;
+    if (lastId && list.some((c) => c.id === lastId) && !currentConversationId()) {
+      vscode.postMessage({ type: 'loadConversation', id: lastId });
+    }
   }
 
   function handleConversationLoaded(conversation: Conversation) {
     setCurrentConversationId(conversation.id);
     pushRecent(conversation.id);
+    vscode.setState({ ...(vscode.getState() as object ?? {}), lastConversationId: conversation.id });
     setMessages(conversation.messages
       .filter((m): m is { role: 'user' | 'assistant'; content: string | ContentPart[]; tool_calls?: unknown; tool_call_id?: string } =>
         m.role === 'user' || m.role === 'assistant')
@@ -209,6 +246,7 @@ function createChatStore() {
   function handleConversationSaved(id: string) {
     setCurrentConversationId(id);
     pushRecent(id);
+    vscode.setState({ ...(vscode.getState() as object ?? {}), lastConversationId: id });
   }
 
   function handleConversationTitled(id: string, title: string) {
@@ -272,6 +310,9 @@ function createChatStore() {
     handleWorktreeStatus,
     recentConversationIds,
     removeFromRecents,
+    noCredits,
+    handleUsageUpdate,
+    handleNoCredits,
   };
 }
 
