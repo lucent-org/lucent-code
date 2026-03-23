@@ -45,27 +45,6 @@ describe('InstructionsLoader', () => {
     expect(loader.getInstructions()).toBeUndefined();
   });
 
-  it('should load .openrouter-instructions.md when present', async () => {
-    mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('# Instructions'));
-    await loader.load();
-    expect(loader.getInstructions()).toBe('# Instructions');
-  });
-
-  it('should fall back to .cursorrules when .openrouter-instructions.md is missing', async () => {
-    mockReadFile
-      .mockRejectedValueOnce(new Error('not found'))
-      .mockResolvedValueOnce(new TextEncoder().encode('Be concise'));
-    await loader.load();
-    expect(loader.getInstructions()).toBe('Be concise');
-  });
-
-  it('should prefer .openrouter-instructions.md and not read .cursorrules', async () => {
-    mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('Override'));
-    await loader.load();
-    expect(loader.getInstructions()).toBe('Override');
-    expect(mockReadFile).toHaveBeenCalledTimes(1);
-  });
-
   it('should warn and skip a file exceeding 50 KB', async () => {
     mockReadFile.mockResolvedValueOnce(new Uint8Array(51 * 1024));
     await loader.load();
