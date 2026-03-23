@@ -1,7 +1,7 @@
 import { createSignal, createRoot } from 'solid-js';
 import { getVsCodeApi } from '../utils/vscode-api';
 import type { DiffLine } from '../components/DiffView';
-import type { ConversationSummary, OpenRouterModel, Conversation, ContentPart } from '@shared';
+import type { ConversationSummary, OpenRouterModel, Conversation, ContentPart, ApprovalScope } from '@shared';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_approval';
@@ -173,7 +173,7 @@ function createChatStore() {
     setNoCredits(true);
   }
 
-  function resolveToolApproval(requestId: string, approved: boolean, scope?: 'once' | 'workspace' | 'global') {
+  function resolveToolApproval(requestId: string, approved: boolean, scope?: ApprovalScope) {
     setMessages((prev) =>
       prev.map((m) =>
         m.toolApproval?.requestId === requestId

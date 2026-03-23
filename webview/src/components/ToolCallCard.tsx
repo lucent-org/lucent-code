@@ -1,8 +1,9 @@
 import { Component, Show } from 'solid-js';
 import DiffView from './DiffView';
 import type { DiffLine } from './DiffView';
+import type { ApprovalScope } from '@shared';
 
-export type ApprovalScope = 'once' | 'workspace' | 'global';
+export type { ApprovalScope };
 
 export interface ToolApprovalData {
   requestId: string;
@@ -62,19 +63,19 @@ const ToolCallCard: Component<ToolCallCardProps> = (props) => {
             Deny
           </button>
           <button
-            class="tool-call-btn tool-call-btn--once"
+            class="tool-call-btn tool-call-btn--allow"
             onClick={() => props.onRespond(props.approval.requestId, true, 'once')}
           >
             Once
           </button>
           <button
-            class="tool-call-btn tool-call-btn--workspace"
+            class="tool-call-btn tool-call-btn--allow-workspace"
             onClick={() => props.onRespond(props.approval.requestId, true, 'workspace')}
           >
             This workspace
           </button>
           <button
-            class="tool-call-btn tool-call-btn--always"
+            class="tool-call-btn tool-call-btn--allow-global"
             onClick={() => props.onRespond(props.approval.requestId, true, 'global')}
           >
             Always

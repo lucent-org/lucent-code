@@ -1,3 +1,7 @@
+// ---- Shared union types ----
+
+export type ApprovalScope = 'once' | 'workspace' | 'global';
+
 // ---- OpenRouter API types ----
 
 export interface OpenRouterModel {
@@ -134,7 +138,7 @@ export type WebviewMessage =
   | { type: 'exportConversation'; id: string; format: 'json' | 'markdown' }
   | { type: 'applyToFile'; code: string; language: string; filename?: string }
   | { type: 'confirmApply'; fileUri: string }
-  | { type: 'toolApprovalResponse'; requestId: string; approved: boolean; scope?: 'once' | 'workspace' | 'global' }
+  | { type: 'toolApprovalResponse'; requestId: string; approved: boolean; scope?: ApprovalScope }
   | { type: 'getTerminalOutput' }
   | { type: 'getSkillContent'; name: string }
   | { type: 'setAutonomousMode'; enabled: boolean }

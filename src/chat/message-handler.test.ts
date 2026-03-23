@@ -1212,6 +1212,121 @@ describe('MessageHandler', () => {
         await sendPromise;
       });
     });
+
+    describe('scope persistence', () => {
+      it('calls approveForWorkspace when scope is workspace', async () => {
+        const toolStream = createToolCallStream([
+          { id: 'call_1', name: 'run_terminal_command', arguments: '{"command":"echo hi"}' },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'run command', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        const approvalManager = (handler as any).approvalManager;
+        const approveForWorkspaceSpy = vi.spyOn(approvalManager, 'approveForWorkspace').mockResolvedValue(undefined);
+
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req.requestId, approved: true, scope: 'workspace' },
+          () => {}
+        );
+
+        await sendPromise;
+
+        expect(approveForWorkspaceSpy).toHaveBeenCalledWith('run_terminal_command');
+      });
+
+      it('calls approveGlobally when scope is global', async () => {
+        const toolStream = createToolCallStream([
+          { id: 'call_1', name: 'run_terminal_command', arguments: '{"command":"echo hi"}' },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'run command', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        const approvalManager = (handler as any).approvalManager;
+        const approveGloballySpy = vi.spyOn(approvalManager, 'approveGlobally').mockResolvedValue(undefined);
+
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req.requestId, approved: true, scope: 'global' },
+          () => {}
+        );
+
+        await sendPromise;
+
+        expect(approveGloballySpy).toHaveBeenCalledWith('run_terminal_command');
+      });
+
+      it('does not call persist methods when scope is once or absent', async () => {
+        const toolStream = createToolCallStream([
+          { id: 'call_1', name: 'run_terminal_command', arguments: '{"command":"echo hi"}' },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'run command', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        const approvalManager = (handler as any).approvalManager;
+        const approveForWorkspaceSpy = vi.spyOn(approvalManager, 'approveForWorkspace').mockResolvedValue(undefined);
+        const approveGloballySpy = vi.spyOn(approvalManager, 'approveGlobally').mockResolvedValue(undefined);
+
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req.requestId, approved: true, scope: 'once' },
+          () => {}
+        );
+
+        await sendPromise;
+
+        expect(approveForWorkspaceSpy).not.toHaveBeenCalled();
+        expect(approveGloballySpy).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('handleSendMessage with images', () => {
