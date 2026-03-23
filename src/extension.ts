@@ -220,6 +220,14 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('Response ready');
     }
   };
+  handler.onAuthInvalid = () => {
+    auth.signOut().then(() => {
+      void updateOpenRouterStatus();
+      vscode.window.showWarningMessage('OpenRouter: Session expired — please sign in again.', 'Sign in').then((choice) => {
+        if (choice === 'Sign in') auth.startOAuth();
+      });
+    }).catch(() => {});
+  };
 
   // Set up webview message handling
   const setupWebviewMessaging = () => {

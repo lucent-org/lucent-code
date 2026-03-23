@@ -25,6 +25,7 @@ export class MessageHandler {
   private pendingApply = new Map<string, string>(); // fileUri string → proposed code
 
   onStreamEnd?: () => void;
+  onAuthInvalid?: () => void;
 
   private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
   private readonly skillMatcher = new SkillMatcher();
@@ -456,7 +457,10 @@ export class MessageHandler {
         postMessage({ type: 'streamEnd' });
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        if (errorMessage.includes('402') || errorMessage.toLowerCase().includes('insufficient credits')) {
+        if (errorMessage.includes('401') || errorMessage.toLowerCase().includes('user not found')) {
+          this.onAuthInvalid?.();
+          postMessage({ type: 'streamError', error: 'Authentication failed — please sign in again.' });
+        } else if (errorMessage.includes('402') || errorMessage.toLowerCase().includes('insufficient credits')) {
           postMessage({ type: 'noCredits' });
           postMessage({ type: 'streamEnd' });
         } else {
