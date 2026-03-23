@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
 import { messageText } from '../core/message-text';
-import { OpenRouterClient } from '../core/openrouter-client';
+import { OpenRouterClient, OpenRouterError } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION, START_WORKTREE_TOOL_DEFINITION } from '../lsp/editor-tools';
@@ -455,18 +455,12 @@ export class MessageHandler {
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         postMessage({ type: 'streamEnd' });
+      } else if (error instanceof OpenRouterError) {
+        await this.handleApiError(error, postMessage);
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        if (errorMessage.includes('401') || errorMessage.toLowerCase().includes('user not found')) {
-          this.onAuthInvalid?.();
-          postMessage({ type: 'streamError', error: 'Authentication failed — please sign in again.' });
-        } else if (errorMessage.includes('402') || errorMessage.toLowerCase().includes('insufficient credits')) {
-          postMessage({ type: 'noCredits' });
-          postMessage({ type: 'streamEnd' });
-        } else {
-          await this.notifications.handleError(errorMessage);
-          postMessage({ type: 'streamError', error: errorMessage });
-        }
+        await this.notifications.handleError(errorMessage);
+        postMessage({ type: 'streamError', error: errorMessage });
       }
     } finally {
       this.abortController = undefined;
@@ -483,6 +477,43 @@ export class MessageHandler {
 
   private handleCancel(): void {
     this.abort();
+  }
+
+  private async handleApiError(error: OpenRouterError, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    switch (error.code) {
+      case 401:
+        this.onAuthInvalid?.();
+        postMessage({ type: 'streamError', error: 'Authentication failed — please sign in again.' });
+        break;
+      case 402:
+        postMessage({ type: 'noCredits' });
+        postMessage({ type: 'streamEnd' });
+        break;
+      case 400:
+        postMessage({ type: 'streamError', error: `Bad request: ${error.message}` });
+        break;
+      case 403: {
+        const reasons = (error.metadata as { reasons?: string[] } | undefined)?.reasons;
+        const detail = reasons?.length ? ` Reason: ${reasons.join(', ')}.` : '';
+        postMessage({ type: 'streamError', error: `Content flagged by moderation policy.${detail}` });
+        break;
+      }
+      case 408:
+        postMessage({ type: 'streamError', error: 'Request timed out. Please try again.' });
+        break;
+      case 429:
+        postMessage({ type: 'streamError', error: 'Rate limit reached. Please wait a moment and try again.' });
+        break;
+      case 502:
+        postMessage({ type: 'streamError', error: 'The model is temporarily unavailable. Try switching to a different model.' });
+        break;
+      case 503:
+        postMessage({ type: 'streamError', error: 'No provider available for this model right now. Try a different model or try again later.' });
+        break;
+      default:
+        await this.notifications.handleError(error.message);
+        postMessage({ type: 'streamError', error: error.message });
+    }
   }
 
   private async handleGetModels(postMessage: (msg: ExtensionMessage) => void): Promise<void> {

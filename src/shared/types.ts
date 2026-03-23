@@ -75,6 +75,11 @@ export interface ChatResponseChunk {
     completion_tokens: number;
     total_tokens: number;
   };
+  error?: {
+    code: number;
+    message: string;
+    metadata?: Record<string, unknown>;
+  };
 }
 
 export interface ChatResponse {
