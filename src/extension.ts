@@ -5,7 +5,7 @@ import { OpenRouterClient } from './core/openrouter-client';
 import { ContextBuilder } from './core/context-builder';
 import { ChatViewProvider } from './chat/chat-provider';
 import { MessageHandler } from './chat/message-handler';
-import type { WebviewMessage } from './shared/types';
+import type { WebviewMessage, ExtensionMessage } from './shared/types';
 import { InlineCompletionProvider } from './completions/inline-provider';
 import { CodeIntelligence } from './lsp/code-intelligence';
 import { CapabilityDetector } from './lsp/capability-detector';
@@ -227,13 +227,12 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!webview) return;
 
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
-      const postMessage = (msg: unknown) => {
-        const m = msg as { type: string };
-        if (m.type === 'usageUpdate') {
-          currentSessionCost = (msg as { sessionCost: number }).sessionCost;
+      const postMessage = (msg: ExtensionMessage) => {
+        if (msg.type === 'usageUpdate') {
+          currentSessionCost = msg.sessionCost;
           void updateOpenRouterStatus();
         }
-        if (m.type === 'noCredits') {
+        if (msg.type === 'noCredits') {
           hasNoCredits = true;
           void updateOpenRouterStatus();
         }
@@ -367,7 +366,12 @@ export async function activate(context: vscode.ExtensionContext) {
         let balanceDescription = '';
         try {
           const balance = await client.getAccountBalance();
-          balanceDescription = `Balance: $${balance.toFixed(4)}`;
+          if (balance.limit !== null) {
+            const remaining = Math.max(0, balance.limit - balance.usage);
+            balanceDescription = `Credits remaining: $${remaining.toFixed(4)}`;
+          } else {
+            balanceDescription = `Usage: $${balance.usage.toFixed(4)}`;
+          }
         } catch {
           balanceDescription = 'Balance unavailable';
         }
