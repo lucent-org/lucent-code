@@ -133,4 +133,65 @@ describe('InstructionsLoader', () => {
       expect(loader.getInstructions()).toBeUndefined();
     });
   });
+
+  // ── New tests for LUCENT.md filenames + @skill() parser ──────────────────
+
+  it('loads LUCENT.md first', async () => {
+    mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('# Project rules'));
+    await loader.load();
+    const firstCall = mockReadFile.mock.calls[0][0];
+    expect(firstCall.path).toContain('LUCENT.md');
+  });
+
+  it('falls back to .clinerules', async () => {
+    mockReadFile
+      .mockRejectedValueOnce(new Error('not found')) // LUCENT.md
+      .mockResolvedValueOnce(new TextEncoder().encode('cline rules content'));
+    await loader.load();
+    const secondCall = mockReadFile.mock.calls[1][0];
+    expect(secondCall.path).toContain('.clinerules');
+    expect(loader.getInstructions()).toBe('cline rules content');
+  });
+
+  it('falls back to CLAUDE.md last', async () => {
+    mockReadFile
+      .mockRejectedValueOnce(new Error('not found')) // LUCENT.md
+      .mockRejectedValueOnce(new Error('not found')) // .clinerules
+      .mockRejectedValueOnce(new Error('not found')) // .cursorrules
+      .mockResolvedValueOnce(new TextEncoder().encode('claude rules'));
+    await loader.load();
+    const fourthCall = mockReadFile.mock.calls[3][0];
+    expect(fourthCall.path).toContain('CLAUDE.md');
+    expect(loader.getInstructions()).toBe('claude rules');
+  });
+
+  it('does not try .openrouter-instructions.md', async () => {
+    mockReadFile.mockRejectedValue(new Error('not found'));
+    await loader.load();
+    const attemptedPaths = mockReadFile.mock.calls.map((c: any[]) => c[0].path as string);
+    expect(attemptedPaths.some(p => p.includes('openrouter'))).toBe(false);
+  });
+
+  it('parses @skill() lines and strips them from instructions', async () => {
+    const raw = '@skill(tdd)\n# Project rules\nBe concise.';
+    mockReadFile.mockResolvedValueOnce(new TextEncoder().encode(raw));
+    await loader.load();
+    expect(loader.getActivatedSkills()).toEqual(['tdd']);
+    expect(loader.getInstructions()).not.toContain('@skill');
+    expect(loader.getInstructions()).toContain('# Project rules');
+  });
+
+  it('returns empty activated skills when no @skill() lines', async () => {
+    mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('# Plain prose\nNo skills here.'));
+    await loader.load();
+    expect(loader.getActivatedSkills()).toEqual([]);
+  });
+
+  it('handles multiple @skill() on same line or multiple lines', async () => {
+    const raw = '@skill(tdd)\n@skill(clean-commits)\n# Rules';
+    mockReadFile.mockResolvedValueOnce(new TextEncoder().encode(raw));
+    await loader.load();
+    expect(loader.getActivatedSkills()).toEqual(['tdd', 'clean-commits']);
+    expect(loader.getInstructions()).not.toContain('@skill');
+  });
 });

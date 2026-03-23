@@ -1,16 +1,19 @@
 import * as vscode from 'vscode';
 
-const FILENAMES = ['.openrouter-instructions.md', '.cursorrules'] as const;
+const FILENAMES = ['LUCENT.md', '.clinerules', '.cursorrules', 'CLAUDE.md'] as const;
 const MAX_BYTES = 50 * 1024;
+const SKILL_REGEX = /@skill\(([^)]+)\)/gm;
 
 export class InstructionsLoader {
   private instructions: string | undefined;
+  private activatedSkills: string[] = [];
   private watcher?: vscode.FileSystemWatcher;
 
   async load(): Promise<void> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       this.instructions = undefined;
+      this.activatedSkills = [];
       return;
     }
     const root = folders[0].uri;
@@ -25,13 +28,27 @@ export class InstructionsLoader {
           );
           continue;
         }
-        this.instructions = new TextDecoder().decode(bytes);
+        const raw = new TextDecoder().decode(bytes);
+        const skills: string[] = [];
+        let match: RegExpExecArray | null;
+        SKILL_REGEX.lastIndex = 0;
+        while ((match = SKILL_REGEX.exec(raw)) !== null) {
+          skills.push(match[1]);
+        }
+        this.activatedSkills = skills;
+        // Strip lines that are solely a @skill() declaration (whole line)
+        this.instructions = raw
+          .split('\n')
+          .filter(line => !/@skill\([^)]+\)/.test(line.trim()) || line.trim().replace(/@skill\([^)]+\)/g, '').trim() !== '')
+          .join('\n')
+          .trim();
         return;
       } catch {
         // file does not exist — try next
       }
     }
     this.instructions = undefined;
+    this.activatedSkills = [];
   }
 
   watch(): void {
@@ -50,8 +67,13 @@ export class InstructionsLoader {
     return this.instructions;
   }
 
+  getActivatedSkills(): string[] {
+    return this.activatedSkills;
+  }
+
   dispose(): void {
     this.watcher?.dispose();
     this.instructions = undefined;
+    this.activatedSkills = [];
   }
 }
