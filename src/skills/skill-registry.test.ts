@@ -63,7 +63,7 @@ describe('SkillRegistry', () => {
     (registry as any).skills.set('tdd', { name: 'tdd', description: 'TDD workflow', content: SKILL_MD2, source: 'local' });
     const summaries = registry.getSummaries();
     expect(summaries).toHaveLength(1);
-    expect(summaries[0]).toEqual({ name: 'tdd', description: 'TDD workflow' });
+    expect(summaries[0]).toEqual({ name: 'tdd', description: 'TDD workflow', source: 'local' });
   });
 
   it('skips skills with no name in frontmatter', async () => {
