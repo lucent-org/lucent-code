@@ -20,7 +20,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Cancel generation | Stop button to abort in-flight streaming responses | 1 |
 | :white_check_mark: | Multi-line input | Shift+Enter for newlines, Enter to submit | 1 |
 | :white_check_mark: | `@terminal` context mention | Type `@terminal` in chat input to inject the last 200 lines of the active terminal | 2 |
-| :white_check_mark: | `@fix` / `@explain` / `@test` action mentions | Type `@fix`, `@explain`, or `@test` to insert a focused prompt prefix; works with the existing editor context | 2 |
+| :white_check_mark: | `@fix` / `@explain` action mentions | Type `@fix` or `@explain` to insert a focused prompt prefix; works with the existing editor context | 2 |
+| :white_check_mark: | `@file` mention | Type `@file` to fuzzy-search and attach any workspace file as context (≤5 MB, text files only) | - |
 | :white_check_mark: | File attachments (paperclip button) | Click 📎 to pick images or text files; up to 5 MB per file | P3 |
 | :white_check_mark: | File attachments (drag-and-drop) | Drag files from Explorer or OS onto the chat input area | P3 |
 | :white_check_mark: | Empty state guidance | Welcome screen with API key hint or quick-start suggestions | 1 |
@@ -134,7 +135,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
 | :white_check_mark: | `LUCENT.md` project instructions | Place `LUCENT.md` (or `.clinerules`/`.cursorrules`/`CLAUDE.md`) in your workspace root; `@skill(name)` lines activate skills | - |
-| :white_check_mark: | Built-in skill pack | 6 language-agnostic skills shipped with the extension: `tdd`, `clean-commits`, `refactor`, `debugging`, `code-review`, `documentation` | - |
+| :white_check_mark: | Built-in skill pack | 10 language-agnostic skills shipped with the extension: `tdd`, `clean-commits`, `refactor`, `debugging`, `code-review`, `documentation`, `doc`, `tests`, `commit`, `onboard` | - |
+| :white_check_mark: | `/compact` command | Summarize and truncate conversation history to free context window; visual divider marks the compaction point | - |
 | :white_check_mark: | Claude Code skill adapter | Auto-loads skills from `~/.claude/skills/*/SKILL.md` — same format as Lucent | - |
 | :white_check_mark: | Claude Code skill cache | Auto-loads skills from ~/.claude/plugins/cache/ | - |
 | :white_check_mark: | GitHub repo source | Fetch skills from any public GitHub repository | - |
@@ -238,7 +240,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 |--------|---------|-----|--------|
 | :white_check_mark: | ~~Image attachments~~ | Attach images via drag-and-drop or paperclip button; thumbnails shown in chat history; sent as base64 content parts to vision models | M |
 | :white_check_mark: | ~~Drag-and-drop files~~ | Drop files onto chat input; images become thumbnails, text/code files are inlined as fenced code blocks | M |
-| :white_check_mark: | ~~Slash commands~~ | Implemented as `@fix`, `@explain`, `@test` action mentions in the `@mentions` dropdown | M |
+| :white_check_mark: | ~~Slash commands~~ | `/` dropdown with built-in and loaded skills; `/compact` truncates history; `@fix`, `@explain` quick-action mentions; `@file` workspace file picker | M |
 | :construction: | **Custom OpenAI-compatible providers** | Ollama, LM Studio, Azure OpenAI alongside OpenRouter — opens up local models | L |
 
 ### P4 — Future / exploratory (large scope)

@@ -1276,3 +1276,30 @@ body {
   cursor: default;
   pointer-events: none;
 }
+
+/* Conversation compaction divider */
+.compaction-divider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-left: 3px solid var(--accent, var(--vscode-focusBorder, #007acc));
+  background: var(--bg-secondary, var(--vscode-sideBar-background, #252526));
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+}
+
+.compaction-divider__label {
+  color: var(--accent, var(--vscode-focusBorder, #007acc));
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.compaction-divider__summary {
+  color: var(--fg-secondary, var(--vscode-descriptionForeground, #9d9d9d));
+  font-style: italic;
+  line-height: 1.4;
+}
