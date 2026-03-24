@@ -93,6 +93,7 @@ const config: Config = {
       copyright: `Copyright © ${new Date().getFullYear()} Lucent Code.`,
     },
     prism: {
+      // vsDark for both modes: we prefer dark code blocks even in light mode
       theme: prismThemes.vsDark,
       darkTheme: prismThemes.vsDark,
       additionalLanguages: ['typescript', 'bash', 'json'],
