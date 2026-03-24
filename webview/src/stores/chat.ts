@@ -185,7 +185,7 @@ function createChatStore() {
         content: `[Conversation compacted]\n\n${summary}`,
         timestamp: Date.now(),
         isCompactionDivider: true,
-      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      } satisfies ChatMessage,
     ]);
   }
 
