@@ -81,6 +81,9 @@ const App: Component = () => {
         case 'noCredits':
           chatStore.handleNoCredits();
           break;
+        case 'conversationCompacted':
+          chatStore.handleConversationCompacted(message.summary);
+          break;
       }
     });
 

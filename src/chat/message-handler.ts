@@ -189,6 +189,35 @@ export class MessageHandler {
         }
         break;
       }
+      case 'compactConversation': {
+        const model = message.model;
+        let summary: string;
+        try {
+          const historyText = this.conversationMessages
+            .map((m) => `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`)
+            .join('\n');
+          const response = await this.client.chat({
+            model,
+            messages: [
+              {
+                role: 'user',
+                content: `Summarize this conversation in 3–5 sentences. Capture key decisions, code changes discussed, and open questions. Be concise.\n\n${historyText}`,
+              },
+            ],
+            max_tokens: 300,
+          });
+          summary = response.choices?.[0]?.message?.content ?? '[No summary generated]';
+        } catch (e: unknown) {
+          summary = `[Compaction failed: ${e instanceof Error ? e.message : String(e)}]`;
+        }
+
+        const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        this.conversationMessages = [
+          { role: 'user', content: `[Conversation compacted — ${timestamp}]\n\n${summary}` },
+        ];
+        postMessage({ type: 'conversationCompacted', summary });
+        break;
+      }
     }
   }
 

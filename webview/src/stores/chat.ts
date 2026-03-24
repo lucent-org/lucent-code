@@ -4,12 +4,13 @@ import type { DiffLine } from '../components/DiffView';
 import type { ConversationSummary, OpenRouterModel, Conversation, ContentPart, ApprovalScope } from '@shared';
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'tool_approval';
+  role: 'user' | 'assistant' | 'tool_approval' | 'system';
   content: string;
   images?: string[];           // base64 data URLs for thumbnail display
   isStreaming?: boolean;
   cost?: number;
   tokens?: number;
+  isCompactionDivider?: boolean;
   toolApproval?: {
     requestId: string;
     toolName: string;
@@ -173,6 +174,19 @@ function createChatStore() {
 
   function handleNoCredits() {
     setNoCredits(true);
+  }
+
+  function handleConversationCompacted(summary: string): void {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: 'system' as const,
+        content: `[Conversation compacted]\n\n${summary}`,
+        timestamp: Date.now(),
+        isCompactionDivider: true,
+      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    ]);
   }
 
   function resolveToolApproval(requestId: string, approved: boolean, scope?: ApprovalScope) {
@@ -342,6 +356,7 @@ function createChatStore() {
     noCredits,
     handleUsageUpdate,
     handleNoCredits,
+    handleConversationCompacted,
   };
 }
 

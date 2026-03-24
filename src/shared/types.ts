@@ -123,7 +123,8 @@ export type ExtensionMessage =
   | { type: 'autonomousModeChanged'; enabled: boolean }
   | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string }
   | { type: 'usageUpdate'; lastMessageCost: number; lastMessageTokens: number; sessionCost: number; creditsUsed: number; creditsLimit: number | null }
-  | { type: 'noCredits' };
+  | { type: 'noCredits' }
+  | { type: 'conversationCompacted'; summary: string };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }
@@ -143,7 +144,8 @@ export type WebviewMessage =
   | { type: 'getSkillContent'; name: string }
   | { type: 'setAutonomousMode'; enabled: boolean }
   | { type: 'startWorktree' }
-  | { type: 'openExternal'; url: string };
+  | { type: 'openExternal'; url: string }
+  | { type: 'compactConversation'; model: string };
 
 // ---- Diff types ----
 

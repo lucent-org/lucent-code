@@ -2461,3 +2461,106 @@ describe('@codebase mention', () => {
     expect(userMessage.content).toBe('@codebase find something');
   });
 });
+
+describe('compactConversation', () => {
+  let handler: MessageHandler;
+  let mockClient: {
+    chatStream: ReturnType<typeof vi.fn>;
+    chat: ReturnType<typeof vi.fn>;
+    listModels: ReturnType<typeof vi.fn>;
+  };
+  let mockContextBuilder: {
+    buildContext: ReturnType<typeof vi.fn>;
+    formatForPrompt: ReturnType<typeof vi.fn>;
+    buildEnrichedContext: ReturnType<typeof vi.fn>;
+    formatEnrichedPrompt: ReturnType<typeof vi.fn>;
+    getCapabilities: ReturnType<typeof vi.fn>;
+    getCustomInstructions: ReturnType<typeof vi.fn>;
+    getActivatedSkills: ReturnType<typeof vi.fn>;
+  };
+  let mockSettings: {
+    setChatModel: ReturnType<typeof vi.fn>;
+    temperature: number;
+    maxTokens: number;
+  };
+  let postMessage: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockClient = {
+      chatStream: vi.fn(),
+      chat: vi.fn(),
+      listModels: vi.fn().mockResolvedValue([]),
+    };
+
+    mockContextBuilder = {
+      buildContext: vi.fn().mockReturnValue({}),
+      formatForPrompt: vi.fn().mockReturnValue(''),
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      formatEnrichedPrompt: vi.fn(() => ''),
+      getCapabilities: vi.fn(() => undefined),
+      getCustomInstructions: vi.fn(() => undefined),
+      getActivatedSkills: vi.fn(() => []),
+    };
+
+    mockSettings = {
+      setChatModel: vi.fn().mockResolvedValue(undefined),
+      temperature: 0.7,
+      maxTokens: 4096,
+    };
+
+    postMessage = vi.fn();
+
+    handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings
+    );
+  });
+
+  it('calls client.chat with a summarization prompt and replaces conversation, then posts conversationCompacted', async () => {
+    // Populate conversationMessages with one turn
+    mockClient.chatStream.mockReturnValue(
+      (async function* () {
+        yield { choices: [{ delta: { content: 'Hello' } }] };
+      })()
+    );
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'What is 2+2?', model: 'test-model' },
+      postMessage
+    );
+    postMessage.mockClear();
+
+    // Now compact
+    mockClient.chat = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'We discussed basic arithmetic.' } }],
+    });
+
+    await handler.handleMessage(
+      { type: 'compactConversation', model: 'test-model' },
+      postMessage
+    );
+
+    expect(mockClient.chat).toHaveBeenCalledOnce();
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'conversationCompacted', summary: 'We discussed basic arithmetic.' })
+    );
+  });
+
+  it('posts conversationCompacted with fallback message if chat call fails', async () => {
+    mockClient.chat = vi.fn().mockRejectedValue(new Error('API error'));
+
+    await handler.handleMessage(
+      { type: 'compactConversation', model: 'test-model' },
+      postMessage
+    );
+
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'conversationCompacted',
+        summary: expect.stringContaining('[Compaction failed'),
+      })
+    );
+  });
+});

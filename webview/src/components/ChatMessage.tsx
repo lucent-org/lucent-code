@@ -52,6 +52,17 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
     );
   }
 
+  // Render compaction divider
+  if ((props.message as any).isCompactionDivider) {
+    const summary = props.message.content.replace('[Conversation compacted]\n\n', '');
+    return (
+      <div class="compaction-divider">
+        <span class="compaction-divider__label">Conversation compacted</span>
+        <span class="compaction-divider__summary">{summary}</span>
+      </div>
+    );
+  }
+
   const parts = createMemo(() => parseContent(props.message.content));
 
   return (

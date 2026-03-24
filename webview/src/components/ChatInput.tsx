@@ -1,6 +1,7 @@
 import { Component, createSignal, createEffect, createMemo, Show, For } from 'solid-js';
 import ModelSelector from './ModelSelector';
 import type { OpenRouterModel } from '@shared';
+import { getVsCodeApi } from '../utils/vscode-api';
 
 interface MentionSource {
   id: string;
@@ -313,6 +314,13 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const handleSend = () => {
     if (props.isStreaming) return;
+
+    if (skillChips().some((c) => c.name === 'compact')) {
+      setSkillChips([]);
+      setInput('');
+      getVsCodeApi().postMessage({ type: 'compactConversation', model: props.selectedModel ?? '' });
+      return;
+    }
 
     const validAttachments = attachments().filter((a) => !a.error);
     const textFiles = validAttachments.filter((a) => a.kind === 'text');
