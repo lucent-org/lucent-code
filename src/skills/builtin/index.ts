@@ -101,4 +101,70 @@ Rules:
 - Keep docs up to date — a wrong doc is worse than no doc
 - Prefer short inline comments over large doc blocks for local context
 `,
+  `---
+name: doc
+description: Generate documentation for selected code or the active file
+---
+
+Generate documentation for the selected code or the active function/class in the editor.
+
+Rules:
+- Match the language's doc format exactly: JSDoc for JavaScript/TypeScript, docstrings for Python, doc comments for Rust/Go
+- Document parameters (name, type, purpose), return value, and side effects
+- Do not restate the function name — describe what it does, not what it is called
+- If no code is selected, document the primary exported symbol in the active file
+- Keep documentation concise — no padding, no filler phrases
+`,
+  `---
+name: tests
+description: Generate tests for selected code using the project's existing test framework
+---
+
+Generate tests for the selected code or the active function/class.
+
+Rules:
+1. Identify the project's test framework from existing test files (Jest, Vitest, pytest, etc.)
+2. Write tests that cover: happy path, edge cases (empty input, null, boundary values), and error cases
+3. Each test has one assertion focus — do not bundle multiple behaviours in one test
+4. Name tests descriptively: "returns empty array when input is null", not "test1"
+5. Follow the TDD skill's pattern if active: write the test, then the implementation
+6. Do not mock what you can test directly
+`,
+  `---
+name: commit
+description: Generate a conventional commit message from the current git diff
+---
+
+Generate a commit message for the current staged or unstaged changes.
+
+Steps:
+1. Call \`run_terminal_command\` with: \`git diff --staged || git diff HEAD\`
+2. Read the diff output carefully
+3. Write a commit message in conventional format: \`type(scope): short description\`
+   - type: feat / fix / refactor / test / docs / chore / style
+   - scope: the module or area affected (optional but helpful)
+   - description: imperative mood, under 72 characters, no trailing period
+4. If the diff contains multiple logical changes, note them as bullet points in the commit body
+5. Do not include "Co-authored-by" or tool attribution lines
+
+Output only the commit message — no explanation, no surrounding text.
+`,
+  `---
+name: onboard
+description: Analyze project structure and orient a developer new to this codebase
+---
+
+Produce a developer orientation for this codebase.
+
+Steps:
+1. Read \`package.json\` (or equivalent manifest) for name, description, scripts, and key dependencies
+2. Read \`README.md\` if present
+3. List top-level directories and explain the purpose of each in one sentence
+4. Identify the main entry point(s)
+5. Call out the 3–5 most important files a new developer should read first
+6. Summarize the architecture in 3–5 sentences: what it does, how it's structured, key patterns used
+7. Note any non-obvious conventions (naming, file layout, config files)
+
+Keep the total response under 400 words. Use headings. Do not repeat what is already in the README verbatim.
+`,
 ];
