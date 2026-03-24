@@ -12,8 +12,7 @@ interface MentionSource {
 const MENTION_SOURCES: MentionSource[] = [
   { id: 'fix',     label: '@fix',     description: 'Fix code at cursor',              kind: 'action'  },
   { id: 'explain', label: '@explain', description: 'Explain code at cursor',           kind: 'action'  },
-  { id: 'test',    label: '@test',    description: 'Write tests for code at cursor',   kind: 'action'  },
-  { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
+{ id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
   { id: 'codebase', label: '@codebase', description: 'Semantic search across all indexed files', kind: 'search' },
   { id: 'model',   label: '@model',   description: 'Switch the active model',          kind: 'model'   },
 ];
