@@ -230,7 +230,7 @@ export class MessageHandler {
         const uris = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 500);
         const files = uris
           .map((uri) => {
-            const rel = uri.fsPath.replace(root + '/', '').replace(root + '\\', '');
+            const rel = path.relative(root, uri.fsPath).split(path.sep).join('/');
             const name = rel.split(/[\\/]/).pop() ?? rel;
             return { name, relativePath: rel };
           })
@@ -253,7 +253,7 @@ export class MessageHandler {
             break;
           }
           // Detect binary files by scanning for null bytes in first 8 KB
-          const probe = new Uint8Array(bytes.buffer, 0, Math.min(bytes.byteLength, 8192));
+          const probe = bytes.subarray(0, Math.min(bytes.byteLength, 8192));
           if (probe.indexOf(0) !== -1) {
             const name = message.relativePath.split(/[\\/]/).pop() ?? message.relativePath;
             postMessage({ type: 'fileAttachment', name, relativePath: message.relativePath, content: '', error: 'Binary file — cannot attach as text' });

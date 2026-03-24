@@ -107,7 +107,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     if (!fa) return;
     const id = Math.random().toString(36).slice(2);
     setAttachments((prev) => {
-      if (prev.some((a) => a.name === fa.name)) return prev;
+      if (prev.some((a) => a.name === fa.name && a.data === fa.content)) return prev;
       return [...prev, { id, name: fa.name, kind: 'text', data: fa.content, mimeType: 'text/plain' }];
     });
     props.onPendingFileAttachmentConsumed?.();
