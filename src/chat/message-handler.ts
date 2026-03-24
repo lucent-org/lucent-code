@@ -226,14 +226,16 @@ export class MessageHandler {
           break;
         }
         const root = folders[0].uri.fsPath;
-        const query = message.query.trim();
-        const pattern = query ? `**/*${query}*` : '**/*';
-        const uris = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 30);
-        const files = uris.map((uri) => {
-          const rel = uri.fsPath.replace(root + '/', '').replace(root + '\\', '');
-          const name = rel.split(/[\\/]/).pop() ?? rel;
-          return { name, relativePath: rel };
-        });
+        const query = message.query.trim().toLowerCase();
+        const uris = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 500);
+        const files = uris
+          .map((uri) => {
+            const rel = uri.fsPath.replace(root + '/', '').replace(root + '\\', '');
+            const name = rel.split(/[\\/]/).pop() ?? rel;
+            return { name, relativePath: rel };
+          })
+          .filter(({ relativePath }) => !query || relativePath.toLowerCase().includes(query))
+          .slice(0, 30);
         postMessage({ type: 'fileList', files });
         break;
       }
@@ -248,6 +250,13 @@ export class MessageHandler {
           const bytes = await vscode.workspace.fs.readFile(uri);
           if (bytes.byteLength > 5 * 1024 * 1024) {
             postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'File exceeds 5 MB limit' });
+            break;
+          }
+          // Detect binary files by scanning for null bytes in first 8 KB
+          const probe = new Uint8Array(bytes.buffer, 0, Math.min(bytes.byteLength, 8192));
+          if (probe.indexOf(0) !== -1) {
+            const name = message.relativePath.split(/[\\/]/).pop() ?? message.relativePath;
+            postMessage({ type: 'fileAttachment', name, relativePath: message.relativePath, content: '', error: 'Binary file — cannot attach as text' });
             break;
           }
           const content = new TextDecoder().decode(bytes);

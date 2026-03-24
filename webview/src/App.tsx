@@ -88,7 +88,9 @@ const App: Component = () => {
           chatStore.handleFileList(message.files);
           break;
         case 'fileAttachment':
-          if (!message.error) {
+          if (message.error) {
+            chatStore.handlePendingFileAttachmentError({ relativePath: message.relativePath, error: message.error });
+          } else {
             chatStore.handlePendingFileAttachment({ name: message.name, relativePath: message.relativePath, content: message.content });
           }
           break;
@@ -295,6 +297,8 @@ const App: Component = () => {
         fileList={chatStore.fileList()}
         pendingFileAttachment={chatStore.pendingFileAttachment()}
         onPendingFileAttachmentConsumed={() => chatStore.setPendingFileAttachment(null)}
+        pendingFileAttachmentError={chatStore.pendingFileAttachmentError()}
+        onPendingFileAttachmentErrorConsumed={() => chatStore.setPendingFileAttachmentError(null)}
       />
     </div>
   );

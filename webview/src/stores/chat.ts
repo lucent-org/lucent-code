@@ -50,6 +50,7 @@ function createChatStore() {
   const [noCredits, setNoCredits] = createSignal(false);
   const [fileList, setFileList] = createSignal<{ name: string; relativePath: string }[]>([]);
   const [pendingFileAttachment, setPendingFileAttachment] = createSignal<{ name: string; relativePath: string; content: string } | null>(null);
+  const [pendingFileAttachmentError, setPendingFileAttachmentError] = createSignal<{ relativePath: string; error: string } | null>(null);
 
   function handleFileList(files: { name: string; relativePath: string }[]) {
     setFileList(files);
@@ -57,6 +58,10 @@ function createChatStore() {
 
   function handlePendingFileAttachment(attachment: { name: string; relativePath: string; content: string }) {
     setPendingFileAttachment(attachment);
+  }
+
+  function handlePendingFileAttachmentError(info: { relativePath: string; error: string }) {
+    setPendingFileAttachmentError(info);
   }
 
   const [recentConversationIds, setRecentConversationIds] = createSignal<string[]>(
@@ -370,6 +375,9 @@ function createChatStore() {
     pendingFileAttachment,
     setPendingFileAttachment,
     handlePendingFileAttachment,
+    pendingFileAttachmentError,
+    setPendingFileAttachmentError,
+    handlePendingFileAttachmentError,
   };
 }
 

@@ -59,6 +59,8 @@ interface ChatInputProps {
   fileList?: { name: string; relativePath: string }[];
   pendingFileAttachment?: { name: string; relativePath: string; content: string } | null;
   onPendingFileAttachmentConsumed?: () => void;
+  pendingFileAttachmentError?: { relativePath: string; error: string } | null;
+  onPendingFileAttachmentErrorConsumed?: () => void;
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
@@ -109,6 +111,18 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       return [...prev, { id, name: fa.name, kind: 'text', data: fa.content, mimeType: 'text/plain' }];
     });
     props.onPendingFileAttachmentConsumed?.();
+  });
+
+  createEffect(() => {
+    const err = props.pendingFileAttachmentError;
+    if (!err) return;
+    const id = Math.random().toString(36).slice(2);
+    const name = err.relativePath.split(/[\\/]/).pop() ?? err.relativePath;
+    setAttachments((prev) => [
+      ...prev,
+      { id, name, kind: 'text', data: '', mimeType: 'text/plain', error: err.error },
+    ]);
+    props.onPendingFileAttachmentErrorConsumed?.();
   });
 
   const handleFiles = (files: FileList | File[]) => {
