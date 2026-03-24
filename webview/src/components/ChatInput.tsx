@@ -316,9 +316,10 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     if (props.isStreaming) return;
 
     if (skillChips().some((c) => c.name === 'compact')) {
+      if (!props.selectedModel) return;
       setSkillChips([]);
       setInput('');
-      getVsCodeApi().postMessage({ type: 'compactConversation', model: props.selectedModel ?? '' });
+      getVsCodeApi().postMessage({ type: 'compactConversation', model: props.selectedModel });
       return;
     }
 

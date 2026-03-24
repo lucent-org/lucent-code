@@ -180,10 +180,8 @@ function createChatStore() {
     setMessages((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
         role: 'system' as const,
         content: `[Conversation compacted]\n\n${summary}`,
-        timestamp: Date.now(),
         isCompactionDivider: true,
       } satisfies ChatMessage,
     ]);

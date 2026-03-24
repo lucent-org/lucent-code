@@ -2546,6 +2546,28 @@ describe('compactConversation', () => {
     expect(postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'conversationCompacted', summary: 'We discussed basic arithmetic.' })
     );
+
+    // Verify conversationMessages was replaced: a subsequent sendMessage should
+    // call chatStream with only the compacted summary entry (+ system message),
+    // not the original multi-turn history.
+    mockClient.chatStream.mockClear();
+    mockClient.chatStream.mockReturnValue(
+      (async function* () {
+        yield { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] };
+      })()
+    );
+    postMessage.mockClear();
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'follow-up', model: 'test-model' },
+      postMessage
+    );
+    const streamCall = mockClient.chatStream.mock.calls[0][0] as { messages: { role: string; content: string }[] };
+    // messages = [system, compacted-user, new-user] — compacted entry is index 1
+    const compactedEntry = streamCall.messages[1];
+    expect(compactedEntry.role).toBe('user');
+    expect(compactedEntry.content).toContain('We discussed basic arithmetic.');
+    // The history must not include the original pre-compact messages (only 3 entries total)
+    expect(streamCall.messages).toHaveLength(3);
   });
 
   it('posts conversationCompacted with fallback message if chat call fails', async () => {

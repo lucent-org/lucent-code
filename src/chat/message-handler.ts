@@ -206,7 +206,8 @@ export class MessageHandler {
             ],
             max_tokens: 300,
           });
-          summary = response.choices?.[0]?.message?.content ?? '[No summary generated]';
+          const raw = response.choices?.[0]?.message?.content;
+          summary = typeof raw === 'string' ? raw : (raw ? JSON.stringify(raw) : '[No summary generated]');
         } catch (e: unknown) {
           summary = `[Compaction failed: ${e instanceof Error ? e.message : String(e)}]`;
         }
