@@ -219,6 +219,45 @@ export class MessageHandler {
         postMessage({ type: 'conversationCompacted', summary });
         break;
       }
+      case 'listFiles': {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+          postMessage({ type: 'fileList', files: [] });
+          break;
+        }
+        const root = folders[0].uri.fsPath;
+        const query = message.query.trim();
+        const pattern = query ? `**/*${query}*` : '**/*';
+        const uris = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 30);
+        const files = uris.map((uri) => {
+          const rel = uri.fsPath.replace(root + '/', '').replace(root + '\\', '');
+          const name = rel.split(/[\\/]/).pop() ?? rel;
+          return { name, relativePath: rel };
+        });
+        postMessage({ type: 'fileList', files });
+        break;
+      }
+      case 'readFileForAttachment': {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+          postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'No workspace' });
+          break;
+        }
+        const uri = vscode.Uri.joinPath(folders[0].uri, message.relativePath);
+        try {
+          const bytes = await vscode.workspace.fs.readFile(uri);
+          if (bytes.byteLength > 5 * 1024 * 1024) {
+            postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'File exceeds 5 MB limit' });
+            break;
+          }
+          const content = new TextDecoder().decode(bytes);
+          const name = message.relativePath.split(/[\\/]/).pop() ?? message.relativePath;
+          postMessage({ type: 'fileAttachment', name, relativePath: message.relativePath, content });
+        } catch {
+          postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'Could not read file' });
+        }
+        break;
+      }
     }
   }
 

@@ -18,6 +18,7 @@ vi.mock('vscode', () => ({
     }),
     workspaceFolders: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace', path: '/workspace' } }],
     applyEdit: vi.fn().mockResolvedValue(true),
+    findFiles: vi.fn().mockResolvedValue([]),
     fs: {
       readFile: vi.fn(),
       stat: vi.fn(),
@@ -2584,5 +2585,70 @@ describe('compactConversation', () => {
         summary: expect.stringContaining('[Compaction failed'),
       })
     );
+  });
+
+  describe('listFiles', () => {
+    it('returns matching workspace files', async () => {
+      const mockUri = { fsPath: '/workspace/src/foo.ts' };
+      vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([mockUri as any]);
+      Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+        value: [{ uri: { fsPath: '/workspace' } }],
+        configurable: true,
+      });
+
+      await handler.handleMessage({ type: 'listFiles', query: 'foo' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith({
+        type: 'fileList',
+        files: [{ name: 'foo.ts', relativePath: 'src/foo.ts' }],
+      });
+    });
+
+    it('returns empty array when no workspace folder', async () => {
+      Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+        value: undefined,
+        configurable: true,
+      });
+
+      await handler.handleMessage({ type: 'listFiles', query: 'anything' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith({ type: 'fileList', files: [] });
+    });
+  });
+
+  describe('readFileForAttachment', () => {
+    it('returns file content', async () => {
+      const content = 'export const foo = 1;';
+      Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+        value: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace' } }],
+        configurable: true,
+      });
+      vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(
+        new TextEncoder().encode(content) as any
+      );
+
+      await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'src/foo.ts' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'fileAttachment',
+        name: 'foo.ts',
+        relativePath: 'src/foo.ts',
+        content,
+      }));
+    });
+
+    it('returns error when no workspace', async () => {
+      Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+        value: undefined,
+        configurable: true,
+      });
+
+      await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'src/foo.ts' }, postMessage);
+
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'fileAttachment',
+        error: expect.any(String),
+      }));
+    });
   });
 });

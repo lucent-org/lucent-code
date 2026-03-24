@@ -84,6 +84,14 @@ const App: Component = () => {
         case 'conversationCompacted':
           chatStore.handleConversationCompacted(message.summary);
           break;
+        case 'fileList':
+          chatStore.handleFileList(message.files);
+          break;
+        case 'fileAttachment':
+          if (!message.error) {
+            chatStore.handlePendingFileAttachment({ name: message.name, relativePath: message.relativePath, content: message.content });
+          }
+          break;
       }
     });
 
@@ -284,6 +292,9 @@ const App: Component = () => {
         onSelectModel={chatStore.selectModel}
         messages={chatStore.messages()}
         noCredits={chatStore.noCredits()}
+        fileList={chatStore.fileList()}
+        pendingFileAttachment={chatStore.pendingFileAttachment()}
+        onPendingFileAttachmentConsumed={() => chatStore.setPendingFileAttachment(null)}
       />
     </div>
   );

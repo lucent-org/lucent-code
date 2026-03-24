@@ -7,7 +7,7 @@ interface MentionSource {
   id: string;
   label: string;
   description: string;
-  kind: 'context' | 'action' | 'search' | 'model';
+  kind: 'context' | 'action' | 'search' | 'model' | 'file';
 }
 
 const MENTION_SOURCES: MentionSource[] = [
@@ -16,6 +16,7 @@ const MENTION_SOURCES: MentionSource[] = [
   { id: 'terminal', label: '@terminal', description: 'Last 200 lines of active terminal', kind: 'context' },
   { id: 'codebase', label: '@codebase', description: 'Semantic search across all indexed files', kind: 'search' },
   { id: 'model',   label: '@model',   description: 'Switch the active model',          kind: 'model'   },
+  { id: 'file',    label: '@file',    description: 'Attach a workspace file as context', kind: 'file'    },
 ];
 
 interface Attachment {
@@ -55,6 +56,9 @@ interface ChatInputProps {
   onSelectModel: (modelId: string) => void;
   messages: { role: string; content: string }[];
   noCredits?: boolean;
+  fileList?: { name: string; relativePath: string }[];
+  pendingFileAttachment?: { name: string; relativePath: string; content: string } | null;
+  onPendingFileAttachmentConsumed?: () => void;
 }
 
 const ChatInput: Component<ChatInputProps> = (props) => {
@@ -73,6 +77,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [showModelPicker, setShowModelPicker] = createSignal(false);
   const [modelPickerFilter, setModelPickerFilter] = createSignal('');
   const [modelPickerBeforeAt, setModelPickerBeforeAt] = createSignal('');
+  const [showFilePicker, setShowFilePicker] = createSignal(false);
+  const [filePickerFilter, setFilePickerFilter] = createSignal('');
+  const [filePickerBeforeAt, setFilePickerBeforeAt] = createSignal('');
   let fileInputRef: HTMLInputElement | undefined;
 
   const contextFillPct = createMemo(() => {
@@ -91,6 +98,17 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       return [...prev, chip];
     });
     props.onPendingChipConsumed?.();
+  });
+
+  createEffect(() => {
+    const fa = props.pendingFileAttachment;
+    if (!fa) return;
+    const id = Math.random().toString(36).slice(2);
+    setAttachments((prev) => {
+      if (prev.some((a) => a.name === fa.name)) return prev;
+      return [...prev, { id, name: fa.name, kind: 'text', data: fa.content, mimeType: 'text/plain' }];
+    });
+    props.onPendingFileAttachmentConsumed?.();
   });
 
   const handleFiles = (files: FileList | File[]) => {
@@ -174,6 +192,12 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      if (showFilePicker()) {
+        setShowFilePicker(false);
+        setFilePickerFilter('');
+        setFilePickerBeforeAt('');
+        return;
+      }
       setShowMentions(false);
       setShowSkills(false);
       setShowModelPicker(false);
@@ -181,7 +205,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       setModelPickerBeforeAt('');
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey && !showMentions() && !showModelPicker()) {
+    if (e.key === 'Enter' && !e.shiftKey && !showMentions() && !showModelPicker() && !showFilePicker()) {
       e.preventDefault();
       handleSend();
     }
@@ -190,6 +214,19 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const handleInput = (e: Event) => {
     const value = (e.currentTarget as HTMLTextAreaElement).value;
     setInput(value);
+
+    // If file picker is open, update filter and request new results
+    if (showFilePicker()) {
+      const atIdx = value.lastIndexOf('@');
+      if (atIdx === -1) {
+        setShowFilePicker(false);
+      } else {
+        const query = value.slice(atIdx + 1);
+        setFilePickerFilter(query);
+        getVsCodeApi().postMessage({ type: 'listFiles', query });
+      }
+      return;
+    }
 
     // If model picker is open, use typed text as filter
     if (showModelPicker()) {
@@ -236,6 +273,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const contextSources = () => filteredSources().filter((s) => s.kind === 'context');
   const searchSources = () => filteredSources().filter((s) => s.kind === 'search');
   const modelSources = () => filteredSources().filter((s) => s.kind === 'model');
+  const fileSources = () => filteredSources().filter((s) => s.kind === 'file');
 
   const filteredModelsForPicker = () => {
     const filter = modelPickerFilter().toLowerCase();
@@ -259,6 +297,15 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       setModelPickerFilter('');
       setInput(beforeAt);
       setShowModelPicker(true);
+      return;
+    }
+
+    if (source.kind === 'file') {
+      setInput(beforeAt);
+      setFilePickerBeforeAt(beforeAt);
+      setFilePickerFilter('');
+      setShowFilePicker(true);
+      getVsCodeApi().postMessage({ type: 'listFiles', query: '' });
       return;
     }
 
@@ -290,6 +337,13 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     props.onSelectModel(modelId);
     // Remove the @model text — restore input to what was before @
     setInput(modelPickerBeforeAt());
+  };
+
+  const selectFileFromPicker = (file: { name: string; relativePath: string }) => {
+    setShowFilePicker(false);
+    setFilePickerFilter('');
+    setInput(filePickerBeforeAt());
+    getVsCodeApi().postMessage({ type: 'readFileForAttachment', relativePath: file.relativePath });
   };
 
   const selectSkill = async (skill: { name: string; description: string }) => {
@@ -408,6 +462,41 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 </button>
               )}
             </For>
+            <Show when={(actionSources().length > 0 || contextSources().length > 0 || searchSources().length > 0 || modelSources().length > 0) && fileSources().length > 0}>
+              <div class="mention-group-separator" />
+            </Show>
+            <For each={fileSources()}>
+              {(source) => (
+                <button
+                  class="mention-item"
+                  onMouseDown={(e) => { e.preventDefault(); void selectMention(source); }}
+                >
+                  <span class="mention-item-label">{source.label}</span>
+                  <span class="mention-item-desc">{source.description}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={showFilePicker()}>
+          <div class="mention-dropdown">
+            <Show when={(props.fileList ?? []).length > 0} fallback={
+              <div class="mention-item mention-item--disabled">
+                {filePickerFilter().length > 0 ? 'No files found' : 'Type to search files…'}
+              </div>
+            }>
+              <For each={props.fileList ?? []}>
+                {(file) => (
+                  <button
+                    class="mention-item"
+                    onMouseDown={(e) => { e.preventDefault(); selectFileFromPicker(file); }}
+                  >
+                    <span class="mention-item-label">{file.name}</span>
+                    <span class="mention-item-desc">{file.relativePath}</span>
+                  </button>
+                )}
+              </For>
+            </Show>
           </div>
         </Show>
         <Show when={showModelPicker()}>

@@ -48,6 +48,16 @@ function createChatStore() {
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
   const [worktreeStatus, setWorktreeStatus] = createSignal<'idle' | 'creating' | 'active' | 'finishing'>('idle');
   const [noCredits, setNoCredits] = createSignal(false);
+  const [fileList, setFileList] = createSignal<{ name: string; relativePath: string }[]>([]);
+  const [pendingFileAttachment, setPendingFileAttachment] = createSignal<{ name: string; relativePath: string; content: string } | null>(null);
+
+  function handleFileList(files: { name: string; relativePath: string }[]) {
+    setFileList(files);
+  }
+
+  function handlePendingFileAttachment(attachment: { name: string; relativePath: string; content: string }) {
+    setPendingFileAttachment(attachment);
+  }
 
   const [recentConversationIds, setRecentConversationIds] = createSignal<string[]>(
     (() => {
@@ -355,6 +365,11 @@ function createChatStore() {
     handleUsageUpdate,
     handleNoCredits,
     handleConversationCompacted,
+    fileList,
+    handleFileList,
+    pendingFileAttachment,
+    setPendingFileAttachment,
+    handlePendingFileAttachment,
   };
 }
 
