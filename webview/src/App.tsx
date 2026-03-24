@@ -121,7 +121,6 @@ const App: Component = () => {
     switch (type) {
       case 'fix':     return Promise.resolve('Fix the following code:');
       case 'explain': return Promise.resolve('Explain the following code:');
-      case 'test':    return Promise.resolve('Write tests for the following code:');
     }
     // Context mentions require extension-host roundtrip
     const requestType = `get${type.charAt(0).toUpperCase() + type.slice(1)}Output` as 'getTerminalOutput';

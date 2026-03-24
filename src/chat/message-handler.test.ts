@@ -2716,4 +2716,38 @@ describe('readFileForAttachment', () => {
       error: expect.any(String),
     }));
   });
+
+  it('returns error for binary files (null-byte probe)', async () => {
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace' } }],
+      configurable: true,
+    });
+    // Binary content with a null byte in the first 8 KB
+    const binaryBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x0d, 0x0a, 0x1a]);
+    vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(binaryBytes as any);
+
+    await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'image.png' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'fileAttachment',
+      error: expect.stringContaining('Binary'),
+    }));
+  });
+
+  it('returns error when file exceeds 5 MB', async () => {
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace' } }],
+      configurable: true,
+    });
+    // Simulate a file just over 5 MB
+    const oversizedBytes = new Uint8Array(5 * 1024 * 1024 + 1);
+    vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(oversizedBytes as any);
+
+    await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'big.ts' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'fileAttachment',
+      error: expect.stringContaining('5 MB'),
+    }));
+  });
 });
