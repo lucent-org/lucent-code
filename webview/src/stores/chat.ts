@@ -38,6 +38,7 @@ function createChatStore() {
       return saved?.selectedModel ?? '';
     })()
   );
+  const [selectedModelProvider, setSelectedModelProvider] = createSignal<string>('');
   const [isStreaming, setIsStreaming] = createSignal(false);
   const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
@@ -45,6 +46,7 @@ function createChatStore() {
   const [diffState, setDiffState] = createSignal<DiffState | null>(null);
   const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description: string }[]>([]);
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
+  const [activeSkillNames, setActiveSkillNames] = createSignal<string[]>([]);
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
   const [worktreeStatus, setWorktreeStatus] = createSignal<'idle' | 'creating' | 'active' | 'finishing'>('idle');
   const [noCredits, setNoCredits] = createSignal(false);
@@ -94,8 +96,8 @@ function createChatStore() {
     }
   }
 
-  function sendMessage(content: string, images: string[] = []) {
-    if (!content.trim() && images.length === 0) return;
+  function sendMessage(content: string, images: string[] = [], skills: Array<{ name: string; content: string }> = []) {
+    if (!content.trim() && images.length === 0 && skills.length === 0) return;
     if (isStreaming()) return;
 
     const model = selectedModel();
@@ -105,7 +107,7 @@ function createChatStore() {
     setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
     setIsStreaming(true);
 
-    vscode.postMessage({ type: 'sendMessage', content, images: images.length ? images : undefined, model });
+    vscode.postMessage({ type: 'sendMessage', content, images: images.length ? images : undefined, model, skills: skills.length ? skills : undefined });
   }
 
   function cancelRequest() {
@@ -117,8 +119,13 @@ function createChatStore() {
     setCurrentConversationId('');
     setShowConversationList(false);
     setNoCredits(false);
+    setActiveSkillNames([]);
     vscode.setState({ ...(vscode.getState() as object ?? {}), lastConversationId: undefined });
     vscode.postMessage({ type: 'newChat' });
+  }
+
+  function handleActiveSkillsChanged(skills: string[]) {
+    setActiveSkillNames(skills);
   }
 
   function handleStreamChunk(content: string) {
@@ -132,13 +139,18 @@ function createChatStore() {
     });
   }
 
-  function handleStreamEnd() {
+  function handleStreamEnd(cancelled?: boolean) {
     setIsStreaming(false);
     setMessages((prev) => {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last && last.role === 'assistant') {
-        const content = last.content || '_(No response received. The model may not support this request or ran out of credits.)_';
+        let content = last.content;
+        if (!content) {
+          content = cancelled
+            ? '_(Stopped.)_'
+            : '_(No response received. The model may not support this request or ran out of credits.)_';
+        }
         updated[updated.length - 1] = { ...last, content, isStreaming: false };
       }
       return updated;
@@ -247,8 +259,9 @@ function createChatStore() {
 
   // Called when the extension notifies us of a model change it already applied (e.g. use_model tool).
   // Does NOT post setModel back — the extension is the source of truth for this change.
-  function receiveModelChange(modelId: string) {
+  function receiveModelChange(modelId: string, providerName?: string) {
     setSelectedModel(modelId);
+    setSelectedModelProvider(providerName ?? '');
     vscode.setState({ ...(vscode.getState() as object ?? {}), selectedModel: modelId });
   }
 
@@ -331,6 +344,7 @@ function createChatStore() {
     messages,
     models,
     selectedModel,
+    selectedModelProvider,
     isStreaming,
     sendMessage,
     cancelRequest,
@@ -360,6 +374,8 @@ function createChatStore() {
     handleSkillsLoaded,
     pendingSkillChip,
     setPendingSkillChip,
+    activeSkillNames,
+    handleActiveSkillsChanged,
     autonomousMode,
     setAutonomousModeFromMessage,
     worktreeStatus,

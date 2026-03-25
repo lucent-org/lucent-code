@@ -285,6 +285,7 @@ describe('MessageHandler', () => {
       expect(postMessage).toHaveBeenCalledWith({
         type: 'modelChanged',
         modelId: 'anthropic/claude-sonnet-4',
+        providerName: '',
       });
     });
   });

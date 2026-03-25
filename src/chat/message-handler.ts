@@ -58,6 +58,12 @@ export class MessageHandler {
 
   private readonly approvalManager: ToolApprovalManager;
 
+  private static readonly PROVIDER_ID_TO_NAME: Record<string, string> = {
+    'openrouter': 'OpenRouter',
+    'anthropic': 'Anthropic',
+    'nvidia-nim': 'NVIDIA NIM',
+  };
+
   constructor(
     private readonly provider: ILLMProvider,
     private readonly contextBuilder: ContextBuilder,
@@ -68,7 +74,8 @@ export class MessageHandler {
     private readonly terminalBuffer?: TerminalBuffer,
     private readonly skillRegistry?: SkillRegistry,
     private readonly mcpClientManager?: McpClientManager,
-    private readonly indexer?: Indexer
+    private readonly indexer?: Indexer,
+    private readonly providerResolver?: (modelId: string) => { id: string }
   ) {
     this._autonomousMode = this.settings.autonomousMode ?? false;
     const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -86,6 +93,12 @@ export class MessageHandler {
         console.error('[WorktreeManager] Failed to create worktree:', e.message);
       });
     }
+  }
+
+  private resolveProviderName(modelId: string): string {
+    if (!this.providerResolver) return '';
+    const providerId = this.providerResolver(modelId).id;
+    return MessageHandler.PROVIDER_ID_TO_NAME[providerId] ?? '';
   }
 
   setModelPricing(models: ProviderModel[]): void {
@@ -115,7 +128,7 @@ export class MessageHandler {
         break;
       case 'setModel':
         await this.settings.setChatModel(message.modelId);
-        postMessage({ type: 'modelChanged', modelId: message.modelId });
+        postMessage({ type: 'modelChanged', modelId: message.modelId, providerName: this.resolveProviderName(message.modelId) });
         break;
       case 'newChat':
         // Call finishSession before switching conversations so user gets the merge/PR/discard prompt
@@ -594,7 +607,7 @@ export class MessageHandler {
                   result.success ? (result.message ?? 'Done') : `Error: ${result.error}`
                 ),
               });
-              postMessage({ type: 'modelChanged', modelId: newModelId });
+              postMessage({ type: 'modelChanged', modelId: newModelId, providerName: this.resolveProviderName(newModelId) });
               continue;
             }
             const result = await this.toolExecutor.execute(tc.function.name, args);

@@ -248,7 +248,7 @@ export async function activate(context: vscode.ExtensionContext) {
   indexerStatusBar.show();
   context.subscriptions.push(indexerStatusBar);
 
-  messageHandler = new MessageHandler(providerProxy, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer);
+  messageHandler = new MessageHandler(providerProxy, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer, (modelId) => providerRegistry.resolve(modelId));
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {

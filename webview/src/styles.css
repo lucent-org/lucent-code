@@ -238,6 +238,14 @@ body {
   line-height: 1.4;
 }
 
+.model-provider-badge {
+  margin-left: 5px;
+  font-size: 0.8em;
+  font-weight: 400;
+  color: var(--fg-secondary);
+  opacity: 0.85;
+}
+
 .context-fill {
   font-size: 0.9em;
 }
@@ -1281,6 +1289,38 @@ body {
 }
 
 /* Worktree badge */
+.active-skill-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 8px;
+  height: 22px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.active-skill-badge__dismiss {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.active-skill-badge__dismiss:hover {
+  opacity: 1;
+}
+
 .worktree-badge {
   background: none;
   border: none;

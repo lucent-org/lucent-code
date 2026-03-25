@@ -107,7 +107,7 @@ export type ExtensionMessage =
   | { type: 'streamEnd'; usage?: ChatResponse['usage']; cancelled?: boolean }
   | { type: 'streamError'; error: string }
   | { type: 'modelsLoaded'; models: OpenRouterModel[] }
-  | { type: 'modelChanged'; modelId: string }
+  | { type: 'modelChanged'; modelId: string; providerName?: string }
   | { type: 'contextUpdate'; context: CodeContext }
   | { type: 'conversationList'; conversations: ConversationSummary[] }
   | { type: 'conversationLoaded'; conversation: Conversation }
