@@ -336,6 +336,7 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "diff": "^8.0.3"
   }
