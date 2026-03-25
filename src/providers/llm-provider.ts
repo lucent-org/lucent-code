@@ -5,7 +5,8 @@ export type LLMErrorCode = 'auth' | 'rate_limit' | 'quota' | 'unavailable' | 'ba
 export class LLMError extends Error {
   constructor(
     public readonly code: LLMErrorCode,
-    message: string
+    message: string,
+    public readonly metadata?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'LLMError';

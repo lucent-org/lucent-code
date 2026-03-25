@@ -8,18 +8,14 @@ const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 8000;
 
-function toProviderError(status: number, message: string): LLMError {
-  let code: LLMErrorCode;
-  switch (status) {
-    case 401: code = 'auth'; break;
-    case 402: code = 'quota'; break;
-    case 403: code = 'moderation'; break;
-    case 408: code = 'timeout'; break;
-    case 429: code = 'rate_limit'; break;
-    case 400: code = 'bad_request'; break;
-    default:  code = 'unavailable'; break;
-  }
-  return new LLMError(code, message);
+function toProviderError(status: number, message: string, metadata?: Record<string, unknown>): LLMError {
+  if (status === 401) return new LLMError('auth', message, metadata);
+  if (status === 402) return new LLMError('quota', message, metadata);
+  if (status === 403) return new LLMError('moderation', message, metadata);
+  if (status === 408) return new LLMError('timeout', message, metadata);
+  if (status === 429) return new LLMError('rate_limit', message, metadata);
+  if (status === 400) return new LLMError('bad_request', message, metadata);
+  return new LLMError('unavailable', message, metadata);
 }
 
 function parseApiError(status: number, body: string): LLMError {
@@ -27,7 +23,7 @@ function parseApiError(status: number, body: string): LLMError {
     const parsed = JSON.parse(body) as { error?: { code?: number; message?: string; metadata?: Record<string, unknown> } };
     const err = parsed.error;
     if (err?.message) {
-      return toProviderError(err.code ?? status, err.message);
+      return toProviderError(status, err.message, err.metadata);
     }
   } catch { /* fall through */ }
   return toProviderError(status, `OpenRouter API error (${status}): ${body}`);
@@ -195,7 +191,7 @@ export class OpenRouterProvider implements ILLMProvider {
           try {
             const chunk = JSON.parse(data) as ChatResponseChunk;
             if (chunk.error) {
-              throw toProviderError(chunk.error.code, chunk.error.message);
+              throw toProviderError(chunk.error.code, chunk.error.message, chunk.error.metadata);
             }
             yield chunk;
           } catch (e) {
