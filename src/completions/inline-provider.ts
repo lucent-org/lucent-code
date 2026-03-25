@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenRouterClient } from '../core/openrouter-client';
+import type { ILLMProvider } from '../providers/llm-provider';
 import { Settings } from '../core/settings';
 import { TriggerConfig } from './trigger-config';
 import { buildCompletionPrompt } from './prompt-builder';
@@ -10,7 +10,7 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
   private readonly statusBarItem: vscode.StatusBarItem;
 
   constructor(
-    private readonly client: OpenRouterClient,
+    private readonly client: ILLMProvider,
     private readonly settings: Settings
   ) {
     this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -62,19 +62,30 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     this.statusBarItem.text = '$(loading~spin) OpenRouter';
 
     try {
-      const response = await this.client.chat({
+      const stream = this.client.chatStream({
         model,
         messages: prompt.messages,
         temperature: 0.2,
         max_tokens: 256,
+        stream: true,
       });
+
+      let fullContent = '';
+      for await (const chunk of stream) {
+        if (token.isCancellationRequested) {
+          this.statusBarItem.text = '$(sparkle) OpenRouter';
+          return emptyResult;
+        }
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) fullContent += delta;
+      }
 
       if (token.isCancellationRequested) {
         this.statusBarItem.text = '$(sparkle) OpenRouter';
         return emptyResult;
       }
 
-      const completionText = messageText(response.choices[0]?.message?.content ?? '').trim();
+      const completionText = messageText(fullContent).trim();
       if (!completionText) {
         this.statusBarItem.text = '$(sparkle) OpenRouter';
         return emptyResult;

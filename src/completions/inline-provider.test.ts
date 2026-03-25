@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
 vi.mock('vscode', () => ({
   InlineCompletionItem: class {
     insertText: string;
@@ -60,11 +57,23 @@ vi.mock('vscode', () => ({
 import * as vscodeModule from 'vscode';
 import { InlineCompletionProvider } from './inline-provider';
 import { Settings } from '../core/settings';
-import { OpenRouterClient } from '../core/openrouter-client';
+import type { ILLMProvider } from '../providers/llm-provider';
+
+// Helper to create a mock stream returning a single assistant content response
+async function* mockCompletionStream(content: string) {
+  yield {
+    id: 'gen-1',
+    choices: [{ delta: { content }, finish_reason: null }],
+  };
+  yield {
+    id: 'gen-1',
+    choices: [{ delta: { content: '' }, finish_reason: 'stop' }],
+  };
+}
 
 describe('InlineCompletionProvider', () => {
   let provider: InlineCompletionProvider;
-  let client: OpenRouterClient;
+  let mockLLMProvider: ILLMProvider;
   let settings: Settings;
   let mockDocument: any;
   let mockPosition: any;
@@ -72,9 +81,14 @@ describe('InlineCompletionProvider', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new OpenRouterClient(() => Promise.resolve('sk-test'));
+    mockLLMProvider = {
+      id: 'openrouter',
+      chatStream: vi.fn(),
+      listModels: vi.fn(),
+      getAccountBalance: vi.fn(),
+    };
     settings = new Settings();
-    provider = new InlineCompletionProvider(client, settings);
+    provider = new InlineCompletionProvider(mockLLMProvider, settings);
     mockDocument = {
       getText: () => 'function hello() {\n  \n}',
       languageId: 'typescript',
@@ -85,14 +99,9 @@ describe('InlineCompletionProvider', () => {
   });
 
   it('should return completions from the API', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          id: 'gen-1',
-          choices: [{ message: { role: 'assistant', content: 'completed code' }, finish_reason: 'stop' }],
-        }),
-    });
+    vi.mocked(mockLLMProvider.chatStream).mockReturnValue(
+      mockCompletionStream('completed code')
+    );
 
     const document = {
       getText: () => 'function hello() {\n  \n}',
@@ -117,7 +126,9 @@ describe('InlineCompletionProvider', () => {
   });
 
   it('should return empty list when API fails', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'));
+    vi.mocked(mockLLMProvider.chatStream).mockImplementation(async function* () {
+      throw new Error('Network error');
+    });
 
     const document = {
       getText: () => 'code',
@@ -136,14 +147,9 @@ describe('InlineCompletionProvider', () => {
   });
 
   it('should use completions.model setting when set', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          id: 'gen-1',
-          choices: [{ message: { role: 'assistant', content: 'x' }, finish_reason: 'stop' }],
-        }),
-    });
+    vi.mocked(mockLLMProvider.chatStream).mockReturnValue(
+      mockCompletionStream('x')
+    );
 
     const document = {
       getText: () => 'code',
@@ -158,8 +164,8 @@ describe('InlineCompletionProvider', () => {
       { isCancellationRequested: false, onCancellationRequested: vi.fn() } as any
     );
 
-    const fetchBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(fetchBody.model).toBe('test/model');
+    const callArgs = vi.mocked(mockLLMProvider.chatStream).mock.calls[0][0];
+    expect(callArgs.model).toBe('test/model');
   });
 
   it('should return empty list when editor.inlineSuggest.enabled is false', async () => {
@@ -188,7 +194,7 @@ describe('InlineCompletionProvider', () => {
     );
 
     expect(result.items).toHaveLength(0);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockLLMProvider.chatStream).not.toHaveBeenCalled();
   });
 
   it('should return empty list when isCancellationRequested before API call', async () => {
@@ -197,8 +203,6 @@ describe('InlineCompletionProvider', () => {
       languageId: 'typescript',
       uri: { toString: () => 'file:///test.ts' },
     };
-    // triggerMode is 'auto' (from mock), so it awaits the debounce trigger
-    // but if cancelled before the API call, should return empty and not call fetch
     const token = { isCancellationRequested: true, onCancellationRequested: vi.fn() };
 
     // Override triggerMode to 'manual' so we skip the debounce await and test the
@@ -218,7 +222,7 @@ describe('InlineCompletionProvider', () => {
       }),
     } as any);
     const manualSettings = new Settings();
-    const manualProvider = new InlineCompletionProvider(client, manualSettings);
+    const manualProvider = new InlineCompletionProvider(mockLLMProvider, manualSettings);
 
     const result = await manualProvider.provideInlineCompletionItems(
       document as any,
@@ -228,7 +232,7 @@ describe('InlineCompletionProvider', () => {
     );
 
     expect(result.items).toHaveLength(0);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockLLMProvider.chatStream).not.toHaveBeenCalled();
   });
 
   it('should return empty when no model configured', async () => {
@@ -242,7 +246,7 @@ describe('InlineCompletionProvider', () => {
     } as any);
 
     const noModelSettings = new Settings();
-    const noModelProvider = new InlineCompletionProvider(client, noModelSettings);
+    const noModelProvider = new InlineCompletionProvider(mockLLMProvider, noModelSettings);
 
     const document = {
       getText: () => 'code',
