@@ -47,7 +47,7 @@ interface ChatInputProps {
   onCancel: () => void;
   isStreaming: boolean;
   onResolveMention: (type: string) => Promise<string | null>;
-  skills: { name: string; description: string }[];
+  skills: { name: string; description: string; source: string }[];
   onResolveSkill: (name: string) => Promise<string | null>;
   pendingChip?: { name: string; content: string };
   onPendingChipConsumed?: () => void;
@@ -75,6 +75,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [terminalError, setTerminalError] = createSignal(false);
   const [showSkills, setShowSkills] = createSignal(false);
   const [skillFilter, setSkillFilter] = createSignal('');
+  const [collapsedGroups, setCollapsedGroups] = createSignal<Set<string>>(new Set(['claude']));
   const [skillChips, setSkillChips] = createSignal<{ name: string; content: string }[]>([]);
   const [showModelPicker, setShowModelPicker] = createSignal(false);
   const [modelPickerFilter, setModelPickerFilter] = createSignal('');
@@ -298,6 +299,39 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const filteredSkills = () =>
     props.skills.filter((s) => s.name.toLowerCase().includes(skillFilter()));
+
+  const groupedSkills = () => {
+    const skills = filteredSkills();
+    const order = ['builtin', 'claude', 'github', 'npm', 'marketplace', 'local'];
+    const groups = new Map<string, typeof skills>();
+    for (const s of skills) {
+      const g = s.source || 'builtin';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g)!.push(s);
+    }
+    return order.filter(g => groups.has(g)).map(g => {
+      const groupSkills = groups.get(g)!;
+      // Sort non-builtin groups alphabetically
+      if (g !== 'builtin') groupSkills.sort((a, b) => a.name.localeCompare(b.name));
+      return { source: g, skills: groupSkills };
+    });
+  };
+
+  const toggleGroup = (source: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source); else next.add(source);
+      return next;
+    });
+  };
+
+  const sourceLabel = (source: string) => {
+    const labels: Record<string, string> = {
+      claude: 'Claude', github: 'GitHub', npm: 'npm',
+      marketplace: 'Marketplace', local: 'Local',
+    };
+    return labels[source] ?? source;
+  };
 
   const selectMention = async (source: MentionSource) => {
     setShowMentions(false);
@@ -533,16 +567,37 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           </div>
         </Show>
         <Show when={showSkills() && filteredSkills().length > 0}>
-          <div class="mention-dropdown">
-            <For each={filteredSkills()}>
-              {(skill) => (
-                <button
-                  class="mention-item"
-                  onMouseDown={(e) => { e.preventDefault(); void selectSkill(skill); }}
-                >
-                  <span class="mention-item-label">/{skill.name}</span>
-                  <span class="mention-item-desc">{skill.description}</span>
-                </button>
+          <div class="mention-dropdown mention-dropdown--skills">
+            <For each={groupedSkills()}>
+              {(group, groupIndex) => (
+                <>
+                  <Show when={group.source !== 'builtin'}>
+                    <Show when={groupIndex() > 0 || groupedSkills()[0].source === 'builtin'}>
+                      <div class="mention-group-separator" />
+                    </Show>
+                    <button
+                      class={`mention-group-label mention-group-label--toggle${collapsedGroups().has(group.source) ? ' mention-group-label--collapsed' : ''}`}
+                      onMouseDown={(e) => { e.preventDefault(); toggleGroup(group.source); }}
+                    >
+                      <span class="mention-group-chevron" />
+                      {sourceLabel(group.source)}
+                      <span class="mention-group-count">{group.skills.length}</span>
+                    </button>
+                  </Show>
+                  <Show when={group.source === 'builtin' || !collapsedGroups().has(group.source)}>
+                    <For each={group.skills}>
+                      {(skill) => (
+                        <button
+                          class={`mention-item${group.source !== 'builtin' ? ' mention-item--indented' : ''}`}
+                          onMouseDown={(e) => { e.preventDefault(); void selectSkill(skill); }}
+                        >
+                          <span class="mention-item-label">/{skill.name}</span>
+                          <span class="mention-item-desc">{skill.description}</span>
+                        </button>
+                      )}
+                    </For>
+                  </Show>
+                </>
               )}
             </For>
           </div>

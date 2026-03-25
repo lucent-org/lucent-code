@@ -223,6 +223,21 @@ body {
 }
 
 /* Context fill indicator */
+.model-reasoning-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  background: color-mix(in srgb, var(--accent, #7c6af7) 18%, transparent);
+  color: var(--accent, #7c6af7);
+  border: 1px solid color-mix(in srgb, var(--accent, #7c6af7) 35%, transparent);
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
 .context-fill {
   font-size: 0.9em;
 }
@@ -780,10 +795,65 @@ body {
   overflow: hidden;
 }
 
+.mention-dropdown--skills {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
 .mention-group-separator {
   height: 1px;
   background: var(--border);
   margin: 2px 0;
+}
+
+.mention-group-label {
+  padding: 4px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #888);
+  user-select: none;
+}
+
+.mention-group-label--toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 5px 10px 3px;
+}
+
+.mention-group-label--toggle:hover {
+  color: var(--fg-primary);
+}
+
+.mention-group-chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4px 0 4px 5px;
+  border-color: transparent transparent transparent currentColor;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.mention-group-label--toggle:not(.mention-group-label--collapsed) .mention-group-chevron {
+  transform: rotate(90deg);
+}
+
+.mention-group-count {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .mention-item {
@@ -796,6 +866,10 @@ body {
   cursor: pointer;
   text-align: left;
   gap: 2px;
+}
+
+.mention-item--indented {
+  padding-left: 22px;
 }
 
 .mention-item:hover {
@@ -1302,4 +1376,65 @@ body {
   color: var(--fg-secondary, var(--vscode-descriptionForeground, #9d9d9d));
   font-style: italic;
   line-height: 1.4;
+}
+
+/* Skill chip in user messages */
+.skill-pill {
+  display: inline-block;
+  margin: 2px 0;
+}
+
+.skill-pill__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent, var(--vscode-focusBorder, #6366f1)) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, var(--vscode-focusBorder, #6366f1)) 40%, transparent);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.skill-pill__summary::-webkit-details-marker {
+  display: none;
+}
+
+.skill-pill__icon {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.skill-pill__name {
+  color: var(--accent, var(--vscode-focusBorder, #818cf8));
+  font-weight: 500;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.skill-pill__toggle-hint {
+  color: var(--fg-secondary, var(--vscode-descriptionForeground, #9d9d9d));
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.skill-pill:not([open]) .skill-pill__toggle-hint::before {
+  content: '▸ ';
+}
+
+.skill-pill[open] .skill-pill__toggle-hint::before {
+  content: '▾ ';
+}
+
+.skill-pill__body {
+  margin: 6px 0 2px 4px;
+  padding: 8px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent, var(--vscode-focusBorder, #6366f1)) 40%, transparent);
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--fg-secondary, var(--vscode-descriptionForeground, #9d9d9d));
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
 }
