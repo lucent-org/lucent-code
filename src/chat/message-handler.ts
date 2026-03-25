@@ -5,9 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
 import { messageText } from '../core/message-text';
-import type { ILLMProvider } from '../providers/llm-provider';
-import { LLMError } from '../providers/llm-provider';
-import type { ProviderModel } from '../providers/llm-provider';
+import { LLMError, type ILLMProvider, type ProviderModel } from '../providers/llm-provider';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION, START_WORKTREE_TOOL_DEFINITION } from '../lsp/editor-tools';
@@ -83,6 +81,11 @@ export class MessageHandler {
 
   setAutonomousMode(value: boolean): void {
     this._autonomousMode = value;
+    if (value && this._worktreeManager?.state === 'idle' && this.currentConversation) {
+      this._worktreeManager.create(this.currentConversation.id).catch((e: Error) => {
+        console.error('[WorktreeManager] Failed to create worktree:', e.message);
+      });
+    }
   }
 
   setModelPricing(models: ProviderModel[]): void {
@@ -688,8 +691,11 @@ export class MessageHandler {
         postMessage({ type: 'streamError', error: 'Rate limit reached. Please wait a moment and try again.' });
         break;
       case 'unavailable':
-      default:
         postMessage({ type: 'streamError', error: 'The model is temporarily unavailable. Try switching to a different model.' });
+        break;
+      default:
+        await this.notifications.handleError(error.message);
+        postMessage({ type: 'streamError', error: error.message });
         break;
     }
   }
