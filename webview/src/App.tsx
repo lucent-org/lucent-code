@@ -29,7 +29,7 @@ const App: Component = () => {
           chatStore.handleModelsLoaded(message.models);
           break;
         case 'modelChanged':
-          chatStore.selectModel(message.modelId);
+          chatStore.receiveModelChange(message.modelId);
           break;
         case 'conversationList':
           chatStore.handleConversationList(message.conversations);
@@ -38,7 +38,7 @@ const App: Component = () => {
           chatStore.handleConversationLoaded(message.conversation);
           break;
         case 'conversationSaved':
-          chatStore.handleConversationSaved(message.id);
+          chatStore.handleConversationSaved(message.id, message.title);
           break;
         case 'conversationTitled':
           chatStore.handleConversationTitled(message.id, message.title);
@@ -60,7 +60,7 @@ const App: Component = () => {
           break;
         case 'toolApprovalRequest': {
           const msg = message as any;
-          chatStore.handleToolApprovalRequest(msg.requestId, msg.toolName, msg.args, msg.diff);
+          chatStore.handleToolApprovalRequest(msg.requestId, msg.toolName, msg.args, msg.diff, msg.currentModel);
           break;
         }
         case 'skillsLoaded':
@@ -75,6 +75,25 @@ const App: Component = () => {
         case 'worktreeStatus':
           chatStore.handleWorktreeStatus(message.status);
           break;
+        case 'usageUpdate':
+          chatStore.handleUsageUpdate(message.lastMessageCost, message.lastMessageTokens);
+          break;
+        case 'noCredits':
+          chatStore.handleNoCredits();
+          break;
+        case 'conversationCompacted':
+          chatStore.handleConversationCompacted(message.summary);
+          break;
+        case 'fileList':
+          chatStore.handleFileList(message.files);
+          break;
+        case 'fileAttachment':
+          if (message.error) {
+            chatStore.handlePendingFileAttachmentError({ relativePath: message.relativePath, error: message.error });
+          } else {
+            chatStore.handlePendingFileAttachment({ name: message.name, relativePath: message.relativePath, content: message.content });
+          }
+          break;
       }
     });
 
@@ -82,8 +101,8 @@ const App: Component = () => {
     vscode.postMessage({ type: 'listConversations' });
 
     window.addEventListener('tool-approval', (e: Event) => {
-      const { requestId, approved } = (e as CustomEvent).detail;
-      chatStore.resolveToolApproval(requestId, approved);
+      const { requestId, approved, scope } = (e as CustomEvent).detail;
+      chatStore.resolveToolApproval(requestId, approved, scope);
     });
   });
 
@@ -102,7 +121,6 @@ const App: Component = () => {
     switch (type) {
       case 'fix':     return Promise.resolve('Fix the following code:');
       case 'explain': return Promise.resolve('Explain the following code:');
-      case 'test':    return Promise.resolve('Write tests for the following code:');
     }
     // Context mentions require extension-host roundtrip
     const requestType = `get${type.charAt(0).toUpperCase() + type.slice(1)}Output` as 'getTerminalOutput';
@@ -250,6 +268,17 @@ const App: Component = () => {
         )}
       </Show>
 
+      <Show when={chatStore.noCredits()}>
+        <div class="no-credits-banner">
+          <span>⚠ Insufficient credits — your account has no remaining balance.</span>
+          <a
+            href="https://openrouter.ai/settings/credits"
+            onClick={(e) => { e.preventDefault(); vscode.postMessage({ type: 'openExternal', url: 'https://openrouter.ai/settings/credits' }); }}
+          >
+            Buy credits ↗
+          </a>
+        </div>
+      </Show>
       <ChatInput
         onSend={handleSend}
         onCancel={chatStore.cancelRequest}
@@ -263,6 +292,12 @@ const App: Component = () => {
         selectedModel={chatStore.selectedModel()}
         onSelectModel={chatStore.selectModel}
         messages={chatStore.messages()}
+        noCredits={chatStore.noCredits()}
+        fileList={chatStore.fileList()}
+        pendingFileAttachment={chatStore.pendingFileAttachment()}
+        onPendingFileAttachmentConsumed={() => chatStore.setPendingFileAttachment(null)}
+        pendingFileAttachmentError={chatStore.pendingFileAttachmentError()}
+        onPendingFileAttachmentErrorConsumed={() => chatStore.setPendingFileAttachmentError(null)}
       />
     </div>
   );

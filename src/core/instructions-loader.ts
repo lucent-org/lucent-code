@@ -1,16 +1,19 @@
 import * as vscode from 'vscode';
 
-const FILENAMES = ['.openrouter-instructions.md', '.cursorrules'] as const;
+const FILENAMES = ['LUCENT.md', '.clinerules', '.cursorrules', 'CLAUDE.md'] as const;
 const MAX_BYTES = 50 * 1024;
+const SKILL_LINE_RE = /^@skill\(([^)]+)\)\s*$/gm;
 
 export class InstructionsLoader {
   private instructions: string | undefined;
+  private activatedSkills: string[] = [];
   private watcher?: vscode.FileSystemWatcher;
 
   async load(): Promise<void> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       this.instructions = undefined;
+      this.activatedSkills = [];
       return;
     }
     const root = folders[0].uri;
@@ -25,13 +28,21 @@ export class InstructionsLoader {
           );
           continue;
         }
-        this.instructions = new TextDecoder().decode(bytes);
+        const raw = new TextDecoder().decode(bytes);
+        const skills: string[] = [];
+        const prose = raw.replace(SKILL_LINE_RE, (_, name: string) => {
+          skills.push(name.trim());
+          return '';
+        }).replace(/\n{3,}/g, '\n\n').trim();
+        this.activatedSkills = skills;
+        this.instructions = prose || undefined;
         return;
       } catch {
         // file does not exist — try next
       }
     }
     this.instructions = undefined;
+    this.activatedSkills = [];
   }
 
   watch(): void {
@@ -50,8 +61,13 @@ export class InstructionsLoader {
     return this.instructions;
   }
 
+  getActivatedSkills(): string[] {
+    return this.activatedSkills;
+  }
+
   dispose(): void {
     this.watcher?.dispose();
     this.instructions = undefined;
+    this.activatedSkills = [];
   }
 }

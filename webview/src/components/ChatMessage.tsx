@@ -10,13 +10,14 @@ interface ChatMessageProps {
 }
 
 interface ContentPart {
-  type: 'text' | 'code';
+  type: 'text' | 'code' | 'skill';
   content: string;
   language?: string;
   filename?: string;
+  skillName?: string;
 }
 
-function parseContent(content: string): ContentPart[] {
+function parseCodeBlocks(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
   const codeBlockRegex = /```([\w]*)([^\n]*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -39,16 +40,48 @@ function parseContent(content: string): ContentPart[] {
   return parts;
 }
 
+function parseContent(content: string): ContentPart[] {
+  const allParts: ContentPart[] = [];
+  const skillRegex = /<skill name="([^"]+)">([\s\S]*?)<\/skill>/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = skillRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      allParts.push(...parseCodeBlocks(content.slice(lastIndex, match.index)));
+    }
+    allParts.push({ type: 'skill', skillName: match[1], content: match[2].trim() });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    allParts.push(...parseCodeBlocks(content.slice(lastIndex)));
+  }
+
+  return allParts;
+}
+
 const ChatMessage: Component<ChatMessageProps> = (props) => {
   // Render tool approval card inline
   if (props.message.role === 'tool_approval' && props.message.toolApproval) {
     return (
       <ToolCallCard
         approval={props.message.toolApproval as ToolApprovalData}
-        onRespond={(requestId, approved) => {
-          window.dispatchEvent(new CustomEvent('tool-approval', { detail: { requestId, approved } }));
+        onRespond={(requestId, approved, scope) => {
+          window.dispatchEvent(new CustomEvent('tool-approval', { detail: { requestId, approved, scope } }));
         }}
       />
+    );
+  }
+
+  // Render compaction divider
+  if (props.message.isCompactionDivider) {
+    const summary = props.message.content.replace('[Conversation compacted]\n\n', '');
+    return (
+      <div class="compaction-divider">
+        <span class="compaction-divider__label">Conversation compacted</span>
+        <span class="compaction-divider__summary">{summary}</span>
+      </div>
     );
   }
 
@@ -69,14 +102,36 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
           {(part) => (
             <Show
               when={part.type === 'code'}
-              fallback={<span innerHTML={formatText(part.content)} />}
+              fallback={
+                <Show
+                  when={part.type === 'skill'}
+                  fallback={<div innerHTML={formatText(part.content)} />}
+                >
+                  <details class="skill-pill">
+                    <summary class="skill-pill__summary">
+                      <span class="skill-pill__icon">⚡</span>
+                      <span class="skill-pill__name">/{part.skillName}</span>
+                      <span class="skill-pill__toggle-hint">skill</span>
+                    </summary>
+                    <pre class="skill-pill__body">{part.content.split('\n\n')[0]}</pre>
+                  </details>
+                </Show>
+              }
             >
               <CodeBlock code={part.content} language={part.language} filename={part.filename} />
             </Show>
           )}
         </For>
-        <Show when={props.message.isStreaming}>
+        <Show when={props.message.isStreaming && !props.message.content}>
+          <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+        </Show>
+        <Show when={props.message.isStreaming && !!props.message.content}>
           <span class="cursor-blink">|</span>
+        </Show>
+        <Show when={props.message.role === 'assistant' && props.message.cost !== undefined}>
+          <div class="message-cost">
+            · ${props.message.cost!.toFixed(4)} · {props.message.tokens?.toLocaleString()} tokens
+          </div>
         </Show>
       </div>
     </div>
@@ -94,6 +149,23 @@ function formatText(text: string): string {
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Tables (| col | col | rows with a separator row)
+  html = html.replace(/((?:^\|.+\|\n?)+)/gm, (block) => {
+    const rows = block.trimEnd().split('\n').filter((r) => r.trim());
+    // Detect separator row (e.g. |---|---|)
+    const sepIdx = rows.findIndex((r) => /^\|[\s\-|:]+\|$/.test(r));
+    if (sepIdx === -1) return block; // not a table
+    const headerRow = rows[sepIdx - 1];
+    const bodyRows = rows.slice(sepIdx + 1);
+    const parseRow = (row: string, tag: string) =>
+      '<tr>' + row.replace(/^\||\|$/g, '').split('|').map((cell) =>
+        `<${tag}>${cell.trim()}</${tag}>`
+      ).join('') + '</tr>';
+    const thead = headerRow ? `<thead>${parseRow(headerRow, 'th')}</thead>` : '';
+    const tbody = bodyRows.length ? `<tbody>${bodyRows.map((r) => parseRow(r, 'td')).join('')}</tbody>` : '';
+    return `<table>${thead}${tbody}</table>`;
+  });
 
   // Unordered lists (consecutive `- ` lines → <ul><li>…</li></ul>)
   html = html.replace(/((?:^- .+\n?)+)/gm, (block) => {
@@ -118,7 +190,7 @@ function formatText(text: string): string {
     .replace(/\n/g, '<br>');
 
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['code', 'strong', 'em', 'br', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li'],
+    ALLOWED_TAGS: ['code', 'strong', 'em', 'br', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
     ALLOWED_ATTR: [],
   });
 }

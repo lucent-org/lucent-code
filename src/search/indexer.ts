@@ -2,15 +2,20 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { VectorStore, SearchResult } from './vector-store';
-import { chunkFile } from './chunker';
+import { chunkFile, chunkBySymbols, SymbolChunkInput, Chunk } from './chunker';
 
 const INDEXABLE_EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.cs',
-  '.java', '.md', '.json',
+  '.java', '.json',
 ]);
 
-const SKIP_DIRS = ['node_modules', '.git', 'dist', 'out', 'build', '.lucent'];
+const SKIP_DIRS = ['node_modules', '.git', 'dist', 'out', 'build', '.lucent', 'docs'];
 const SKIP_SUFFIXES = ['.min.js', '.map', '.lock', '.png', '.jpg', '.svg', '.woff'];
+const SKIP_FILENAMES = new Set([
+  'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+  'tsconfig.json', 'tsconfig.build.json', 'jsconfig.json',
+  '.eslintrc.json', '.prettierrc.json', 'jest.config.json',
+]);
 const MAX_FILE_SIZE = 500 * 1024; // 500 KB
 const EMBED_BATCH_SIZE = 100;
 
@@ -24,9 +29,9 @@ export class Indexer {
 
   async start(workspaceRoot: string): Promise<void> {
     this.workspaceRoot = workspaceRoot;
-    this.dbPath = path.join(workspaceRoot, '.lucent', 'index.db');
+    this.dbPath = path.join(workspaceRoot, '.lucent');
 
-    await fs.mkdir(path.dirname(this.dbPath), { recursive: true });
+    await fs.mkdir(this.dbPath, { recursive: true });
     this.vectorStore.open(this.dbPath);
     this.vectorStore.loadIntoMemory();
 
@@ -53,9 +58,13 @@ export class Indexer {
       const content = await fs.readFile(filePath, 'utf8');
       if (isBinary(content)) return;
 
-      const chunks = chunkFile(content);
+      let chunks = await this.getSymbolChunks(filePath, content);
+      if (chunks.length === 0) {
+        chunks = chunkFile(content);
+      }
       if (chunks.length === 0) return;
 
+      console.log(`[Lucent Indexer] indexing ${path.relative(this.workspaceRoot, filePath)} (${chunks.length} chunks)`);
       const embeddings = await this.embedChunks(chunks);
       const chunksWithEmbeddings = chunks.map((c, i) => ({ ...c, embedding: embeddings[i] }));
 
@@ -63,9 +72,13 @@ export class Indexer {
       if (!skipMemoryReload) {
         this.vectorStore.loadIntoMemory();
       }
-    } catch {
-      // Skip unreadable files silently
+    } catch (e) {
+      console.error(`[Lucent Indexer] error indexing ${path.basename(filePath)}: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  isDbOpen(): boolean {
+    return this.vectorStore.isOpen();
   }
 
   async searchAsync(query: string, topK: number): Promise<SearchResult[]> {
@@ -80,6 +93,10 @@ export class Indexer {
 
   private shouldIndex(filePath: string): boolean {
     const normalized = filePath.replace(/\\/g, '/');
+    const root = this.workspaceRoot.replace(/\\/g, '/');
+
+    // Must be within the workspace root
+    if (!normalized.startsWith(root + '/') && normalized !== root) return false;
 
     for (const dir of SKIP_DIRS) {
       if (normalized.includes(`/${dir}/`) || normalized.endsWith(`/${dir}`)) return false;
@@ -88,6 +105,9 @@ export class Indexer {
     for (const suffix of SKIP_SUFFIXES) {
       if (normalized.endsWith(suffix)) return false;
     }
+
+    const basename = path.basename(filePath);
+    if (SKIP_FILENAMES.has(basename)) return false;
 
     const ext = path.extname(filePath).toLowerCase();
     return INDEXABLE_EXTENSIONS.has(ext);
@@ -126,6 +146,52 @@ export class Indexer {
     }
 
     return results;
+  }
+
+  private async getSymbolChunks(filePath: string, content: string): Promise<Chunk[]> {
+    try {
+      const uri = vscode.Uri.file(filePath);
+      await vscode.workspace.openTextDocument(uri);
+      const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+        'vscode.executeDocumentSymbolProvider',
+        uri
+      );
+      if (!symbols || symbols.length === 0) return [];
+
+      const INCLUDED_KINDS = new Set([5, 6, 7, 9, 11]); // Class, Method, Property, Constructor, Function
+
+      function flattenSymbols(
+        syms: vscode.DocumentSymbol[],
+        containerName: string | undefined,
+        depth: number
+      ): SymbolChunkInput[] {
+        const result: SymbolChunkInput[] = [];
+        for (const sym of syms) {
+          const startLine = sym.range.start.line;
+          const endLine = sym.range.end.line;
+          const lineSpan = endLine - startLine + 1;
+
+          if (INCLUDED_KINDS.has(sym.kind)) {
+            if (depth === 0 || lineSpan >= 3) {
+              result.push({ name: sym.name, containerName, startLine, endLine });
+            }
+          }
+
+          if (sym.children && sym.children.length > 0) {
+            // Use this symbol's name as the container for its children (innermost container)
+            const childContainer = INCLUDED_KINDS.has(sym.kind) ? sym.name : containerName;
+            result.push(...flattenSymbols(sym.children, childContainer, depth + 1));
+          }
+        }
+        return result;
+      }
+
+      const flatSymbols = flattenSymbols(symbols, undefined, 0);
+      if (flatSymbols.length === 0) return [];
+      return chunkBySymbols(content, flatSymbols);
+    } catch {
+      return [];
+    }
   }
 
   private startFileWatcher(): void {

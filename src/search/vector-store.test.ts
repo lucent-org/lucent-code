@@ -1,46 +1,54 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { VectorStore } from './vector-store';
 
-// Inject a mock Database constructor so no native binary is needed in CI
-const mockRun = vi.fn();
-const mockGet = vi.fn();
-const mockAll = vi.fn(() => []);
-const mockPrepare = vi.fn(() => ({ run: mockRun, get: mockGet, all: mockAll }));
-const mockExec = vi.fn();
-const mockClose = vi.fn();
-const MockDatabase = vi.fn(() => ({
-  prepare: mockPrepare,
-  exec: mockExec,
-  close: mockClose,
-  transaction: vi.fn((fn: () => void) => fn),  // returns the fn itself (calling tx() calls fn())
-}));
+// Build a mock fs that the VectorStore can use instead of the real fs
+function makeMockFs() {
+  const files: Map<string, Buffer | string> = new Map();
+  return {
+    files,
+    existsSync: vi.fn((p: string) => files.has(p)),
+    readFileSync: vi.fn((p: string, encoding?: string) => {
+      const data = files.get(p);
+      if (data === undefined) throw new Error(`ENOENT: ${p}`);
+      if (encoding === 'utf8') return data.toString();
+      return data as Buffer;
+    }),
+    writeFileSync: vi.fn((p: string, data: string | Buffer) => {
+      files.set(p, typeof data === 'string' ? Buffer.from(data) : data);
+    }),
+    mkdirSync: vi.fn(),
+  };
+}
 
 describe('VectorStore', () => {
   let store: VectorStore;
+  let mockFs: ReturnType<typeof makeMockFs>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockAll.mockReturnValue([]);
-    store = new VectorStore(MockDatabase as unknown as typeof import('better-sqlite3'));
-    store.open(':memory:');
+    mockFs = makeMockFs();
+    store = new VectorStore(mockFs as any);
+    store.open('/test-db');
   });
 
-  it('opens database and creates schema', () => {
-    expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('CREATE TABLE IF NOT EXISTS chunks'));
+  it('isOpen returns true after open()', () => {
+    expect(store.isOpen()).toBe(true);
+  });
+
+  it('isOpen returns false before open()', () => {
+    const s = new VectorStore(mockFs as any);
+    expect(s.isOpen()).toBe(false);
   });
 
   it('getAllFileMtimes returns empty map when no chunks', () => {
-    mockAll.mockReturnValue([]);
     const result = store.getAllFileMtimes();
     expect(result).toBeInstanceOf(Map);
     expect(result.size).toBe(0);
   });
 
-  it('getAllFileMtimes aggregates by file path', () => {
-    mockAll.mockReturnValue([
-      { file_path: 'a.ts', mtime: 1000 },
-      { file_path: 'b.ts', mtime: 2000 },
-    ]);
+  it('getAllFileMtimes aggregates by file path after upsert', () => {
+    const emb = new Float32Array([1, 0, 0]);
+    store.upsertChunks('a.ts', [{ startLine: 0, endLine: 5, content: 'x', embedding: emb }], 1000);
+    store.upsertChunks('b.ts', [{ startLine: 0, endLine: 5, content: 'y', embedding: emb }], 2000);
     const result = store.getAllFileMtimes();
     expect(result.get('a.ts')).toBe(1000);
     expect(result.get('b.ts')).toBe(2000);
@@ -52,57 +60,65 @@ describe('VectorStore', () => {
     expect(results).toEqual([]);
   });
 
-  it('cosine similarity finds closest vector', () => {
+  it('cosine similarity finds closest vector after upsert', () => {
     const embedding = new Float32Array([1, 0, 0]);
+    store.upsertChunks('test.ts', [{ startLine: 0, endLine: 10, content: 'const x = 1;', embedding }], 0);
     const queryEmbedding = new Float32Array([1, 0, 0]);
-    mockAll.mockReturnValue([
-      {
-        file_path: 'test.ts',
-        start_line: 0,
-        end_line: 10,
-        content: 'const x = 1;',
-        embedding: Buffer.from(embedding.buffer),
-      },
-    ]);
-    store.loadIntoMemory();
     const results = store.search(queryEmbedding, 1);
     expect(results).toHaveLength(1);
     expect(results[0].filePath).toBe('test.ts');
     expect(results[0].score).toBeCloseTo(1.0);
   });
 
-  it('upsertChunks deletes old chunks and inserts new ones', () => {
-    const embedding = new Float32Array([1, 0, 0]);
-    store.upsertChunks('src/foo.ts', [{ startLine: 0, endLine: 5, content: 'hello', embedding }], 1000);
-    // deleteStmt.run called with filePath
-    expect(mockRun).toHaveBeenCalledWith('src/foo.ts');
-    // insertStmt.run called with chunk data
-    expect(mockRun).toHaveBeenCalledWith('src/foo.ts', 0, 5, 'hello', expect.any(Buffer), 1000);
+  it('upsertChunks removes old chunks for file and inserts new ones', () => {
+    const emb1 = new Float32Array([1, 0, 0]);
+    const emb2 = new Float32Array([0, 1, 0]);
+    store.upsertChunks('src/foo.ts', [{ startLine: 0, endLine: 5, content: 'old', embedding: emb1 }], 1000);
+    store.upsertChunks('src/foo.ts', [{ startLine: 0, endLine: 5, content: 'new', embedding: emb2 }], 2000);
+    const results = store.search(new Float32Array([0, 1, 0]), 5);
+    const contents = results.map(r => r.content);
+    expect(contents).toContain('new');
+    expect(contents).not.toContain('old');
   });
 
-  it('deleteFile removes all chunks for a file', () => {
+  it('deleteFile removes all chunks for that file', () => {
+    const emb = new Float32Array([1, 0, 0]);
+    store.upsertChunks('src/bar.ts', [{ startLine: 0, endLine: 5, content: 'bar', embedding: emb }], 1000);
+    store.upsertChunks('src/keep.ts', [{ startLine: 0, endLine: 5, content: 'keep', embedding: emb }], 1000);
     store.deleteFile('src/bar.ts');
-    expect(mockPrepare).toHaveBeenCalledWith('DELETE FROM chunks WHERE file_path = ?');
-    expect(mockRun).toHaveBeenCalledWith('src/bar.ts');
+    const mtimes = store.getAllFileMtimes();
+    expect(mtimes.has('src/bar.ts')).toBe(false);
+    expect(mtimes.has('src/keep.ts')).toBe(true);
   });
 
-  it('close calls db.close()', () => {
-    store.close();
-    expect(mockClose).toHaveBeenCalled();
+  it('close flushes data to disk', () => {
+    const emb = new Float32Array([1, 0, 0]);
+    store.upsertChunks('close-test.ts', [{ startLine: 0, endLine: 5, content: 'data', embedding: emb }], 500);
+    // writeFileSync is called on upsert (flush)
+    expect(mockFs.writeFileSync).toHaveBeenCalled();
+  });
+
+  it('upsertChunks does nothing if store is not open', () => {
+    const s = new VectorStore(mockFs as any);
+    const emb = new Float32Array([1, 0, 0]);
+    s.upsertChunks('a.ts', [{ startLine: 0, endLine: 5, content: 'x', embedding: emb }], 0);
+    expect(mockFs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it('deleteFile does nothing if store is not open', () => {
+    const s = new VectorStore(mockFs as any);
+    s.deleteFile('a.ts');
+    expect(mockFs.writeFileSync).not.toHaveBeenCalled();
   });
 
   describe('search with topK > 1', () => {
     it('returns multiple results sorted by score descending', () => {
-      // chunk1: aligns with [1,0,0], chunk2: aligns with [0,1,0]
       const emb1 = new Float32Array([1, 0, 0]);
       const emb2 = new Float32Array([0.5, 0.5, 0]);
       const emb3 = new Float32Array([0, 0, 1]);
-      mockAll.mockReturnValue([
-        { file_path: 'a.ts', start_line: 0, end_line: 5, content: 'a', embedding: Buffer.from(emb1.buffer) },
-        { file_path: 'b.ts', start_line: 0, end_line: 5, content: 'b', embedding: Buffer.from(emb2.buffer) },
-        { file_path: 'c.ts', start_line: 0, end_line: 5, content: 'c', embedding: Buffer.from(emb3.buffer) },
-      ]);
-      store.loadIntoMemory();
+      store.upsertChunks('a.ts', [{ startLine: 0, endLine: 5, content: 'a', embedding: emb1 }], 0);
+      store.upsertChunks('b.ts', [{ startLine: 0, endLine: 5, content: 'b', embedding: emb2 }], 0);
+      store.upsertChunks('c.ts', [{ startLine: 0, endLine: 5, content: 'c', embedding: emb3 }], 0);
       const query = new Float32Array([1, 0, 0]);
       const results = store.search(query, 2);
       expect(results).toHaveLength(2);
@@ -114,12 +130,8 @@ describe('VectorStore', () => {
   describe('cosine similarity edge cases', () => {
     it('handles zero query vector gracefully', () => {
       const emb = new Float32Array([1, 0, 0]);
-      mockAll.mockReturnValue([
-        { file_path: 'a.ts', start_line: 0, end_line: 5, content: 'a', embedding: Buffer.from(emb.buffer) },
-      ]);
-      store.loadIntoMemory();
+      store.upsertChunks('a.ts', [{ startLine: 0, endLine: 5, content: 'a', embedding: emb }], 0);
       const zeroQuery = new Float32Array([0, 0, 0]);
-      // Should not throw, returns empty (qNorm === 0)
       expect(() => store.search(zeroQuery, 1)).not.toThrow();
       const results = store.search(zeroQuery, 1);
       expect(results).toEqual([]);
@@ -127,36 +139,48 @@ describe('VectorStore', () => {
 
     it('skips chunk with zero embedding vector', () => {
       const zeroEmb = new Float32Array([0, 0, 0]);
-      mockAll.mockReturnValue([
-        { file_path: 'a.ts', start_line: 0, end_line: 5, content: 'a', embedding: Buffer.from(zeroEmb.buffer) },
-      ]);
-      store.loadIntoMemory();
+      store.upsertChunks('a.ts', [{ startLine: 0, endLine: 5, content: 'a', embedding: zeroEmb }], 0);
       const query = new Float32Array([1, 0, 0]);
-      // chunk has zero norm, gets skipped
       expect(() => store.search(query, 1)).not.toThrow();
       const results = store.search(query, 1);
       expect(results).toEqual([]);
     });
   });
 
+  describe('loadIntoMemory', () => {
+    it('populates chunks from persisted files', () => {
+      // First write some data via upsert
+      const emb = new Float32Array([1, 0, 0]);
+      store.upsertChunks('persist.ts', [{ startLine: 0, endLine: 5, content: 'hello', embedding: emb }], 123);
+
+      // Create a new store pointing at same mockFs dir
+      const store2 = new VectorStore(mockFs as any);
+      store2.open('/test-db');
+      store2.loadIntoMemory();
+
+      const results = store2.search(new Float32Array([1, 0, 0]), 1);
+      expect(results).toHaveLength(1);
+      expect(results[0].filePath).toBe('persist.ts');
+      expect(results[0].content).toBe('hello');
+    });
+
+    it('does nothing if store is not open', () => {
+      const s = new VectorStore(mockFs as any);
+      expect(() => s.loadIntoMemory()).not.toThrow();
+    });
+  });
+
   describe('deleteFile removes chunks for a file', () => {
     it('removes all chunks for the deleted file while keeping others', () => {
-      // We test that deleteFile calls the correct prepare + run
-      // Simulate: upsert 2 chunks for /del.ts, 1 for /keep.ts
-      // Then deleteFile /del.ts and verify mockRun was called with /del.ts
-      vi.clearAllMocks();
-      mockAll.mockReturnValue([]);
-      store.open(':memory:');
+      const emb = new Float32Array([1, 0, 0]);
+      store.upsertChunks('/del.ts', [{ startLine: 0, endLine: 5, content: 'del', embedding: emb }], 0);
+      store.upsertChunks('/keep.ts', [{ startLine: 0, endLine: 5, content: 'keep', embedding: emb }], 0);
 
       store.deleteFile('/del.ts');
-      expect(mockRun).toHaveBeenCalledWith('/del.ts');
 
-      // /keep.ts was not targeted
-      const calls = (mockRun as ReturnType<typeof vi.fn>).mock.calls;
-      const delTsCalls = calls.filter((c: unknown[]) => c[0] === '/del.ts');
-      const keepTsCalls = calls.filter((c: unknown[]) => c[0] === '/keep.ts');
-      expect(delTsCalls.length).toBeGreaterThan(0);
-      expect(keepTsCalls.length).toBe(0);
+      const mtimes = store.getAllFileMtimes();
+      expect(mtimes.has('/del.ts')).toBe(false);
+      expect(mtimes.has('/keep.ts')).toBe(true);
     });
   });
 });

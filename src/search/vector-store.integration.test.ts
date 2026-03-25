@@ -4,34 +4,25 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { VectorStore } from './vector-store';
 
-// NOTE: No vi.mock — uses real better-sqlite3 against a temp file
+// Uses real fs against a temp directory
 
 describe('VectorStore integration', () => {
   let store: VectorStore;
-  let dbPath: string;
+  let dbDir: string;
 
   beforeEach(() => {
-    dbPath = path.join(os.tmpdir(), `lucent-test-${Date.now()}.db`);
+    dbDir = path.join(os.tmpdir(), `lucent-test-${Date.now()}`);
     store = new VectorStore();
-    store.open(dbPath);
+    store.open(dbDir);
   });
 
   afterEach(() => {
     store.close();
-    try { fs.unlinkSync(dbPath); } catch { /* already deleted */ }
+    try { fs.rmSync(dbDir, { recursive: true, force: true }); } catch { /* already deleted */ }
   });
 
-  it('creates schema on open', () => {
-    const tables = (store as any).db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chunks'")
-      .all() as { name: string }[];
-    expect(tables).toHaveLength(1);
-    expect(tables[0].name).toBe('chunks');
-
-    const indexes = (store as any).db
-      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_file_path'")
-      .all() as { name: string }[];
-    expect(indexes).toHaveLength(1);
+  it('isOpen returns true after open()', () => {
+    expect(store.isOpen()).toBe(true);
   });
 
   it('upsert then loadIntoMemory then search returns correct result', () => {
@@ -84,12 +75,20 @@ describe('VectorStore integration', () => {
     store.close();
 
     const store2 = new VectorStore();
-    store2.open(dbPath);
+    store2.open(dbDir);
     store2.loadIntoMemory();
     const results = store2.search(new Float32Array([0.5, 0.5, 0]), 1);
     store2.close();
 
     expect(results[0].filePath).toBe('persist.ts');
     expect(results[0].content).toBe('persistent');
+  });
+
+  it('writes chunks.json and embeddings.bin to the directory', () => {
+    const emb = new Float32Array([1, 0, 0]);
+    store.upsertChunks('check.ts', [{ startLine: 0, endLine: 2, content: 'check', embedding: emb }], 111);
+
+    expect(fs.existsSync(path.join(dbDir, 'chunks.json'))).toBe(true);
+    expect(fs.existsSync(path.join(dbDir, 'embeddings.bin'))).toBe(true);
   });
 });

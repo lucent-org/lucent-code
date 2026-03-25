@@ -44,7 +44,7 @@ describe('ContextBuilder', () => {
   it('should populate activeFile when active editor exists', () => {
     (vscode.window as any).activeTextEditor = {
       document: {
-        uri: { toString: () => 'file:///test.ts' },
+        uri: { scheme: 'file', toString: () => 'file:///test.ts' },
         languageId: 'typescript',
         getText: vi.fn((range?: any) => range ? 'selected text' : 'full content'),
       },
@@ -69,7 +69,7 @@ describe('ContextBuilder', () => {
   it('should populate selection when text is selected', () => {
     (vscode.window as any).activeTextEditor = {
       document: {
-        uri: { toString: () => 'file:///test.ts' },
+        uri: { scheme: 'file', toString: () => 'file:///test.ts' },
         languageId: 'typescript',
         getText: vi.fn((range?: any) => range ? 'selected text' : 'full content'),
       },
@@ -92,7 +92,7 @@ describe('ContextBuilder', () => {
   it('should not populate selection when selection is empty', () => {
     (vscode.window as any).activeTextEditor = {
       document: {
-        uri: { toString: () => 'file:///test.ts' },
+        uri: { scheme: 'file', toString: () => 'file:///test.ts' },
         languageId: 'typescript',
         getText: vi.fn(() => 'full content'),
       },
@@ -244,7 +244,7 @@ describe('ContextBuilder', () => {
 
       (vscode.window as any).activeTextEditor = {
         document: {
-          uri: { toString: () => 'file:///test.ts' },
+          uri: { scheme: 'file', toString: () => 'file:///test.ts' },
           languageId: 'typescript',
           getText: vi.fn(() => 'const x = 1;'),
         },
@@ -266,7 +266,7 @@ describe('ContextBuilder', () => {
 
       (vscode.window as any).activeTextEditor = {
         document: {
-          uri: { toString: () => 'file:///test.ts' },
+          uri: { scheme: 'file', toString: () => 'file:///test.ts' },
           languageId: 'typescript',
           getText: vi.fn(() => 'const x = 1;'),
         },

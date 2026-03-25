@@ -18,6 +18,7 @@ vi.mock('vscode', () => ({
     }),
     workspaceFolders: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace', path: '/workspace' } }],
     applyEdit: vi.fn().mockResolvedValue(true),
+    findFiles: vi.fn().mockResolvedValue([]),
     fs: {
       readFile: vi.fn(),
       stat: vi.fn(),
@@ -122,6 +123,7 @@ describe('MessageHandler', () => {
     formatEnrichedPrompt: ReturnType<typeof vi.fn>;
     getCapabilities: ReturnType<typeof vi.fn>;
     getCustomInstructions: ReturnType<typeof vi.fn>;
+    getActivatedSkills: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     setChatModel: ReturnType<typeof vi.fn>;
@@ -180,6 +182,7 @@ describe('MessageHandler', () => {
       formatEnrichedPrompt: vi.fn(() => 'formatted context'),
       getCapabilities: vi.fn(() => undefined),
       getCustomInstructions: vi.fn(() => undefined),
+      getActivatedSkills: vi.fn(() => []),
     };
 
     mockSettings = {
@@ -969,13 +972,13 @@ describe('MessageHandler', () => {
     });
 
     it('clears pending approvals when abort() is called', () => {
-      const resolved: boolean[] = [];
+      const resolved: { approved: boolean; scope: string }[] = [];
       const requestId = 'test-id';
-      (handler as any).pendingApprovals.set(requestId, (v: boolean) => resolved.push(v));
+      (handler as any).pendingApprovals.set(requestId, (v: { approved: boolean; scope: string }) => resolved.push(v));
 
       handler.abort();
 
-      expect(resolved).toEqual([false]);
+      expect(resolved).toEqual([{ approved: false, scope: 'once' }]);
       expect((handler as any).pendingApprovals.size).toBe(0);
     });
 
@@ -1212,6 +1215,242 @@ describe('MessageHandler', () => {
         await sendPromise;
       });
     });
+
+    describe('scope persistence', () => {
+      it('calls approveForWorkspace when scope is workspace', async () => {
+        const toolStream = createToolCallStream([
+          { id: 'call_1', name: 'run_terminal_command', arguments: '{"command":"echo hi"}' },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'run command', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        const approvalManager = (handler as any).approvalManager;
+        const approveForWorkspaceSpy = vi.spyOn(approvalManager, 'approveForWorkspace').mockResolvedValue(undefined);
+
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req.requestId, approved: true, scope: 'workspace' },
+          () => {}
+        );
+
+        await sendPromise;
+
+        expect(approveForWorkspaceSpy).toHaveBeenCalledWith('run_terminal_command');
+      });
+
+      it('calls approveGlobally when scope is global', async () => {
+        const toolStream = createToolCallStream([
+          { id: 'call_1', name: 'run_terminal_command', arguments: '{"command":"echo hi"}' },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'run command', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        const approvalManager = (handler as any).approvalManager;
+        const approveGloballySpy = vi.spyOn(approvalManager, 'approveGlobally').mockResolvedValue(undefined);
+
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req.requestId, approved: true, scope: 'global' },
+          () => {}
+        );
+
+        await sendPromise;
+
+        expect(approveGloballySpy).toHaveBeenCalledWith('run_terminal_command');
+      });
+
+      it('does not call persist methods when scope is once or absent', async () => {
+        const toolStream = createToolCallStream([
+          { id: 'call_1', name: 'run_terminal_command', arguments: '{"command":"echo hi"}' },
+        ]);
+        const stopStream = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStream)
+          .mockReturnValueOnce(stopStream);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        const postMessages: ExtensionMessage[] = [];
+        const sendPromise = handler.handleMessage(
+          { type: 'sendMessage', content: 'run command', model: 'gpt-4' },
+          (msg) => postMessages.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        const approvalManager = (handler as any).approvalManager;
+        const approveForWorkspaceSpy = vi.spyOn(approvalManager, 'approveForWorkspace').mockResolvedValue(undefined);
+        const approveGloballySpy = vi.spyOn(approvalManager, 'approveGlobally').mockResolvedValue(undefined);
+
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req.requestId, approved: true, scope: 'once' },
+          () => {}
+        );
+
+        await sendPromise;
+
+        expect(approveForWorkspaceSpy).not.toHaveBeenCalled();
+        expect(approveGloballySpy).not.toHaveBeenCalled();
+      });
+
+      it('approves for session when scope is once so second call skips approval card', async () => {
+        const toolStreamFirst = createToolCallStream([
+          { id: 'call_1', name: 'write_file', arguments: '{"path":"src/foo.ts","content":"a"}' },
+        ]);
+        const stopStreamFirst = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        const toolStreamSecond = createToolCallStream([
+          { id: 'call_2', name: 'write_file', arguments: '{"path":"src/bar.ts","content":"b"}' },
+        ]);
+        const stopStreamSecond = createMockStream([
+          { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+        ]);
+        mockClient.chatStream
+          .mockReturnValueOnce(toolStreamFirst)
+          .mockReturnValueOnce(stopStreamFirst)
+          .mockReturnValueOnce(toolStreamSecond)
+          .mockReturnValueOnce(stopStreamSecond);
+        mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'OK' });
+
+        // First send — approval required
+        const postMessages1: ExtensionMessage[] = [];
+        const sendPromise1 = handler.handleMessage(
+          { type: 'sendMessage', content: 'write first file', model: 'gpt-4' },
+          (msg) => postMessages1.push(msg)
+        );
+
+        await vi.waitFor(() => {
+          expect(postMessages1.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+        }, { timeout: 1000 });
+
+        const req1 = postMessages1.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+        // Approve with 'once' scope
+        await handler.handleMessage(
+          { type: 'toolApprovalResponse', requestId: req1.requestId, approved: true, scope: 'once' },
+          () => {}
+        );
+        await sendPromise1;
+
+        // Second send — write_file should execute without another approval card
+        const postMessages2: ExtensionMessage[] = [];
+        await handler.handleMessage(
+          { type: 'sendMessage', content: 'write second file', model: 'gpt-4' },
+          (msg) => postMessages2.push(msg)
+        );
+
+        expect(postMessages2.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+        expect(mockToolExecutor.execute).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('use_model: posts toolApprovalRequest and emits modelChanged after approval', async () => {
+      mockToolExecutor.execute.mockResolvedValue({ success: true, message: 'Switched to model: anthropic/claude-opus-4-6' });
+
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'use_model', arguments: '{"model_id":"anthropic/claude-opus-4-6","reason":"Needs stronger reasoning"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      const postMessages: ExtensionMessage[] = [];
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'switch model', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+      expect(req.toolName).toBe('use_model');
+      expect(req.currentModel).toBe('gpt-4');
+
+      await handler.handleMessage(
+        { type: 'toolApprovalResponse', requestId: req.requestId, approved: true },
+        (msg) => postMessages.push(msg)
+      );
+
+      await sendPromise;
+
+      expect(postMessages.some((m) => m.type === 'modelChanged' && (m as any).modelId === 'anthropic/claude-opus-4-6')).toBe(true);
+    });
+
+    it('use_model: denied → no modelChanged posted', async () => {
+      const toolStream = createToolCallStream([
+        { id: 'call_1', name: 'use_model', arguments: '{"model_id":"anthropic/claude-opus-4-6"}' },
+      ]);
+      const stopStream = createMockStream([
+        { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] },
+      ]);
+      mockClient.chatStream
+        .mockReturnValueOnce(toolStream)
+        .mockReturnValueOnce(stopStream);
+
+      const postMessages: ExtensionMessage[] = [];
+      const sendPromise = handler.handleMessage(
+        { type: 'sendMessage', content: 'switch model', model: 'gpt-4' },
+        (msg) => postMessages.push(msg)
+      );
+
+      await vi.waitFor(() => {
+        expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(true);
+      }, { timeout: 1000 });
+
+      const req = postMessages.find((m) => m.type === 'toolApprovalRequest') as Extract<ExtensionMessage, { type: 'toolApprovalRequest' }>;
+
+      await handler.handleMessage(
+        { type: 'toolApprovalResponse', requestId: req.requestId, approved: false },
+        (msg) => postMessages.push(msg)
+      );
+
+      await sendPromise;
+
+      expect(postMessages.some((m) => m.type === 'modelChanged')).toBe(false);
+    });
   });
 
   describe('handleSendMessage with images', () => {
@@ -1315,22 +1554,35 @@ describe('MessageHandler', () => {
       expect(mockClient.chatStream).toHaveBeenCalledTimes(2);
     });
 
-    it('should post streamError after exceeding max tool iterations', async () => {
-      // Always return tool_calls — never resolves with 'stop'
-      // Use mockImplementation so each call gets a fresh async generator instance
-      mockClient.chatStream.mockImplementation(() =>
-        createToolCallStream([{ id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' }])
-      );
+    it('strips tools on the final iteration and produces a text response instead of an error', async () => {
+      // First 14 calls return tool_calls; the 15th (final) must return a stop response
+      // because tools are stripped on the last iteration.
+      const toolStream = () =>
+        createToolCallStream([{ id: 'call_1', name: 'format_document', arguments: '{"uri":"file:///test.ts"}' }]);
+      const finalStream = createMockStream([
+        { choices: [{ delta: { content: 'Here is a summary of what I did.' }, finish_reason: null }] },
+        { choices: [{ delta: {}, finish_reason: 'stop' }] },
+      ]);
+
+      let callCount = 0;
+      mockClient.chatStream.mockImplementation(() => {
+        callCount++;
+        return callCount < 15 ? toolStream() : finalStream;
+      });
 
       await toolHandler.handleMessage(
         { type: 'sendMessage', content: 'loop forever', model: 'test-model' },
         postMessage
       );
 
-      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'streamError' }));
-      expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'streamEnd' }));
-      // 5 iterations max
-      expect(mockClient.chatStream).toHaveBeenCalledTimes(5);
+      // Should resolve cleanly with streamEnd, not streamError
+      expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'streamEnd' }));
+      expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'streamError' }));
+      // 15 iterations max
+      expect(mockClient.chatStream).toHaveBeenCalledTimes(15);
+      // Final call must NOT include tools (forces text response)
+      const lastCallArgs = mockClient.chatStream.mock.calls[14][0];
+      expect(lastCallArgs.tools).toBeUndefined();
     });
 
     it('should pass TOOL_DEFINITIONS in the API request when toolExecutor is provided', async () => {
@@ -1457,14 +1709,32 @@ describe('MessageHandler', () => {
       expect(systemMessage.content).toContain('use_skill');
     });
 
-    it('pre-injects matching skill content as <skill> block in user message', async () => {
+    it('shows project-activated skills note in system prompt when getActivatedSkills returns names', async () => {
+      mockContextBuilder.getActivatedSkills.mockReturnValue(['tdd']);
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'hello', model: 'test-model' },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      const systemMessage = callArgs.messages.find((m: { role: string }) => m.role === 'system');
+      expect(systemMessage).toBeDefined();
+      expect(systemMessage.content).toContain('Project-activated skills');
+      expect(systemMessage.content).toContain('tdd');
+    });
+
+    it('does not pre-inject skill content into user message content', async () => {
       const skillContent = 'Write tests first, then implementation.';
       mockSkillRegistry.get.mockImplementation((name: string) => {
         if (name === 'tdd') return { name: 'tdd', description: 'Test-driven development approach', content: skillContent, source: 'local' };
         return undefined;
       });
-      // SkillMatcher will score 'tdd' message against 'tdd' description — use a spy to force a match
-      const matchSpy = vi.spyOn((skillHandler as any).skillMatcher, 'match').mockReturnValue(['tdd']);
       mockClient.chatStream.mockReturnValue(
         createMockStream([
           { choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }] },
@@ -1479,10 +1749,10 @@ describe('MessageHandler', () => {
       const callArgs = mockClient.chatStream.mock.calls[0][0];
       const userMsg = callArgs.messages.find((m: { role: string }) => m.role === 'user');
       expect(userMsg).toBeDefined();
-      expect(userMsg.content).toContain(`<skill name="tdd">`);
-      expect(userMsg.content).toContain(skillContent);
+      // Skill content must NOT be pre-injected — baseContent is just the raw user message
+      expect(userMsg.content).not.toContain('<skill name="tdd">');
+      expect(userMsg.content).not.toContain(skillContent);
       expect(userMsg.content).toContain('write some tdd tests');
-      matchSpy.mockRestore();
     });
 
     it('posts skillsLoaded when registry has skills on ready', async () => {
@@ -2058,6 +2328,31 @@ describe('autonomous mode', () => {
     expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
     expect(mockToolExecutor.execute).toHaveBeenCalledWith('rename_symbol', expect.any(Object));
   });
+
+  it('approval-gated editor tool (write_file), autonomous mode on → executes directly, no approval', async () => {
+    const handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings,
+      mockToolExecutor as unknown as EditorToolExecutor,
+      undefined, undefined, undefined, undefined,
+      mcpManager,
+    );
+
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
+
+    mockClient.chatStream.mockReturnValue(
+      createToolCallStream([{ id: 'call_1', name: 'write_file', arguments: '{"path":"src/foo.ts","content":"export {}"}' }])
+    );
+
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'write a file', model: 'gpt-4' },
+      (m) => postMessages.push(m)
+    );
+
+    expect(postMessages.some((m) => m.type === 'toolApprovalRequest')).toBe(false);
+    expect(mockToolExecutor.execute).toHaveBeenCalledWith('write_file', expect.any(Object));
+  });
 });
 
 describe('@codebase mention', () => {
@@ -2115,7 +2410,7 @@ describe('@codebase mention', () => {
       vi.fn()
     );
 
-    expect(mockIndexer.searchAsync).toHaveBeenCalledWith('find auth logic', 10);
+    expect(mockIndexer.searchAsync).toHaveBeenCalledWith('find auth logic', 8);
 
     const callArgs = mockClient.chatStream.mock.calls[0][0];
     const systemMessage = callArgs.messages.find((m: any) => m.role === 'system');
@@ -2165,5 +2460,294 @@ describe('@codebase mention', () => {
     const userMessage = callArgs.messages.find((m: any) => m.role === 'user');
     // Without indexer, processedContent stays as original content
     expect(userMessage.content).toBe('@codebase find something');
+  });
+});
+
+describe('compactConversation', () => {
+  let handler: MessageHandler;
+  let mockClient: {
+    chatStream: ReturnType<typeof vi.fn>;
+    chat: ReturnType<typeof vi.fn>;
+    listModels: ReturnType<typeof vi.fn>;
+  };
+  let mockContextBuilder: {
+    buildContext: ReturnType<typeof vi.fn>;
+    formatForPrompt: ReturnType<typeof vi.fn>;
+    buildEnrichedContext: ReturnType<typeof vi.fn>;
+    formatEnrichedPrompt: ReturnType<typeof vi.fn>;
+    getCapabilities: ReturnType<typeof vi.fn>;
+    getCustomInstructions: ReturnType<typeof vi.fn>;
+    getActivatedSkills: ReturnType<typeof vi.fn>;
+  };
+  let mockSettings: {
+    setChatModel: ReturnType<typeof vi.fn>;
+    temperature: number;
+    maxTokens: number;
+  };
+  let postMessage: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockClient = {
+      chatStream: vi.fn(),
+      chat: vi.fn(),
+      listModels: vi.fn().mockResolvedValue([]),
+    };
+
+    mockContextBuilder = {
+      buildContext: vi.fn().mockReturnValue({}),
+      formatForPrompt: vi.fn().mockReturnValue(''),
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      formatEnrichedPrompt: vi.fn(() => ''),
+      getCapabilities: vi.fn(() => undefined),
+      getCustomInstructions: vi.fn(() => undefined),
+      getActivatedSkills: vi.fn(() => []),
+    };
+
+    mockSettings = {
+      setChatModel: vi.fn().mockResolvedValue(undefined),
+      temperature: 0.7,
+      maxTokens: 4096,
+    };
+
+    postMessage = vi.fn();
+
+    handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings
+    );
+  });
+
+  it('calls client.chat with a summarization prompt and replaces conversation, then posts conversationCompacted', async () => {
+    // Populate conversationMessages with one turn
+    mockClient.chatStream.mockReturnValue(
+      (async function* () {
+        yield { choices: [{ delta: { content: 'Hello' } }] };
+      })()
+    );
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'What is 2+2?', model: 'test-model' },
+      postMessage
+    );
+    postMessage.mockClear();
+
+    // Now compact
+    mockClient.chat = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'We discussed basic arithmetic.' } }],
+    });
+
+    await handler.handleMessage(
+      { type: 'compactConversation', model: 'test-model' },
+      postMessage
+    );
+
+    expect(mockClient.chat).toHaveBeenCalledOnce();
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'conversationCompacted', summary: 'We discussed basic arithmetic.' })
+    );
+
+    // Verify conversationMessages was replaced: a subsequent sendMessage should
+    // call chatStream with only the compacted summary entry (+ system message),
+    // not the original multi-turn history.
+    mockClient.chatStream.mockClear();
+    mockClient.chatStream.mockReturnValue(
+      (async function* () {
+        yield { choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] };
+      })()
+    );
+    postMessage.mockClear();
+    await handler.handleMessage(
+      { type: 'sendMessage', content: 'follow-up', model: 'test-model' },
+      postMessage
+    );
+    const streamCall = mockClient.chatStream.mock.calls[0][0] as { messages: { role: string; content: string }[] };
+    // messages = [system, compacted-user, new-user] — compacted entry is index 1
+    const compactedEntry = streamCall.messages[1];
+    expect(compactedEntry.role).toBe('user');
+    expect(compactedEntry.content).toContain('We discussed basic arithmetic.');
+    // The history must not include the original pre-compact messages (only 3 entries total)
+    expect(streamCall.messages).toHaveLength(3);
+  });
+
+  it('posts conversationCompacted with fallback message if chat call fails', async () => {
+    mockClient.chat = vi.fn().mockRejectedValue(new Error('API error'));
+
+    await handler.handleMessage(
+      { type: 'compactConversation', model: 'test-model' },
+      postMessage
+    );
+
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'conversationCompacted',
+        summary: expect.stringContaining('[Compaction failed'),
+      })
+    );
+  });
+
+});
+
+describe('listFiles', () => {
+  let handler: MessageHandler;
+  let postMessage: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const mockClient = {
+      chatStream: vi.fn(),
+      chat: vi.fn(),
+      listModels: vi.fn().mockResolvedValue([]),
+    };
+    const mockContextBuilder = {
+      buildContext: vi.fn().mockReturnValue({}),
+      formatForPrompt: vi.fn().mockReturnValue(''),
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      formatEnrichedPrompt: vi.fn(() => ''),
+      getCapabilities: vi.fn(() => undefined),
+      getCustomInstructions: vi.fn(() => undefined),
+      getActivatedSkills: vi.fn(() => []),
+    };
+    const mockSettings = {
+      setChatModel: vi.fn().mockResolvedValue(undefined),
+      temperature: 0.7,
+      maxTokens: 4096,
+    };
+    postMessage = vi.fn();
+    handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings
+    );
+  });
+
+  it('returns matching workspace files', async () => {
+    const mockUri = { fsPath: '/workspace/src/foo.ts' };
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValueOnce([mockUri as any]);
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace' } }],
+      configurable: true,
+    });
+
+    await handler.handleMessage({ type: 'listFiles', query: 'foo' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'fileList',
+      files: [{ name: 'foo.ts', relativePath: 'src/foo.ts' }],
+    });
+  });
+
+  it('returns empty array when no workspace folder', async () => {
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: undefined,
+      configurable: true,
+    });
+
+    await handler.handleMessage({ type: 'listFiles', query: 'anything' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith({ type: 'fileList', files: [] });
+  });
+});
+
+describe('readFileForAttachment', () => {
+  let handler: MessageHandler;
+  let postMessage: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const mockClient = {
+      chatStream: vi.fn(),
+      chat: vi.fn(),
+      listModels: vi.fn().mockResolvedValue([]),
+    };
+    const mockContextBuilder = {
+      buildContext: vi.fn().mockReturnValue({}),
+      formatForPrompt: vi.fn().mockReturnValue(''),
+      buildEnrichedContext: vi.fn().mockResolvedValue({}),
+      formatEnrichedPrompt: vi.fn(() => ''),
+      getCapabilities: vi.fn(() => undefined),
+      getCustomInstructions: vi.fn(() => undefined),
+      getActivatedSkills: vi.fn(() => []),
+    };
+    const mockSettings = {
+      setChatModel: vi.fn().mockResolvedValue(undefined),
+      temperature: 0.7,
+      maxTokens: 4096,
+    };
+    postMessage = vi.fn();
+    handler = new MessageHandler(
+      mockClient as unknown as OpenRouterClient,
+      mockContextBuilder as unknown as ContextBuilder,
+      mockSettings as unknown as Settings
+    );
+  });
+
+  it('returns file content', async () => {
+    const content = 'export const foo = 1;';
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace' } }],
+      configurable: true,
+    });
+    vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(
+      new TextEncoder().encode(content) as any
+    );
+
+    await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'src/foo.ts' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'fileAttachment',
+      name: 'foo.ts',
+      relativePath: 'src/foo.ts',
+      content,
+    }));
+  });
+
+  it('returns error when no workspace', async () => {
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: undefined,
+      configurable: true,
+    });
+
+    await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'src/foo.ts' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'fileAttachment',
+      error: expect.any(String),
+    }));
+  });
+
+  it('returns error for binary files (null-byte probe)', async () => {
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace' } }],
+      configurable: true,
+    });
+    // Binary content with a null byte in the first 8 KB
+    const binaryBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x0d, 0x0a, 0x1a]);
+    vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(binaryBytes as any);
+
+    await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'image.png' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'fileAttachment',
+      error: expect.stringContaining('Binary'),
+    }));
+  });
+
+  it('returns error when file exceeds 5 MB', async () => {
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace', toString: () => 'file:///workspace' } }],
+      configurable: true,
+    });
+    // Simulate a file just over 5 MB
+    const oversizedBytes = new Uint8Array(5 * 1024 * 1024 + 1);
+    vi.mocked(vscode.workspace.fs.readFile).mockResolvedValueOnce(oversizedBytes as any);
+
+    await handler.handleMessage({ type: 'readFileForAttachment', relativePath: 'big.ts' }, postMessage);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'fileAttachment',
+      error: expect.stringContaining('5 MB'),
+    }));
   });
 });

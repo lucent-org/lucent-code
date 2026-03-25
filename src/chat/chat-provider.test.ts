@@ -34,6 +34,7 @@ function makeWebviewView(visible = true) {
   return {
     webview,
     visible,
+    onDidDispose: vi.fn(),
   } as any;
 }
 

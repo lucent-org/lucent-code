@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
 import { messageText } from '../core/message-text';
-import { OpenRouterClient } from '../core/openrouter-client';
+import { OpenRouterClient, OpenRouterError } from '../core/openrouter-client';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION, START_WORKTREE_TOOL_DEFINITION } from '../lsp/editor-tools';
@@ -14,9 +14,9 @@ import { ConversationHistory } from './history';
 import { NotificationService } from '../core/notifications';
 import { TerminalBuffer } from '../core/terminal-buffer';
 import { SkillRegistry } from '../skills/skill-registry';
-import { SkillMatcher } from '../skills/skill-matcher';
 import type { McpClientManager } from '../mcp/mcp-client-manager';
 import type { Indexer } from '../search/indexer';
+import { ToolApprovalManager } from './tool-approval-manager';
 
 export class MessageHandler {
   private conversationMessages: ChatMessage[] = [];
@@ -25,11 +25,20 @@ export class MessageHandler {
   private pendingApply = new Map<string, string>(); // fileUri string → proposed code
 
   onStreamEnd?: () => void;
+  onAuthInvalid?: () => void;
 
-  private readonly pendingApprovals = new Map<string, (approved: boolean) => void>();
-  private readonly skillMatcher = new SkillMatcher();
+  resetConversation(): void {
+    this.conversationMessages = [];
+    this.currentConversation = undefined;
+    this.sessionCost = 0;
+  }
+
+  private readonly pendingApprovals = new Map<string, (result: { approved: boolean; scope: 'once' | 'workspace' | 'global' }) => void>();
   private _autonomousMode = false;
   private _worktreeManager: WorktreeManager | null = null;
+
+  private sessionCost = 0;
+  private modelPricing = new Map<string, { prompt: string; completion: string }>();
 
   private static readonly GATED_TOOLS = new Set([
     'rename_symbol',
@@ -37,6 +46,15 @@ export class MessageHandler {
     'replace_range',
     'apply_code_action',
   ]);
+
+  private static readonly APPROVAL_GATED_TOOLS = new Set([
+    'write_file',
+    'delete_file',
+    'run_terminal_command',
+    'use_model',
+  ]);
+
+  private readonly approvalManager: ToolApprovalManager;
 
   constructor(
     private readonly client: OpenRouterClient,
@@ -51,6 +69,8 @@ export class MessageHandler {
     private readonly indexer?: Indexer
   ) {
     this._autonomousMode = this.settings.autonomousMode ?? false;
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    this.approvalManager = new ToolApprovalManager(wsRoot);
   }
 
   setWorktreeManager(manager: WorktreeManager): void {
@@ -63,6 +83,12 @@ export class MessageHandler {
       this._worktreeManager.create(this.currentConversation.id).catch((e: Error) => {
         console.error('[WorktreeManager] Failed to create worktree:', e.message);
       });
+    }
+  }
+
+  setModelPricing(models: import('../shared/types').OpenRouterModel[]): void {
+    for (const m of models) {
+      this.modelPricing.set(m.id, m.pricing);
     }
   }
 
@@ -137,7 +163,7 @@ export class MessageHandler {
         const resolve = this.pendingApprovals.get(message.requestId);
         if (resolve) {
           this.pendingApprovals.delete(message.requestId);
-          resolve(message.approved);
+          resolve({ approved: message.approved, scope: message.scope ?? 'once' });
         }
         break;
       }
@@ -163,6 +189,84 @@ export class MessageHandler {
         }
         break;
       }
+      case 'compactConversation': {
+        const model = message.model;
+        let summary: string;
+        try {
+          const historyText = this.conversationMessages
+            .map((m) => `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`)
+            .join('\n');
+          const response = await this.client.chat({
+            model,
+            messages: [
+              {
+                role: 'user',
+                content: `Summarize this conversation in 3–5 sentences. Capture key decisions, code changes discussed, and open questions. Be concise.\n\n${historyText}`,
+              },
+            ],
+            max_tokens: 300,
+          });
+          const raw = response.choices?.[0]?.message?.content;
+          summary = typeof raw === 'string' ? raw : (raw ? JSON.stringify(raw) : '[No summary generated]');
+        } catch (e: unknown) {
+          summary = `[Compaction failed: ${e instanceof Error ? e.message : String(e)}]`;
+        }
+
+        const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        this.conversationMessages = [
+          { role: 'user', content: `[Conversation compacted — ${timestamp}]\n\n${summary}` },
+        ];
+        postMessage({ type: 'conversationCompacted', summary });
+        break;
+      }
+      case 'listFiles': {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+          postMessage({ type: 'fileList', files: [] });
+          break;
+        }
+        const root = folders[0].uri.fsPath;
+        const query = message.query.trim().toLowerCase();
+        const uris = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 500);
+        const files = uris
+          .map((uri) => {
+            const rel = path.relative(root, uri.fsPath).split(path.sep).join('/');
+            const name = rel.split(/[\\/]/).pop() ?? rel;
+            return { name, relativePath: rel };
+          })
+          .filter(({ relativePath }) => !query || relativePath.toLowerCase().includes(query))
+          .slice(0, 30);
+        postMessage({ type: 'fileList', files });
+        break;
+      }
+      case 'readFileForAttachment': {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+          postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'No workspace' });
+          break;
+        }
+        const uri = vscode.Uri.joinPath(folders[0].uri, message.relativePath);
+        try {
+          const bytes = await vscode.workspace.fs.readFile(uri);
+          if (bytes.byteLength > 5 * 1024 * 1024) {
+            postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'File exceeds 5 MB limit' });
+            break;
+          }
+          // Detect binary files by scanning for null bytes in first 8 KB
+          const probe = bytes.subarray(0, Math.min(bytes.byteLength, 8192));
+          if (probe.indexOf(0) !== -1) {
+            const name = message.relativePath.split(/[\\/]/).pop() ?? message.relativePath;
+            postMessage({ type: 'fileAttachment', name, relativePath: message.relativePath, content: '', error: 'Binary file — cannot attach as text' });
+            break;
+          }
+          const content = new TextDecoder().decode(bytes);
+          const name = message.relativePath.split(/[\\/]/).pop() ?? message.relativePath;
+          postMessage({ type: 'fileAttachment', name, relativePath: message.relativePath, content });
+        } catch {
+          postMessage({ type: 'fileAttachment', name: '', relativePath: message.relativePath, content: '', error: 'Could not read file' });
+        }
+        break;
+      }
     }
   }
 
@@ -172,6 +276,7 @@ export class MessageHandler {
     model: string,
     postMessage: (msg: ExtensionMessage) => void
   ): Promise<void> {
+    let activeModel = model;
     const context = await this.contextBuilder.buildEnrichedContext();
     const capabilities = this.contextBuilder.getCapabilities();
     const contextPrompt = this.contextBuilder.formatEnrichedPrompt(context, capabilities);
@@ -188,7 +293,13 @@ export class MessageHandler {
 
     const skillSummaries = this.skillRegistry?.getSummaries() ?? [];
     if (skillSummaries.length > 0) {
-      const advertisement = `\n\n## Available Skills\nThe following skills are available. Use the \`use_skill\` tool when a skill is relevant.\n\n${skillSummaries.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`;
+      const activatedSkills = this.contextBuilder.getActivatedSkills();
+      // "Preferred" is a soft signal — the model still decides when to call use_skill.
+      // This is intentional pull-only behaviour: no automatic injection, just a hint.
+      const activatedNote = activatedSkills.length > 0
+        ? `\n\n**Project-activated skills** (preferred for this workspace): ${activatedSkills.join(', ')}`
+        : '';
+      const advertisement = `\n\n## Available Skills\nThe following skills are available. Use the \`use_skill\` tool when relevant.${activatedNote}\n\n${skillSummaries.map((s) => `- **${s.name}**: ${s.description}`).join('\n')}`;
       systemMessage.content += advertisement;
     }
 
@@ -199,12 +310,20 @@ export class MessageHandler {
       processedContent = query || content; // strip @codebase prefix; fall back to original if no query
       if (query) {
         try {
-          const results = await this.indexer.searchAsync(query, 10);
+          const results = await this.indexer.searchAsync(query, 8);
           if (results.length > 0) {
-            const contextBlock = results
-              .map((r) => `${r.filePath}:${r.startLine}-${r.endLine}\n\`\`\`\n${r.content}\n\`\`\``)
-              .join('\n\n');
-            systemMessage.content += `\n\n<codebase-context query="${query}">\n${contextBlock}\n</codebase-context>`;
+            const MAX_CONTEXT_CHARS = 40_000;
+            let used = 0;
+            const parts: string[] = [];
+            for (const r of results) {
+              const entry = `${r.filePath}:${r.startLine}-${r.endLine}\n\`\`\`\n${r.content}\n\`\`\``;
+              if (used + entry.length > MAX_CONTEXT_CHARS) break;
+              parts.push(entry);
+              used += entry.length;
+            }
+            if (parts.length > 0) {
+              systemMessage.content += `\n\n<codebase-context query="${query}">\n${parts.join('\n\n')}\n</codebase-context>`;
+            }
           }
         } catch {
           // Non-fatal — send message without codebase context
@@ -212,16 +331,7 @@ export class MessageHandler {
       }
     }
 
-    const skillMatches = this.skillRegistry
-      ? this.skillMatcher.match(content, this.skillRegistry.getSummaries())
-      : [];
-    const skillBlocks = skillMatches
-      .map((name) => this.skillRegistry!.get(name))
-      .filter((s): s is NonNullable<typeof s> => s !== undefined)
-      .map((s) => `<skill name="${s.name}">\n${s.content}\n</skill>`)
-      .join('\n\n');
-
-    const baseContent = skillBlocks ? `${skillBlocks}\n\n${processedContent}` : processedContent;
+    const baseContent = processedContent;
     const userContent = images.length > 0
       ? [
           { type: 'text' as const, text: baseContent },
@@ -239,22 +349,26 @@ export class MessageHandler {
     const tools         = allTools.length > 0 ? allTools : undefined;
 
     try {
-      const MAX_TOOL_ITERATIONS = 5;
+      const MAX_TOOL_ITERATIONS = 15;
       let completed = false;
 
       for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
         let fullContent = '';
         const toolCallAccumulator = new Map<number, { id: string; name: string; arguments: string }>();
         let finishReason: string | null = null;
+        let usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
+
+        // On the last iteration, strip tools so the model is forced to produce a text response
+        const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
 
         const stream = this.client.chatStream(
           {
-            model,
+            model: activeModel,
             messages: [systemMessage, ...this.conversationMessages],
             temperature: this.settings.temperature,
             max_tokens: this.settings.maxTokens,
             stream: true,
-            tools,
+            tools: isLastIteration ? undefined : tools,
           },
           this.abortController.signal
         );
@@ -277,6 +391,36 @@ export class MessageHandler {
             }
           }
           finishReason = chunk.choices[0]?.finish_reason ?? finishReason;
+          if (chunk.usage) usage = chunk.usage;
+        }
+
+        if (usage) {
+          const pricing = this.modelPricing.get(activeModel);
+          const promptCost = pricing ? usage.prompt_tokens * parseFloat(pricing.prompt) : 0;
+          const completionCost = pricing ? usage.completion_tokens * parseFloat(pricing.completion) : 0;
+          const lastMessageCost = promptCost + completionCost;
+          this.sessionCost += lastMessageCost;
+
+          let creditsUsed = 0;
+          let creditsLimit: number | null = null;
+          try {
+            const balance = await this.client.getAccountBalance();
+            creditsUsed = balance.usage;
+            creditsLimit = balance.limit;
+          } catch { /* non-fatal */ }
+
+          postMessage({
+            type: 'usageUpdate',
+            lastMessageCost,
+            lastMessageTokens: usage.total_tokens,
+            sessionCost: this.sessionCost,
+            creditsUsed,
+            creditsLimit,
+          });
+
+          if (creditsLimit !== null && creditsUsed >= creditsLimit) {
+            postMessage({ type: 'noCredits' });
+          }
         }
 
         if (finishReason === 'tool_calls' && toolCallAccumulator.size > 0 && (this.toolExecutor || this.skillRegistry || this.mcpClientManager)) {
@@ -330,7 +474,7 @@ export class MessageHandler {
             }
             if (tc.function.name.startsWith('mcp__') && this.mcpClientManager) {
               if (!this._autonomousMode) {
-                const approved = await this.requestToolApproval(tc.function.name, args, postMessage);
+                const { approved } = await this.requestToolApproval(tc.function.name, args, postMessage);
                 if (!approved) {
                   this.conversationMessages.push({
                     role: 'tool',
@@ -358,7 +502,7 @@ export class MessageHandler {
             }
             if (!this._autonomousMode && MessageHandler.GATED_TOOLS.has(tc.function.name)) {
               const diff = await this.computeToolDiff(tc.function.name, args);
-              const approved = await this.requestToolApproval(tc.function.name, args, postMessage, diff);
+              const { approved } = await this.requestToolApproval(tc.function.name, args, postMessage, diff);
               if (!approved) {
                 this.conversationMessages.push({
                   role: 'tool',
@@ -367,6 +511,51 @@ export class MessageHandler {
                 });
                 continue;
               }
+            }
+            if (!this._autonomousMode && MessageHandler.APPROVAL_GATED_TOOLS.has(tc.function.name)) {
+              const alreadyApproved = await this.approvalManager.isApproved(tc.function.name);
+              if (!alreadyApproved) {
+                const currentModelForApproval = tc.function.name === 'use_model' ? activeModel : undefined;
+                const { approved, scope } = await this.requestToolApproval(tc.function.name, args, postMessage, undefined, currentModelForApproval);
+                if (!approved) {
+                  this.conversationMessages.push({
+                    role: 'tool',
+                    tool_call_id: tc.id,
+                    content: 'User denied this action.',
+                  });
+                  continue;
+                }
+                if (scope === 'workspace') {
+                  await this.approvalManager.approveForWorkspace(tc.function.name);
+                } else if (scope === 'global') {
+                  await this.approvalManager.approveGlobally(tc.function.name);
+                }
+                if (scope === 'once') {
+                  this.approvalManager.approveForSession(tc.function.name);
+                }
+              }
+            }
+            if (tc.function.name === 'use_model') {
+              const newModelId = ((args as Record<string, unknown>).model_id as string | undefined)?.trim();
+              if (!newModelId) {
+                this.conversationMessages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: 'Error: model_id must be a non-empty string.',
+                });
+                continue;
+              }
+              activeModel = newModelId;
+              const result = await this.toolExecutor.execute(tc.function.name, args);
+              this.conversationMessages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: this.truncateToolOutput(
+                  result.success ? (result.message ?? 'Done') : `Error: ${result.error}`
+                ),
+              });
+              postMessage({ type: 'modelChanged', modelId: newModelId });
+              continue;
             }
             const result = await this.toolExecutor.execute(tc.function.name, args);
             this.conversationMessages.push({
@@ -387,7 +576,8 @@ export class MessageHandler {
       }
 
       if (!completed) {
-        postMessage({ type: 'streamError', error: 'Tool execution loop exceeded maximum iterations' });
+        // Should not be reachable — last iteration always has tools stripped, forcing finish_reason: stop
+        postMessage({ type: 'streamEnd' });
         return;
       }
 
@@ -398,7 +588,7 @@ export class MessageHandler {
           .map((m) => ({ role: m.role, content: m.content })) as ChatMessage[];
 
         if (!this.currentConversation) {
-          this.currentConversation = await this.history.create(model);
+          this.currentConversation = await this.history.create(activeModel);
         }
         this.currentConversation.messages = savable;
         await this.history.save(this.currentConversation);
@@ -414,10 +604,12 @@ export class MessageHandler {
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         postMessage({ type: 'streamEnd' });
+      } else if (error instanceof OpenRouterError) {
+        await this.handleApiError(error, postMessage);
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        await this.notifications.handleError(errorMessage);
         postMessage({ type: 'streamError', error: errorMessage });
-        this.notifications.handleError(errorMessage);
       }
     } finally {
       this.abortController = undefined;
@@ -427,7 +619,7 @@ export class MessageHandler {
   abort(): void {
     this.abortController?.abort();
     for (const resolve of this.pendingApprovals.values()) {
-      resolve(false);
+      resolve({ approved: false, scope: 'once' });
     }
     this.pendingApprovals.clear();
   }
@@ -436,9 +628,47 @@ export class MessageHandler {
     this.abort();
   }
 
+  private async handleApiError(error: OpenRouterError, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+    switch (error.code) {
+      case 401:
+        this.onAuthInvalid?.();
+        postMessage({ type: 'streamError', error: 'Authentication failed — please sign in again.' });
+        break;
+      case 402:
+        postMessage({ type: 'noCredits' });
+        postMessage({ type: 'streamError', error: 'Insufficient credits. Please top up your OpenRouter balance.' });
+        break;
+      case 400:
+        postMessage({ type: 'streamError', error: `Bad request: ${error.message}` });
+        break;
+      case 403: {
+        const reasons = (error.metadata as { reasons?: string[] } | undefined)?.reasons;
+        const detail = reasons?.length ? ` Reason: ${reasons.join(', ')}.` : '';
+        postMessage({ type: 'streamError', error: `Content flagged by moderation policy.${detail}` });
+        break;
+      }
+      case 408:
+        postMessage({ type: 'streamError', error: 'Request timed out. Please try again.' });
+        break;
+      case 429:
+        postMessage({ type: 'streamError', error: 'Rate limit reached. Please wait a moment and try again.' });
+        break;
+      case 502:
+        postMessage({ type: 'streamError', error: 'The model is temporarily unavailable. Try switching to a different model.' });
+        break;
+      case 503:
+        postMessage({ type: 'streamError', error: 'No provider available for this model right now. Try a different model or try again later.' });
+        break;
+      default:
+        await this.notifications.handleError(error.message);
+        postMessage({ type: 'streamError', error: error.message });
+    }
+  }
+
   private async handleGetModels(postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     try {
       const models = await this.client.listModels();
+      this.setModelPricing(models);
       postMessage({ type: 'modelsLoaded', models });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';
@@ -620,12 +850,13 @@ export class MessageHandler {
     toolName: string,
     args: Record<string, unknown>,
     postMessage: (msg: ExtensionMessage) => void,
-    diff?: DiffLine[]
-  ): Promise<boolean> {
+    diff?: DiffLine[],
+    currentModel?: string
+  ): Promise<{ approved: boolean; scope: 'once' | 'workspace' | 'global' }> {
     const requestId = `approval-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve) => {
       this.pendingApprovals.set(requestId, resolve);
-      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args, diff });
+      postMessage({ type: 'toolApprovalRequest', requestId, toolName, args, diff, currentModel });
     });
   }
 

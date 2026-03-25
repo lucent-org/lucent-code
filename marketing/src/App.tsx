@@ -7,12 +7,13 @@ import AdvancedFeaturesGrid from './sections/AdvancedFeaturesGrid';
 import CtaBanner from './sections/CtaBanner';
 import Footer from './sections/Footer';
 
-// TODO: Replace with actual VS Code marketplace URL when published
 const MARKETPLACE_URL = 'https://marketplace.visualstudio.com/items?itemName=lucentcode.lucent-code';
+const DOCS_URL = 'https://docs.lucentcode.dev';
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'How it works', href: '#demo' },
+  { label: 'Docs', href: DOCS_URL },
 ];
 
 const GITHUB_URL = 'https://github.com/lucent-org/lucent-code';

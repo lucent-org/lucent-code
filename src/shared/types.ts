@@ -1,3 +1,7 @@
+// ---- Shared union types ----
+
+export type ApprovalScope = 'once' | 'workspace' | 'global';
+
 // ---- OpenRouter API types ----
 
 export interface OpenRouterModel {
@@ -12,6 +16,7 @@ export interface OpenRouterModel {
   top_provider?: {
     max_completion_tokens?: number;
   };
+  supported_parameters?: string[];
 }
 
 export interface ChatMessage {
@@ -70,6 +75,16 @@ export interface ChatResponseChunk {
     };
     finish_reason: string | null;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  error?: {
+    code: number;
+    message: string;
+    metadata?: Record<string, unknown>;
+  };
 }
 
 export interface ChatResponse {
@@ -100,14 +115,19 @@ export type ExtensionMessage =
   | { type: 'conversationTitled'; id: string; title: string }
   | { type: 'triggerSend'; content: string; newChat: boolean }
   | { type: 'showDiff'; lines: DiffLine[]; filename: string; fileUri: string }
-  | { type: 'toolApprovalRequest'; requestId: string; toolName: string; args: Record<string, unknown>; diff?: DiffLine[] }
+  | { type: 'toolApprovalRequest'; requestId: string; toolName: string; args: Record<string, unknown>; diff?: DiffLine[]; currentModel?: string }
   | { type: 'terminalOutput'; content: string | null }
   | { type: 'skillsLoaded'; skills: SkillSummary[] }
   | { type: 'skillContent'; name: string; content: string | null }
   | { type: 'insertSkillChip'; name: string; content: string }
   | { type: 'mcpStatus'; servers: Record<string, 'connected' | 'error'> }
   | { type: 'autonomousModeChanged'; enabled: boolean }
-  | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string };
+  | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string }
+  | { type: 'usageUpdate'; lastMessageCost: number; lastMessageTokens: number; sessionCost: number; creditsUsed: number; creditsLimit: number | null }
+  | { type: 'noCredits' }
+  | { type: 'conversationCompacted'; summary: string }
+  | { type: 'fileList'; files: { name: string; relativePath: string }[] }
+  | { type: 'fileAttachment'; name: string; relativePath: string; content: string; error?: string };
 
 export type WebviewMessage =
   | { type: 'sendMessage'; content: string; images?: string[]; model: string }
@@ -122,11 +142,15 @@ export type WebviewMessage =
   | { type: 'exportConversation'; id: string; format: 'json' | 'markdown' }
   | { type: 'applyToFile'; code: string; language: string; filename?: string }
   | { type: 'confirmApply'; fileUri: string }
-  | { type: 'toolApprovalResponse'; requestId: string; approved: boolean }
+  | { type: 'toolApprovalResponse'; requestId: string; approved: boolean; scope?: ApprovalScope }
   | { type: 'getTerminalOutput' }
   | { type: 'getSkillContent'; name: string }
   | { type: 'setAutonomousMode'; enabled: boolean }
-  | { type: 'startWorktree' };
+  | { type: 'startWorktree' }
+  | { type: 'openExternal'; url: string }
+  | { type: 'compactConversation'; model: string }
+  | { type: 'listFiles'; query: string }
+  | { type: 'readFileForAttachment'; relativePath: string };
 
 // ---- Diff types ----
 
@@ -184,6 +208,7 @@ export interface ConversationSummary {
 export interface SkillSummary {
   name: string;
   description: string;
+  source: string;
 }
 
 export interface WorktreeDiff {

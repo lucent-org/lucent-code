@@ -9,7 +9,8 @@ export function parseFrontmatter(markdown: string): FrontmatterResult {
   if (!match) return { body: markdown };
   const fm = match[1];
   const body = match[2] ?? '';
-  const name = fm.match(/^name:\s*(.+)$/m)?.[1]?.trim();
-  const description = fm.match(/^description:\s*(.+)$/m)?.[1]?.trim();
+  const stripQuotes = (s: string) => s.replace(/^["']|["']$/g, '');
+  const name = fm.match(/^name:\s*(.+)$/m)?.[1] ? stripQuotes(fm.match(/^name:\s*(.+)$/m)![1].trim()) : undefined;
+  const description = fm.match(/^description:\s*(.+)$/m)?.[1] ? stripQuotes(fm.match(/^description:\s*(.+)$/m)![1].trim()) : undefined;
   return { name, description, body };
 }

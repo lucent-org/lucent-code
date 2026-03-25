@@ -5,7 +5,7 @@ import { OpenRouterClient } from './core/openrouter-client';
 import { ContextBuilder } from './core/context-builder';
 import { ChatViewProvider } from './chat/chat-provider';
 import { MessageHandler } from './chat/message-handler';
-import type { WebviewMessage } from './shared/types';
+import type { WebviewMessage, ExtensionMessage } from './shared/types';
 import { InlineCompletionProvider } from './completions/inline-provider';
 import { CodeIntelligence } from './lsp/code-intelligence';
 import { CapabilityDetector } from './lsp/capability-detector';
@@ -15,10 +15,12 @@ import { NotificationService } from './core/notifications';
 import { InstructionsLoader } from './core/instructions-loader';
 import { TerminalBuffer } from './core/terminal-buffer';
 import { messageText } from './core/message-text';
-import { SkillRegistry } from './skills/skill-registry';
+import { SkillRegistry, PreloadedSource } from './skills/skill-registry';
 import { fetchGitHubSkills } from './skills/sources/github-source';
 import { fetchNpmSkills } from './skills/sources/npm-source';
 import { fetchMarketplaceSkills } from './skills/sources/marketplace-source';
+import { fetchClaudeCodeSkills } from './skills/sources/claude-code-source';
+import { BUILTIN_SKILLS } from './skills/builtin/index';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as nodePath from 'path';
@@ -49,24 +51,35 @@ export async function activate(context: vscode.ExtensionContext) {
   const skillRegistry = new SkillRegistry();
 
   async function loadSkills(): Promise<void> {
-    const sources = settings.skillSources;
-    const ownMarkdowns: string[] = [];
+    skillRegistry.clear();
 
-    for (const src of sources) {
+    // Built-in skills (always first)
+    for (const md of BUILTIN_SKILLS) {
+      skillRegistry.ingestFromSource(md, 'builtin');
+    }
+
+    // User-configured external sources
+    for (const src of settings.skillSources) {
       try {
         if (src.type === 'github' && src.url) {
-          ownMarkdowns.push(...await fetchGitHubSkills(src.url));
+          for (const md of await fetchGitHubSkills(src.url)) {
+            skillRegistry.ingestFromSource(md, 'github');
+          }
         } else if (src.type === 'npm' && src.package) {
-          ownMarkdowns.push(...await fetchNpmSkills(src.package));
+          for (const md of await fetchNpmSkills(src.package)) {
+            skillRegistry.ingestFromSource(md, 'npm');
+          }
         } else if (src.type === 'marketplace' && src.slug) {
-          ownMarkdowns.push(...await fetchMarketplaceSkills(src.slug, src.version));
+          for (const md of await fetchMarketplaceSkills(src.slug, src.version)) {
+            skillRegistry.ingestFromSource(md, 'marketplace');
+          }
         } else if (src.type === 'local' && src.path) {
           const expandedPath = src.path.replace(/^~/, os.homedir());
           const files = await fs.readdir(expandedPath).catch(() => [] as string[]);
           for (const file of files) {
             if (typeof file === 'string' && file.endsWith('.md')) {
               const content = await fs.readFile(nodePath.join(expandedPath, file), 'utf8').catch(() => '');
-              if (content) ownMarkdowns.push(content);
+              if (content) skillRegistry.ingestFromSource(content, 'local');
             }
           }
         }
@@ -75,10 +88,10 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
 
-    const preloaded = ownMarkdowns.length > 0
-      ? [{ type: 'local' as const, content: new Map(ownMarkdowns.map((md, i) => [String(i), md])) }]
-      : [];
-    await skillRegistry.load(preloaded);
+    // Auto-detect Claude Code skills (~/.claude/skills/ and ~/.claude/plugins/cache/)
+    for (const md of await fetchClaudeCodeSkills()) {
+      skillRegistry.ingestFromSource(md, 'claude');
+    }
   }
 
   // Non-critical: don't let skill loading crash activation
@@ -116,7 +129,7 @@ export async function activate(context: vscode.ExtensionContext) {
     indexer.start(workspaceRoot)
       .then(() => { indexerStatusBar.text = '$(database) Indexed'; })
       .catch((e: Error) => {
-        console.error('[Indexer] Failed to start:', e instanceof Error ? e.message : String(e));
+        console.error('[Lucent Indexer] Failed to start:', e instanceof Error ? e.message : String(e));
         indexerStatusBar.text = '$(warning) Index failed';
       });
   }
@@ -158,59 +171,55 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set up code intelligence
   const codeIntelligence = new CodeIntelligence();
   const capabilityDetector = new CapabilityDetector();
-  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), indexer);
   contextBuilder.setCodeIntelligence(codeIntelligence, capabilityDetector);
 
   const history = new ConversationHistory(context.globalStorageUri);
 
   const notifications = new NotificationService();
   const terminalBuffer = new TerminalBuffer();
+  const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), terminalBuffer, indexer);
 
-  // Auth status bar item
-  const authStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 90);
-  authStatusBar.command = 'lucentCode.authMenu';
-  context.subscriptions.push(authStatusBar);
+  let currentSessionCost = 0;
+  let hasNoCredits = false;
 
-  const updateAuthStatus = async () => {
+  // OpenRouter status bar item
+  const openRouterStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
+  openRouterStatusBar.command = 'lucentCode.authMenu';
+  context.subscriptions.push(openRouterStatusBar);
+
+  const updateOpenRouterStatus = async () => {
     const isAuthed = await auth.isAuthenticated();
-    if (isAuthed) {
-      authStatusBar.text = '$(key) OpenRouter';
-      authStatusBar.tooltip = 'OpenRouter: Signed in — click to manage';
-      authStatusBar.backgroundColor = undefined;
+    if (hasNoCredits) {
+      openRouterStatusBar.text = '$(warning) OpenRouter: No credits';
+      openRouterStatusBar.tooltip = 'No credits remaining — click to manage';
+      openRouterStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    } else if (isAuthed) {
+      const costStr = currentSessionCost > 0 ? ` · $${currentSessionCost.toFixed(4)}` : '';
+      openRouterStatusBar.text = `$(key) OpenRouter${costStr}`;
+      openRouterStatusBar.tooltip = 'OpenRouter: Signed in — click to manage';
+      openRouterStatusBar.backgroundColor = undefined;
     } else {
-      authStatusBar.text = '$(warning) OpenRouter: No API key';
-      authStatusBar.tooltip = 'OpenRouter: Not signed in — click to set up';
-      authStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+      openRouterStatusBar.text = '$(warning) OpenRouter: Not signed in';
+      openRouterStatusBar.tooltip = 'OpenRouter: Not signed in — click to sign in';
+      openRouterStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     }
-    authStatusBar.show();
+    openRouterStatusBar.show();
   };
 
-  // Update status bar on auth changes
+  // Update status bar and reload models on auth changes
   context.subscriptions.push(
-    auth.onDidChangeAuth(() => updateAuthStatus())
+    auth.onDidChangeAuth(() => {
+      hasNoCredits = false;
+      updateOpenRouterStatus();
+      handler.handleMessage({ type: 'getModels' }, (msg) => chatProvider.postMessageToWebview(msg));
+    })
   );
 
   // Set initial state
-  void updateAuthStatus();
-
-  // Skills status bar
-  const skillsStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 89);
-  context.subscriptions.push(skillsStatusBar);
-
-  function updateSkillsStatus(): void {
-    const count = skillRegistry.getAll().length;
-    if (count > 0) {
-      skillsStatusBar.text = `$(book) ${count} skills`;
-      skillsStatusBar.tooltip = `Lucent Code: ${count} skills loaded — click to browse`;
-      skillsStatusBar.command = 'lucentCode.browseSkills';
-      skillsStatusBar.show();
-      setTimeout(() => skillsStatusBar.hide(), 5000);
-    }
-  }
-  updateSkillsStatus();
+  void updateOpenRouterStatus();
 
   // Indexer status bar
-  const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 88);
+  const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 88);
   indexerStatusBar.command = 'lucentCode.indexCodebase';
   indexerStatusBar.text = '$(loading~spin) Indexing…';
   indexerStatusBar.tooltip = 'Lucent Code: Codebase index — click to re-index';
@@ -224,6 +233,14 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('Response ready');
     }
   };
+  handler.onAuthInvalid = () => {
+    auth.signOut().then(() => {
+      void updateOpenRouterStatus();
+      vscode.window.showWarningMessage('OpenRouter: Session expired — please sign in again.', 'Sign in').then((choice) => {
+        if (choice === 'Sign in') auth.startOAuth();
+      });
+    }).catch(() => {});
+  };
 
   // Set up webview message handling
   const setupWebviewMessaging = () => {
@@ -231,7 +248,21 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!webview) return;
 
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
-      const postMessage = (msg: unknown) => webview.postMessage(msg);
+      if (message.type === 'openExternal') {
+        void vscode.env.openExternal(vscode.Uri.parse(message.url));
+        return;
+      }
+      const postMessage = (msg: ExtensionMessage) => {
+        if (msg.type === 'usageUpdate') {
+          currentSessionCost = msg.sessionCost;
+          void updateOpenRouterStatus();
+        }
+        if (msg.type === 'noCredits') {
+          hasNoCredits = true;
+          void updateOpenRouterStatus();
+        }
+        webview.postMessage(msg);
+      };
       await handler.handleMessage(message, postMessage);
     });
 
@@ -253,6 +284,7 @@ export async function activate(context: vscode.ExtensionContext) {
   };
 
   chatProvider.onResolve = setupWebviewMessaging;
+  chatProvider.onDispose = () => handler.resetConversation();
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
       webviewOptions: { retainContextWhenHidden: true },
@@ -331,14 +363,23 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.startOAuth', () => {
+      auth.startOAuth();
+    })
+  );
+
   // Register URI handler for OAuth callback (vscode://lucentcode.lucent-code/oauth-callback)
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri(uri: vscode.Uri) {
-        if (uri.path === '/oauth-callback') {
-          auth.handleOAuthCallback(uri).catch((e: unknown) =>
-            console.error('[Lucent Code] OAuth callback failed:', e instanceof Error ? e.message : String(e))
-          );
+        console.log('[Lucent Code] URI handler called:', uri.toString(), 'path:', uri.path, 'query:', uri.query);
+        if (uri.path.startsWith('/oauth-callback')) {
+          auth.handleOAuthCallback(uri).catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error('[Lucent Code] OAuth callback failed:', msg);
+            vscode.window.showErrorMessage(`OpenRouter: OAuth callback failed — ${msg}`);
+          });
         }
       },
     })
@@ -347,19 +388,58 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('lucentCode.authMenu', async () => {
       const isAuthed = await auth.isAuthenticated();
-      const options = isAuthed
-        ? ['Set API Key', 'Sign in with OAuth', 'Sign out']
-        : ['Set API Key', 'Sign in with OAuth'];
+      if (isAuthed) {
+        let balanceDescription = '';
+        try {
+          const balance = await client.getAccountBalance();
+          if (balance.limit !== null) {
+            const remaining = Math.max(0, balance.limit - balance.usage);
+            balanceDescription = `Credits remaining: $${remaining.toFixed(4)}`;
+          } else {
+            balanceDescription = `Usage: $${balance.usage.toFixed(4)}`;
+          }
+        } catch {
+          balanceDescription = 'Balance unavailable';
+        }
+        const sessionCostStr = currentSessionCost > 0
+          ? `Session cost: $${currentSessionCost.toFixed(4)}`
+          : 'Session cost: $0.0000';
 
-      const choice = await vscode.window.showQuickPick(options, {
-        placeHolder: isAuthed ? 'OpenRouter: Signed in' : 'OpenRouter: Not signed in',
-      });
+        const items: vscode.QuickPickItem[] = [
+          { label: '$(key) Signed in', description: balanceDescription },
+          { label: sessionCostStr, kind: vscode.QuickPickItemKind.Default },
+          { label: '', kind: vscode.QuickPickItemKind.Separator },
+          { label: '$(globe) Buy credits' },
+          { label: '$(sign-out) Sign out' },
+          { label: '$(edit) Set API key manually' },
+        ];
 
-      if (choice === 'Set API Key') auth.promptForApiKey();
-      else if (choice === 'Sign in with OAuth') auth.startOAuth();
-      else if (choice === 'Sign out') {
-        await auth.signOut();
-        vscode.window.showInformationMessage('Signed out of OpenRouter.');
+        const choice = await vscode.window.showQuickPick(items, {
+          placeHolder: 'OpenRouter: Signed in',
+        });
+
+        if (!choice) return;
+        if (choice.label === '$(globe) Buy credits') {
+          await vscode.env.openExternal(vscode.Uri.parse('https://openrouter.ai/settings/credits'));
+        } else if (choice.label === '$(sign-out) Sign out') {
+          await auth.signOut();
+          vscode.window.showInformationMessage('Signed out of OpenRouter.');
+        } else if (choice.label === '$(edit) Set API key manually') {
+          auth.promptForApiKey();
+        }
+      } else {
+        const items: vscode.QuickPickItem[] = [
+          { label: '$(sign-in) Sign in with OpenRouter (OAuth)' },
+          { label: '$(edit) Set API key manually' },
+        ];
+
+        const choice = await vscode.window.showQuickPick(items, {
+          placeHolder: 'OpenRouter: Not signed in',
+        });
+
+        if (!choice) return;
+        if (choice.label === '$(sign-in) Sign in with OpenRouter (OAuth)') auth.startOAuth();
+        else if (choice.label === '$(edit) Set API key manually') auth.promptForApiKey();
       }
     })
   );
@@ -499,14 +579,12 @@ export async function activate(context: vscode.ExtensionContext) {
       const existing = config.get<unknown[]>('skills.sources', []);
       await config.update('skills.sources', [...existing, newSource], vscode.ConfigurationTarget.Global);
       await loadSkills();
-      updateSkillsStatus();
       chatProvider.postMessageToWebview({ type: 'skillsLoaded', skills: skillRegistry.getSummaries() });
       vscode.window.showInformationMessage(`Skill source added. ${skillRegistry.getAll().length} skills loaded.`);
     }),
 
     vscode.commands.registerCommand('lucentCode.refreshSkills', async () => {
       await loadSkills();
-      updateSkillsStatus();
       chatProvider.postMessageToWebview({ type: 'skillsLoaded', skills: skillRegistry.getSummaries() });
       vscode.window.showInformationMessage(`Skills refreshed: ${skillRegistry.getAll().length} skills loaded.`);
     })

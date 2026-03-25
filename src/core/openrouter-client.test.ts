@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { OpenRouterClient } from './openrouter-client';
+import { OpenRouterClient, OpenRouterError } from './openrouter-client';
 
 describe('OpenRouterClient', () => {
   let client: OpenRouterClient;
@@ -237,6 +237,202 @@ describe('OpenRouterClient', () => {
       await expect(
         noKeyClient.listModels()
       ).rejects.toThrow('No API key configured');
+    });
+  });
+
+  describe('OpenRouterError', () => {
+    it('has correct name, code, and message', () => {
+      const err = new OpenRouterError(429, 'Rate limited');
+      expect(err.name).toBe('OpenRouterError');
+      expect(err.code).toBe(429);
+      expect(err.message).toBe('Rate limited');
+      expect(err instanceof Error).toBe(true);
+    });
+
+    it('stores metadata when provided', () => {
+      const meta = { provider_name: 'anthropic', reasons: ['violence'] };
+      const err = new OpenRouterError(403, 'Flagged', meta);
+      expect(err.metadata).toEqual(meta);
+    });
+
+    it('metadata is undefined when not provided', () => {
+      const err = new OpenRouterError(401, 'Unauthorized');
+      expect(err.metadata).toBeUndefined();
+    });
+  });
+
+  describe('error parsing (parseApiError via non-retryable path)', () => {
+    it('parses JSON error body into OpenRouterError with correct code and message', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: { get: () => null },
+        text: () => Promise.resolve(JSON.stringify({ error: { code: 401, message: 'User not found.' } })),
+      });
+
+      const error = await client.listModels().catch((e) => e);
+      expect(error).toBeInstanceOf(OpenRouterError);
+      expect(error.code).toBe(401);
+      expect(error.message).toBe('User not found.');
+    });
+
+    it('parses JSON error body with metadata', async () => {
+      const body = JSON.stringify({
+        error: {
+          code: 403,
+          message: 'Input flagged',
+          metadata: { reasons: ['violence'], provider_name: 'anthropic' },
+        },
+      });
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: { get: () => null },
+        text: () => Promise.resolve(body),
+      });
+
+      const error = await client.listModels().catch((e) => e);
+      expect(error).toBeInstanceOf(OpenRouterError);
+      expect(error.code).toBe(403);
+      expect(error.metadata).toMatchObject({ reasons: ['violence'] });
+    });
+
+    it('falls back to raw body when JSON is not parseable', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: { get: () => null },
+        text: () => Promise.resolve('plain text error'),
+      });
+
+      const error = await client.listModels().catch((e) => e);
+      expect(error).toBeInstanceOf(OpenRouterError);
+      expect(error.code).toBe(400);
+      expect(error.message).toContain('plain text error');
+    });
+
+    it('uses status code as error code when JSON body omits it', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 408,
+        headers: { get: () => null },
+        text: () => Promise.resolve(JSON.stringify({ error: { message: 'Timeout' } })),
+      });
+
+      const error = await client.listModels().catch((e) => e);
+      expect(error).toBeInstanceOf(OpenRouterError);
+      expect(error.code).toBe(408);
+      expect(error.message).toBe('Timeout');
+    });
+  });
+
+  describe('chatStream mid-stream errors', () => {
+    function createSSEStream(chunks: string[]): ReadableStream<Uint8Array> {
+      const encoder = new TextEncoder();
+      return new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        },
+      });
+    }
+
+    it('throws OpenRouterError when a mid-stream SSE chunk contains an error field', async () => {
+      const errorChunk = JSON.stringify({
+        error: { code: 503, message: 'No provider available' },
+        choices: [{ finish_reason: 'error' }],
+      });
+      const stream = createSSEStream([
+        'data: {"id":"gen-1","choices":[{"delta":{"content":"partial"},"finish_reason":null}]}\n\n',
+        `data: ${errorChunk}\n\n`,
+      ]);
+
+      mockFetch.mockResolvedValue({ ok: true, body: stream });
+
+      const chunks: unknown[] = [];
+      let caughtError: unknown;
+      try {
+        for await (const chunk of client.chatStream({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })) {
+          chunks.push(chunk);
+        }
+      } catch (e) {
+        caughtError = e;
+      }
+
+      expect(chunks).toHaveLength(1); // partial chunk before error
+      expect(caughtError).toBeInstanceOf(OpenRouterError);
+      expect((caughtError as OpenRouterError).code).toBe(503);
+      expect((caughtError as OpenRouterError).message).toBe('No provider available');
+    });
+
+    it('includes metadata from mid-stream error chunk', async () => {
+      const errorChunk = JSON.stringify({
+        error: {
+          code: 403,
+          message: 'Flagged',
+          metadata: { provider_name: 'openai', reasons: ['hate'] },
+        },
+        choices: [{ finish_reason: 'error' }],
+      });
+      const stream = createSSEStream([`data: ${errorChunk}\n\n`]);
+      mockFetch.mockResolvedValue({ ok: true, body: stream });
+
+      const error = await (async () => {
+        for await (const _ of client.chatStream({
+          model: 'anthropic/claude-sonnet-4',
+          messages: [{ role: 'user', content: 'Hi' }],
+        })) { /* consume */ }
+      })().catch((e) => e);
+
+      expect(error).toBeInstanceOf(OpenRouterError);
+      expect(error.metadata).toMatchObject({ reasons: ['hate'] });
+    });
+  });
+
+  describe('getAccountBalance', () => {
+    it('returns usage and limit when API responds successfully', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { usage: 1.5, limit: 10.0 } }),
+      });
+
+      const balance = await client.getAccountBalance();
+      expect(balance.usage).toBe(1.5);
+      expect(balance.limit).toBe(10.0);
+    });
+
+    it('returns null limit when account has no credit limit set', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { usage: 0.5, limit: null } }),
+      });
+
+      const balance = await client.getAccountBalance();
+      expect(balance.limit).toBeNull();
+    });
+
+    it('returns zero usage and null limit when API request fails', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 401 });
+
+      const balance = await client.getAccountBalance();
+      expect(balance.usage).toBe(0);
+      expect(balance.limit).toBeNull();
+    });
+
+    it('returns zero defaults when data fields are missing', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: {} }),
+      });
+
+      const balance = await client.getAccountBalance();
+      expect(balance.usage).toBe(0);
+      expect(balance.limit).toBeNull();
     });
   });
 

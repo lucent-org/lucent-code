@@ -17,6 +17,7 @@ vi.mock('./chunker', () => ({
   chunkFile: vi.fn((content: string) => [
     { content, startLine: 0, endLine: 1 },
   ]),
+  chunkBySymbols: vi.fn(() => []),
 }));
 
 const mockFetch = vi.fn();
@@ -37,9 +38,13 @@ vi.mock('vscode', () => ({
       dispose: vi.fn(),
     })),
     findFiles: vi.fn(() => Promise.resolve([])),
+    openTextDocument: vi.fn(() => Promise.resolve({})),
+  },
+  commands: {
+    executeCommand: vi.fn(() => Promise.resolve([])),
   },
   Uri: {
-    file: (p: string) => ({ fsPath: p }),
+    file: (p: string) => ({ fsPath: p, toString: () => `file://${p}` }),
   },
   RelativePattern: class {
     constructor(public base: string, public pattern: string) {}
@@ -48,6 +53,7 @@ vi.mock('vscode', () => ({
 
 import { Indexer } from './indexer';
 import * as vscode from 'vscode';
+import * as chunkerModule from './chunker';
 
 describe('Indexer.shouldIndex', () => {
   it('indexes .ts files', () => {
@@ -70,9 +76,9 @@ describe('Indexer.shouldIndex', () => {
     expect((indexer as any).shouldIndex('/workspace/.lucent/index.db')).toBe(false);
   });
 
-  it('indexes .md files', () => {
+  it('does not index .md files', () => {
     const indexer = new Indexer(() => 'fake-key');
-    expect((indexer as any).shouldIndex('/workspace/README.md')).toBe(true);
+    expect((indexer as any).shouldIndex('/workspace/README.md')).toBe(false);
   });
 
   it('skips .png files', () => {
@@ -176,6 +182,97 @@ describe('Indexer.searchAsync', () => {
 
     expect(results).toEqual(mockResults);
     expect(searchFn).toHaveBeenCalledWith(expect.any(Float32Array), 5);
+  });
+});
+
+describe('Indexer.getSymbolChunks', () => {
+  const embedding = Array.from({ length: 1536 }, () => 0.1);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ embedding }] }),
+    });
+  });
+
+  it('uses symbol-based chunks when executeDocumentSymbolProvider returns symbols', async () => {
+    const mockSymbols = [
+      {
+        name: 'MyClass',
+        kind: 5, // Class
+        range: { start: { line: 0 }, end: { line: 20 } },
+        children: [
+          {
+            name: 'doWork',
+            kind: 6, // Method
+            range: { start: { line: 5 }, end: { line: 15 } },
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(vscode.commands.executeCommand).mockResolvedValueOnce(mockSymbols as any);
+    vi.mocked(chunkerModule.chunkBySymbols).mockReturnValueOnce([
+      { content: '// MyClass\nclass MyClass {}', startLine: 0, endLine: 20 },
+      { content: '// MyClass.doWork\ndoWork() {}', startLine: 5, endLine: 15 },
+    ]);
+
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValue([
+      { fsPath: '/workspace/src/foo.ts' } as any,
+    ]);
+
+    const indexer = new Indexer(() => 'test-key');
+    const upsertChunks = (indexer as any).vectorStore.upsertChunks as ReturnType<typeof vi.fn>;
+
+    await indexer.indexAll();
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.executeDocumentSymbolProvider',
+      expect.anything()
+    );
+    expect(chunkerModule.chunkBySymbols).toHaveBeenCalled();
+    expect(chunkerModule.chunkFile).not.toHaveBeenCalled();
+    expect(upsertChunks).toHaveBeenCalledWith(
+      '/workspace/src/foo.ts',
+      expect.arrayContaining([
+        expect.objectContaining({ content: '// MyClass\nclass MyClass {}' }),
+      ]),
+      expect.any(Number)
+    );
+  });
+
+  it('falls back to line-based chunks when executeDocumentSymbolProvider returns empty', async () => {
+    vi.mocked(vscode.commands.executeCommand).mockResolvedValueOnce([] as any);
+
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValue([
+      { fsPath: '/workspace/src/foo.ts' } as any,
+    ]);
+
+    const indexer = new Indexer(() => 'test-key');
+    const upsertChunks = (indexer as any).vectorStore.upsertChunks as ReturnType<typeof vi.fn>;
+
+    await indexer.indexAll();
+
+    expect(chunkerModule.chunkFile).toHaveBeenCalled();
+    expect(upsertChunks).toHaveBeenCalledWith('/workspace/src/foo.ts', expect.any(Array), expect.any(Number));
+  });
+
+  it('falls back to line-based chunks when executeDocumentSymbolProvider throws', async () => {
+    vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce(new Error('LSP not available'));
+
+    vi.mocked(vscode.workspace.findFiles).mockResolvedValue([
+      { fsPath: '/workspace/src/foo.ts' } as any,
+    ]);
+
+    const indexer = new Indexer(() => 'test-key');
+    const upsertChunks = (indexer as any).vectorStore.upsertChunks as ReturnType<typeof vi.fn>;
+
+    await indexer.indexAll();
+
+    expect(chunkerModule.chunkFile).toHaveBeenCalled();
+    expect(upsertChunks).toHaveBeenCalledWith('/workspace/src/foo.ts', expect.any(Array), expect.any(Number));
   });
 });
 

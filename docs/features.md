@@ -20,7 +20,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Cancel generation | Stop button to abort in-flight streaming responses | 1 |
 | :white_check_mark: | Multi-line input | Shift+Enter for newlines, Enter to submit | 1 |
 | :white_check_mark: | `@terminal` context mention | Type `@terminal` in chat input to inject the last 200 lines of the active terminal | 2 |
-| :white_check_mark: | `@fix` / `@explain` / `@test` action mentions | Type `@fix`, `@explain`, or `@test` to insert a focused prompt prefix; works with the existing editor context | 2 |
+| :white_check_mark: | `@fix` / `@explain` action mentions | Type `@fix` or `@explain` to insert a focused prompt prefix; works with the existing editor context | 2 |
+| :white_check_mark: | `@file` mention | Type `@file` to fuzzy-search and attach any workspace file as context (≤5 MB, text files only) | - |
 | :white_check_mark: | File attachments (paperclip button) | Click 📎 to pick images or text files; up to 5 MB per file | P3 |
 | :white_check_mark: | File attachments (drag-and-drop) | Drag files from Explorer or OS onto the chat input area | P3 |
 | :white_check_mark: | Empty state guidance | Welcome screen with API key hint or quick-start suggestions | 1 |
@@ -37,6 +38,8 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 | :white_check_mark: | Model selector dropdown | Choose model from dropdown with search, shows name + provider | 1 |
 | :white_check_mark: | Separate chat model setting | Configurable default model for chat | 1 |
 | :white_check_mark: | Separate completions model setting | Configurable default model for inline completions | 2 |
+| :white_check_mark: | `use_model` tool | AI can switch to a different OpenRouter model mid-conversation (scoped approval: once / workspace / always) | - |
+| :white_check_mark: | `@model` mention | Type `@model` in the chat input to open a fuzzy-search model picker and switch instantly — no approval needed | - |
 
 ## Inline Completions
 
@@ -131,13 +134,16 @@ Complete feature list for the OpenRouter Chat VSCode extension. Features are gro
 
 | Status | Feature | Description | Phase |
 |--------|---------|-------------|-------|
-| :white_check_mark: | Claude Code skill cache | Auto-loads skills from ~/.claude/plugins/cache/ and ~/.claude/skills/ | - |
+| :white_check_mark: | `LUCENT.md` project instructions | Place `LUCENT.md` (or `.clinerules`/`.cursorrules`/`CLAUDE.md`) in your workspace root; `@skill(name)` lines activate skills | - |
+| :white_check_mark: | Built-in skill pack | 10 language-agnostic skills shipped with the extension: `tdd`, `clean-commits`, `refactor`, `debugging`, `code-review`, `documentation`, `doc`, `tests`, `commit`, `onboard` | - |
+| :white_check_mark: | `/compact` command | Summarize and truncate conversation history to free context window; visual divider marks the compaction point | - |
+| :white_check_mark: | Claude Code skill adapter | Auto-loads skills from `~/.claude/skills/*/SKILL.md` — same format as Lucent | - |
+| :white_check_mark: | Claude Code skill cache | Auto-loads skills from ~/.claude/plugins/cache/ | - |
 | :white_check_mark: | GitHub repo source | Fetch skills from any public GitHub repository | - |
 | :white_check_mark: | npm/unpkg source | Fetch skills from npm packages via unpkg.com | - |
 | :white_check_mark: | Superpowers marketplace | Fetch versioned skill packs from the superpowers registry | - |
 | :white_check_mark: | Local directory source | Load skills from a local directory | - |
-| :white_check_mark: | Skill advertisement | System prompt lists available skills (name + description) each turn | - |
-| :white_check_mark: | Semantic pre-injection | Keyword matching auto-injects relevant skills before model responds | - |
+| :white_check_mark: | Pull-only skill loading | System prompt lists available skills (name + description only); content loaded on-demand via `use_skill` — no context bloat | - |
 | :white_check_mark: | use_skill tool | Model can explicitly request a skill's full content via tool call | - |
 | :white_check_mark: | Slash command autocomplete | Type /skill-name to select and attach a skill chip | - |
 | :white_check_mark: | Skill browser | ⚡ button + browseSkills command opens quick pick of all loaded skills | - |
@@ -208,7 +214,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 | :white_check_mark: | ~~Apply to file~~ | Fixed — Apply button on code blocks; inline diff for ≤1 hunk, native diff editor for 2+ hunks | S |
 | :white_check_mark: | ~~Diff preview & approval~~ | Fixed — inline DiffView with Apply/Discard; native diff + notification for multi-hunk changes | S |
 | :white_check_mark: | ~~Context menu actions~~ | Fixed — Explain/Fix/Improve submenus on selected code, append or new chat | S |
-| :white_check_mark: | ~~Custom instructions file~~ | Fixed — loads .openrouter-instructions.md or .cursorrules from workspace root into system prompt | S |
+| :white_check_mark: | ~~Custom instructions file~~ | Fixed — loads `LUCENT.md` (or `.clinerules`/`.cursorrules`/`CLAUDE.md` fallbacks) from workspace root into system prompt | S |
 | :white_check_mark: | ~~Enriched context on `ready`~~ | Fixed — `ready` calls `buildEnrichedContext()` with fallback to `buildContext()` | XS |
 | :white_check_mark: | ~~inlineSuggest kill switch~~ | Fixed — guard clause respects `editor.inlineSuggest.enabled` | XS |
 | :white_check_mark: | ~~Retry with backoff~~ | Fixed — exponential backoff with jitter, Retry-After, AbortSignal | XS |
@@ -234,7 +240,7 @@ All remaining work, ranked by impact vs effort. Items at the top should be picke
 |--------|---------|-----|--------|
 | :white_check_mark: | ~~Image attachments~~ | Attach images via drag-and-drop or paperclip button; thumbnails shown in chat history; sent as base64 content parts to vision models | M |
 | :white_check_mark: | ~~Drag-and-drop files~~ | Drop files onto chat input; images become thumbnails, text/code files are inlined as fenced code blocks | M |
-| :white_check_mark: | ~~Slash commands~~ | Implemented as `@fix`, `@explain`, `@test` action mentions in the `@mentions` dropdown | M |
+| :white_check_mark: | ~~Slash commands~~ | `/` dropdown with built-in and loaded skills; `/compact` truncates history; `@fix`, `@explain` quick-action mentions; `@file` workspace file picker | M |
 | :construction: | **Custom OpenAI-compatible providers** | Ollama, LM Studio, Azure OpenAI alongside OpenRouter — opens up local models | L |
 
 ### P4 — Future / exploratory (large scope)

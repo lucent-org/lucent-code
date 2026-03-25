@@ -88,12 +88,10 @@ export class AuthManager {
   }
 
   async startOAuth(): Promise<void> {
-    const codeVerifier = this.generateCodeVerifier();
-    const codeChallenge = await this.generateCodeChallenge(codeVerifier);
     const state = this.generateState();
 
     // Persist for callback verification
-    this.pendingOAuth = { state, codeVerifier };
+    this.pendingOAuth = { state, codeVerifier: '' };
 
     const callbackUri = await vscode.env.asExternalUri(
       vscode.Uri.parse('vscode://lucentcode.lucent-code/oauth-callback')
@@ -101,9 +99,8 @@ export class AuthManager {
 
     const params = new URLSearchParams({
       callback_url: callbackUri.toString(),
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
       state,
+      app_name: 'Lucent Code',
     });
 
     const authUrl = `https://openrouter.ai/auth?${params.toString()}`;
@@ -111,12 +108,14 @@ export class AuthManager {
   }
 
   async handleOAuthCallback(uri: vscode.Uri): Promise<void> {
+    console.log('[Lucent Code] OAuth callback received, query:', uri.query);
     const params = new URLSearchParams(uri.query);
     const code = params.get('code');
     const state = params.get('state');
+    console.log('[Lucent Code] OAuth code:', code ? 'present' : 'missing', 'state:', state, 'pending:', !!this.pendingOAuth);
 
     if (!this.pendingOAuth || state !== this.pendingOAuth.state) {
-      vscode.window.showErrorMessage('OpenRouter: OAuth state mismatch. Please try again.');
+      vscode.window.showErrorMessage(`OpenRouter: OAuth state mismatch (got: ${state}, expected: ${this.pendingOAuth?.state ?? 'none'}). Please try again.`);
       this.pendingOAuth = undefined;
       return;
     }
@@ -129,17 +128,17 @@ export class AuthManager {
 
     try {
       // Exchange code for API key
+      console.log('[Lucent Code] Exchanging OAuth code for API key...');
       const response = await fetch('https://openrouter.ai/api/v1/auth/keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          code_verifier: this.pendingOAuth.codeVerifier,
-        }),
+        body: JSON.stringify({ code }),
       });
 
       if (!response.ok) {
-        throw new Error(`Token exchange failed (${response.status})`);
+        const body = await response.text().catch(() => '(unreadable)');
+        console.error('[Lucent Code] Token exchange error body:', body);
+        throw new Error(`Token exchange failed (${response.status}): ${body}`);
       }
 
       const data = (await response.json()) as { key?: string };
