@@ -10,13 +10,14 @@ interface ChatMessageProps {
 }
 
 interface ContentPart {
-  type: 'text' | 'code';
+  type: 'text' | 'code' | 'skill';
   content: string;
   language?: string;
   filename?: string;
+  skillName?: string;
 }
 
-function parseContent(content: string): ContentPart[] {
+function parseCodeBlocks(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
   const codeBlockRegex = /```([\w]*)([^\n]*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -37,6 +38,27 @@ function parseContent(content: string): ContentPart[] {
   }
 
   return parts;
+}
+
+function parseContent(content: string): ContentPart[] {
+  const allParts: ContentPart[] = [];
+  const skillRegex = /<skill name="([^"]+)">([\s\S]*?)<\/skill>/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = skillRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      allParts.push(...parseCodeBlocks(content.slice(lastIndex, match.index)));
+    }
+    allParts.push({ type: 'skill', skillName: match[1], content: match[2].trim() });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    allParts.push(...parseCodeBlocks(content.slice(lastIndex)));
+  }
+
+  return allParts;
 }
 
 const ChatMessage: Component<ChatMessageProps> = (props) => {
@@ -80,7 +102,21 @@ const ChatMessage: Component<ChatMessageProps> = (props) => {
           {(part) => (
             <Show
               when={part.type === 'code'}
-              fallback={<div innerHTML={formatText(part.content)} />}
+              fallback={
+                <Show
+                  when={part.type === 'skill'}
+                  fallback={<div innerHTML={formatText(part.content)} />}
+                >
+                  <details class="skill-pill">
+                    <summary class="skill-pill__summary">
+                      <span class="skill-pill__icon">⚡</span>
+                      <span class="skill-pill__name">/{part.skillName}</span>
+                      <span class="skill-pill__toggle-hint">skill</span>
+                    </summary>
+                    <pre class="skill-pill__body">{part.content.split('\n\n')[0]}</pre>
+                  </details>
+                </Show>
+              }
             >
               <CodeBlock code={part.content} language={part.language} filename={part.filename} />
             </Show>

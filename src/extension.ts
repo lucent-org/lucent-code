@@ -51,24 +51,35 @@ export async function activate(context: vscode.ExtensionContext) {
   const skillRegistry = new SkillRegistry();
 
   async function loadSkills(): Promise<void> {
-    const sources = settings.skillSources;
-    const ownMarkdowns: string[] = [];
+    skillRegistry.clear();
 
-    for (const src of sources) {
+    // Built-in skills (always first)
+    for (const md of BUILTIN_SKILLS) {
+      skillRegistry.ingestFromSource(md, 'builtin');
+    }
+
+    // User-configured external sources
+    for (const src of settings.skillSources) {
       try {
         if (src.type === 'github' && src.url) {
-          ownMarkdowns.push(...await fetchGitHubSkills(src.url));
+          for (const md of await fetchGitHubSkills(src.url)) {
+            skillRegistry.ingestFromSource(md, 'github');
+          }
         } else if (src.type === 'npm' && src.package) {
-          ownMarkdowns.push(...await fetchNpmSkills(src.package));
+          for (const md of await fetchNpmSkills(src.package)) {
+            skillRegistry.ingestFromSource(md, 'npm');
+          }
         } else if (src.type === 'marketplace' && src.slug) {
-          ownMarkdowns.push(...await fetchMarketplaceSkills(src.slug, src.version));
+          for (const md of await fetchMarketplaceSkills(src.slug, src.version)) {
+            skillRegistry.ingestFromSource(md, 'marketplace');
+          }
         } else if (src.type === 'local' && src.path) {
           const expandedPath = src.path.replace(/^~/, os.homedir());
           const files = await fs.readdir(expandedPath).catch(() => [] as string[]);
           for (const file of files) {
             if (typeof file === 'string' && file.endsWith('.md')) {
               const content = await fs.readFile(nodePath.join(expandedPath, file), 'utf8').catch(() => '');
-              if (content) ownMarkdowns.push(content);
+              if (content) skillRegistry.ingestFromSource(content, 'local');
             }
           }
         }
@@ -77,20 +88,10 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
 
-    // Auto-detect Claude Code skills from ~/.claude/skills/
-    const claudeCodeMarkdowns = await fetchClaudeCodeSkills();
-    ownMarkdowns.push(...claudeCodeMarkdowns);
-
-    const preloaded = ownMarkdowns.length > 0
-      ? [{ type: 'local' as const, content: new Map(ownMarkdowns.map((md, i) => [String(i), md])) }]
-      : [];
-
-    // Built-in skills are inlined as module text by esbuild — no runtime file I/O needed.
-    const builtinSource: PreloadedSource[] = BUILTIN_SKILLS.length > 0
-      ? [{ type: 'local' as const, content: new Map(BUILTIN_SKILLS.map((md, i) => [String(i), md])) }]
-      : [];
-
-    await skillRegistry.load([...builtinSource, ...preloaded]);
+    // Auto-detect Claude Code skills (~/.claude/skills/ and ~/.claude/plugins/cache/)
+    for (const md of await fetchClaudeCodeSkills()) {
+      skillRegistry.ingestFromSource(md, 'claude');
+    }
   }
 
   // Non-critical: don't let skill loading crash activation

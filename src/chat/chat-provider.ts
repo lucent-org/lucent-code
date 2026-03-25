@@ -6,6 +6,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private webviewView?: vscode.WebviewView;
   private pendingMessages: ExtensionMessage[] = [];
   public onResolve?: () => void;
+  public onDispose?: () => void;
+  private resetPending = false;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -16,6 +18,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   ): void {
     this.webviewView = webviewView;
 
+    webviewView.onDidDispose(() => {
+      this.webviewView = undefined;
+      this.resetPending = true;
+      this.onDispose?.();
+    });
+
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
@@ -23,6 +31,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
     this.onResolve?.();
+
+    // If the view was previously disposed, send newChat to reset the webview state
+    if (this.resetPending) {
+      this.resetPending = false;
+      this.webviewView.webview.postMessage({ type: 'newChat' });
+    }
 
     // Flush any messages queued before the panel was first opened
     for (const msg of this.pendingMessages) {

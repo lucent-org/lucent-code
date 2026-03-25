@@ -1,14 +1,5 @@
-// Load better-sqlite3 in a module-level try-catch so that an ABI mismatch
-// (the .node binary was compiled for a different Node/Electron version) does not
-// crash the extension host before the webview registers.
-// vi.mock() hoisting in tests also intercepts this require correctly.
-type DatabaseConstructor = typeof import('better-sqlite3');
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-let Database: DatabaseConstructor | null = (() => {
-  try { const m = require('better-sqlite3'); return m.default ?? m; }
-  catch { return null; }
-})();
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface SearchResult {
   filePath: string;
@@ -18,50 +9,56 @@ export interface SearchResult {
   score: number;
 }
 
-interface ChunkRow {
-  file_path: string;
-  start_line: number;
-  end_line: number;
-  content: string;
-  embedding: Buffer;
-}
-
 interface ChunkMeta {
   filePath: string;
   startLine: number;
   endLine: number;
   content: string;
+  mtime: number;
 }
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS chunks (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  file_path  TEXT    NOT NULL,
-  start_line INTEGER NOT NULL,
-  end_line   INTEGER NOT NULL,
-  content    TEXT    NOT NULL,
-  embedding  BLOB    NOT NULL,
-  mtime      INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_file_path ON chunks(file_path);
-`;
+interface IndexData {
+  version: number;
+  chunks: ChunkMeta[];
+}
 
 export class VectorStore {
-  private db: import('better-sqlite3').Database | null = null;
+  private dbDir = '';
+  private chunks: ChunkMeta[] = [];
   private embeddingsMatrix: Float32Array = new Float32Array(0);
-  private metadata: ChunkMeta[] = [];
-  private dim = 1536; // text-embedding-3-small dimension
+  private dim = 1536;
+  private dirty = false;
 
-  constructor(private readonly DatabaseCtor: DatabaseConstructor | null = Database) {}
+  // Injectable for tests
+  constructor(private readonly _fs: typeof fs = fs) {}
 
-  open(dbPath: string): void {
-    if (!this.DatabaseCtor) {
-      console.warn('[VectorStore] better-sqlite3 unavailable — codebase indexing disabled');
-      return;
+  open(dbDir: string): void {
+    this.dbDir = dbDir;
+  }
+
+  isOpen(): boolean {
+    return this.dbDir !== '';
+  }
+
+  loadIntoMemory(): void {
+    if (!this.dbDir) return;
+    const metaPath = path.join(this.dbDir, 'chunks.json');
+    const embPath = path.join(this.dbDir, 'embeddings.bin');
+
+    try {
+      if (!this._fs.existsSync(metaPath) || !this._fs.existsSync(embPath)) return;
+      const meta: IndexData = JSON.parse(this._fs.readFileSync(metaPath, 'utf8'));
+      const embBuf = this._fs.readFileSync(embPath);
+      this.chunks = meta.chunks;
+      this.embeddingsMatrix = new Float32Array(embBuf.buffer, embBuf.byteOffset, embBuf.byteLength / 4);
+      if (this.chunks.length > 0) {
+        this.dim = this.embeddingsMatrix.length / this.chunks.length;
+      }
+    } catch {
+      // Corrupt index — will be rebuilt
+      this.chunks = [];
+      this.embeddingsMatrix = new Float32Array(0);
     }
-    this.db = new this.DatabaseCtor(dbPath);
-    this.db.exec(SCHEMA);
   }
 
   upsertChunks(
@@ -69,63 +66,63 @@ export class VectorStore {
     chunks: { startLine: number; endLine: number; content: string; embedding: Float32Array }[],
     mtime: number
   ): void {
-    if (!this.db) return;
-    const deleteStmt = this.db.prepare('DELETE FROM chunks WHERE file_path = ?');
-    const insertStmt = this.db.prepare(
-      'INSERT INTO chunks (file_path, start_line, end_line, content, embedding, mtime) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    const tx = this.db.transaction(() => {
-      deleteStmt.run(filePath);
-      for (const chunk of chunks) {
-        const buf = Buffer.from(chunk.embedding.buffer);
-        insertStmt.run(filePath, chunk.startLine, chunk.endLine, chunk.content, buf, mtime);
-      }
-    });
-    tx();
+    if (!this.dbDir) return;
+
+    // Remove existing entries for this file
+    const keep: number[] = [];
+    for (let i = 0; i < this.chunks.length; i++) {
+      if (this.chunks[i].filePath !== filePath) keep.push(i);
+    }
+
+    const keptChunks = keep.map((i) => this.chunks[i]);
+    const keptEmbeddings: number[] = [];
+    for (const i of keep) {
+      const offset = i * this.dim;
+      for (let j = 0; j < this.dim; j++) keptEmbeddings.push(this.embeddingsMatrix[offset + j]);
+    }
+
+    // Append new chunks
+    for (const c of chunks) {
+      keptChunks.push({ filePath, startLine: c.startLine, endLine: c.endLine, content: c.content, mtime });
+      for (let j = 0; j < c.embedding.length; j++) keptEmbeddings.push(c.embedding[j]);
+    }
+
+    this.chunks = keptChunks;
+    this.embeddingsMatrix = new Float32Array(keptEmbeddings);
+    if (chunks.length > 0) this.dim = chunks[0].embedding.length;
+    this.dirty = true;
+    this.flush();
   }
 
   deleteFile(filePath: string): void {
-    if (!this.db) return;
-    this.db.prepare('DELETE FROM chunks WHERE file_path = ?').run(filePath);
-  }
-
-  loadIntoMemory(): void {
-    if (!this.db) return;
-    const rows = this.db
-      .prepare('SELECT file_path, start_line, end_line, content, embedding FROM chunks')
-      .all() as ChunkRow[];
-
-    this.metadata = [];
-    const flat: number[] = [];
-
-    for (const row of rows) {
-      const embedding = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4);
-      this.metadata.push({
-        filePath: row.file_path,
-        startLine: row.start_line,
-        endLine: row.end_line,
-        content: row.content,
-      });
-      for (let i = 0; i < embedding.length; i++) {
-        flat.push(embedding[i]);
-      }
+    if (!this.dbDir) return;
+    const before = this.chunks.length;
+    const keep: number[] = [];
+    for (let i = 0; i < this.chunks.length; i++) {
+      if (this.chunks[i].filePath !== filePath) keep.push(i);
     }
+    if (keep.length === before) return;
 
-    if (this.metadata.length > 0) {
-      this.dim = flat.length / this.metadata.length;
+    const keptChunks = keep.map((i) => this.chunks[i]);
+    const keptEmbeddings: number[] = [];
+    for (const i of keep) {
+      const offset = i * this.dim;
+      for (let j = 0; j < this.dim; j++) keptEmbeddings.push(this.embeddingsMatrix[offset + j]);
     }
-    this.embeddingsMatrix = new Float32Array(flat);
+    this.chunks = keptChunks;
+    this.embeddingsMatrix = new Float32Array(keptEmbeddings);
+    this.dirty = true;
+    this.flush();
   }
 
   search(queryEmbedding: Float32Array, topK: number): SearchResult[] {
-    if (this.metadata.length === 0) return [];
+    if (this.chunks.length === 0) return [];
 
     const qNorm = norm(queryEmbedding);
     if (qNorm === 0) return [];
 
     const scores: { index: number; score: number }[] = [];
-
-    for (let i = 0; i < this.metadata.length; i++) {
+    for (let i = 0; i < this.chunks.length; i++) {
       const offset = i * this.dim;
       const chunk = this.embeddingsMatrix.subarray(offset, offset + this.dim);
       const chunkNorm = norm(chunk);
@@ -135,27 +132,39 @@ export class VectorStore {
     }
 
     scores.sort((a, b) => b.score - a.score);
-
     return scores.slice(0, topK).map(({ index, score }) => ({
-      ...this.metadata[index],
+      filePath: this.chunks[index].filePath,
+      startLine: this.chunks[index].startLine,
+      endLine: this.chunks[index].endLine,
+      content: this.chunks[index].content,
       score,
     }));
   }
 
   getAllFileMtimes(): Map<string, number> {
-    if (!this.db) return new Map();
-    const rows = this.db
-      .prepare('SELECT file_path, mtime FROM chunks GROUP BY file_path')
-      .all() as { file_path: string; mtime: number }[];
     const map = new Map<string, number>();
-    for (const row of rows) {
-      map.set(row.file_path, row.mtime);
+    for (const c of this.chunks) {
+      map.set(c.filePath, c.mtime);
     }
     return map;
   }
 
   close(): void {
-    this.db?.close();
+    this.flush();
+  }
+
+  private flush(): void {
+    if (!this.dirty || !this.dbDir) return;
+    try {
+      this._fs.mkdirSync(this.dbDir, { recursive: true });
+      const meta: IndexData = { version: 1, chunks: this.chunks };
+      this._fs.writeFileSync(path.join(this.dbDir, 'chunks.json'), JSON.stringify(meta));
+      const buf = Buffer.from(this.embeddingsMatrix.buffer);
+      this._fs.writeFileSync(path.join(this.dbDir, 'embeddings.bin'), buf);
+      this.dirty = false;
+    } catch (e) {
+      console.warn('[VectorStore] flush failed:', e instanceof Error ? e.message : String(e));
+    }
   }
 }
 

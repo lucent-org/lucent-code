@@ -12,6 +12,7 @@ const buildOptions = {
   target: 'node18',
   sourcemap: true,
   minify: !isWatch,
+  loader: { '.md': 'text' },
 };
 
 if (isWatch) {

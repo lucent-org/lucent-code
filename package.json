@@ -319,19 +319,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:icon": "node scripts/generate-icon.mjs",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
     "package": "vsce package",
     "publish:marketplace": "vsce publish"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
-    "@vscode/vsce": "^3.0.0",
-    "@electron/rebuild": "^4.0.3",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
     "concurrently": "^8.2.0",
     "esbuild": "^0.20.0",
     "sharp": "^0.34.5",
@@ -340,7 +337,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "better-sqlite3": "^12.8.0",
     "diff": "^8.0.3"
   }
 }

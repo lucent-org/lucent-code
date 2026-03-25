@@ -16,6 +16,7 @@ export interface OpenRouterModel {
   top_provider?: {
     max_completion_tokens?: number;
   };
+  supported_parameters?: string[];
 }
 
 export interface ChatMessage {
@@ -207,6 +208,7 @@ export interface ConversationSummary {
 export interface SkillSummary {
   name: string;
   description: string;
+  source: string;
 }
 
 export interface WorktreeDiff {

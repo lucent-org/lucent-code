@@ -25,6 +25,14 @@ const ModelSelector: Component<ModelSelectorProps> = (props) => {
     return model ? model.name : props.selectedModel || 'Select a model';
   });
 
+  const isReasoning = (model: OpenRouterModel) =>
+    model.supported_parameters?.includes('reasoning') ?? false;
+
+  const selectedIsReasoning = createMemo(() => {
+    const model = props.models.find((m) => m.id === props.selectedModel);
+    return model ? isReasoning(model) : false;
+  });
+
   const fillClass = () => {
     const pct = props.contextFillPct;
     if (pct === undefined) return '';
@@ -37,6 +45,9 @@ const ModelSelector: Component<ModelSelectorProps> = (props) => {
     <div class="model-selector">
       <button class="model-selector-toggle" onClick={() => setIsOpen(!isOpen())}>
         {selectedModelName()}
+        <Show when={selectedIsReasoning()}>
+          <span class="model-reasoning-badge" title="Reasoning model — thinks before responding">thinking</span>
+        </Show>
         <Show when={props.contextFillPct !== undefined}>
           <span class={`context-fill ${fillClass()}`}>{' · '}{props.contextFillPct}%</span>
         </Show>
@@ -66,7 +77,12 @@ const ModelSelector: Component<ModelSelectorProps> = (props) => {
                     }}
                   >
                     <div class="model-item-main">
-                      <div class="model-name">{model.name}</div>
+                      <div class="model-name">
+                        {model.name}
+                        <Show when={isReasoning(model)}>
+                          <span class="model-reasoning-badge">thinking</span>
+                        </Show>
+                      </div>
                       <div class="model-pricing">
                         {isFree ? 'free' : `$${promptPer1M} · $${completionPer1M} /1M`}
                       </div>

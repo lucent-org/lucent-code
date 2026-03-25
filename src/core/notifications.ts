@@ -11,7 +11,7 @@ export class NotificationService {
         'Enter API Key manually'
       );
       if (action === 'Sign in with OpenRouter') {
-        vscode.commands.executeCommand('lucentCode.authMenu');
+        vscode.commands.executeCommand('lucentCode.startOAuth');
       } else if (action === 'Enter API Key manually') {
         vscode.commands.executeCommand('lucentCode.setApiKey');
       }

@@ -16,36 +16,41 @@ const ChatTabs: Component<ChatTabsProps> = (props) => {
       .filter((c): c is ConversationSummary => c !== undefined)
   );
 
+  const isNewChat = () => !props.currentId;
+
   return (
-    <Show when={recentConversations().length > 0}>
-      <div class="chat-tabs" role="tablist" aria-label="Open chats">
-        <For each={recentConversations()}>
-          {(conv) => (
-            <div
-              class={`chat-tab ${conv.id === props.currentId ? 'chat-tab--active' : ''}`}
-              role="tab"
-              aria-selected={conv.id === props.currentId}
+    <div class="chat-tabs" role="tablist" aria-label="Open chats">
+      <Show when={isNewChat()}>
+        <div class="chat-tab chat-tab--active" role="tab" aria-selected={true}>
+          <span class="chat-tab__label">New Chat</span>
+        </div>
+      </Show>
+      <For each={recentConversations()}>
+        {(conv) => (
+          <div
+            class={`chat-tab ${conv.id === props.currentId ? 'chat-tab--active' : ''}`}
+            role="tab"
+            aria-selected={conv.id === props.currentId}
+          >
+            <button
+              class="chat-tab__label"
+              onClick={() => props.onSelect(conv.id)}
+              title={conv.title}
             >
-              <button
-                class="chat-tab__label"
-                onClick={() => props.onSelect(conv.id)}
-                title={conv.title}
-              >
-                {conv.title}
-              </button>
-              <button
-                class="chat-tab__close"
-                onClick={(e) => { e.stopPropagation(); props.onClose(conv.id); }}
-                title="Close tab"
-                aria-label={`Close ${conv.title}`}
-              >
-                ×
-              </button>
-            </div>
-          )}
-        </For>
-      </div>
-    </Show>
+              {conv.title}
+            </button>
+            <button
+              class="chat-tab__close"
+              onClick={(e) => { e.stopPropagation(); props.onClose(conv.id); }}
+              title="Close tab"
+              aria-label={`Close ${conv.title}`}
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </For>
+    </div>
   );
 };
 

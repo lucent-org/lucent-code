@@ -4,6 +4,7 @@ webview/src/**
 webview/node_modules/**
 node_modules/**
 *.map
+**/*.map
 .gitignore
 tsconfig.json
 esbuild.config.mjs
@@ -12,3 +13,6 @@ scripts/**
 marketing/**
 docs/**
 .github/**
+.playwright-mcp/**
+.lucent/**
+lucent-code-*.vsix
