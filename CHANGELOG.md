@@ -1,5 +1,89 @@
 # Changelog
 
+## [0.3.0](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.8...lucent-code-v0.3.0) (2026-03-25)
+
+
+### Features
+
+* **chat:** add [@file](https://github.com/file) typed mention for keyboard-driven file context injection ([446e317](https://github.com/lucent-org/lucent-code/commit/446e3179c433574fdc067d44930bc811322297c1))
+* **chat:** add [@model](https://github.com/model) mention for user-initiated model switching ([26375fe](https://github.com/lucent-org/lucent-code/commit/26375feb7473231ebc1295c2f190ea1a4b2d0620))
+* **chat:** add /compact system command — summarize and truncate conversation history ([0a434f3](https://github.com/lucent-org/lucent-code/commit/0a434f395b70a04e37dd40e77a48c9dbaf9c6096))
+* **chat:** drop [@test](https://github.com/test) action mention — replaced by /tests skill ([7acdcf5](https://github.com/lucent-org/lucent-code/commit/7acdcf56939d9110837e7ad8ff4d3ada4f6755ea))
+* **chat:** style compaction divider and update feature inventory ([83dd4cb](https://github.com/lucent-org/lucent-code/commit/83dd4cbc0de055ed494b0ca620757804fe4baec9))
+* **chat:** style use_model approval card and [@model](https://github.com/model) picker empty state ([e3fd7f5](https://github.com/lucent-org/lucent-code/commit/e3fd7f5a28d14bf67c62a8b8c3e2829088c58a23))
+* **credits:** add usage types and usageUpdate message ([8897910](https://github.com/lucent-org/lucent-code/commit/88979109afea4006839308437f7bf869c2b81d27))
+* **credits:** consolidate status bar, show session cost, credits menu ([ca65f5c](https://github.com/lucent-org/lucent-code/commit/ca65f5cc1b27133b38d044d8e73c67702ee93c8d))
+* **credits:** handle usageUpdate and noCredits in webview store ([0e89e63](https://github.com/lucent-org/lucent-code/commit/0e89e635a75a29f7f29d3b6b2f47519e8abcafff))
+* **credits:** per-message cost tooltip, no-credits banner, openExternal message ([e3d87f9](https://github.com/lucent-org/lucent-code/commit/e3d87f9893aa3b405e019aaa5736667efd9c6b72))
+* **credits:** track session cost and fetch account balance ([1d09ffd](https://github.com/lucent-org/lucent-code/commit/1d09ffdb8d0ba1f994fd438f026b5b177a2526e7))
+* **docs:** apply Lucent Code brand styling and home page ([ca2a2a8](https://github.com/lucent-org/lucent-code/commit/ca2a2a8067f5ee909904e2ec03b52fcb1bc2bf8f))
+* **docs:** scaffold Docusaurus 3.7 in docs-site/ ([5c311fc](https://github.com/lucent-org/lucent-code/commit/5c311fcaa66acdd71069190ec3cac6d52433a1ba))
+* **marketing:** add Docs link to navbar and footer, fix GitHub URL, fix marketplace link ([4ea4b70](https://github.com/lucent-org/lucent-code/commit/4ea4b70c300a8b6ea394552d40f03aa5f4869b8c))
+* missing tools + scoped approval system ([26489aa](https://github.com/lucent-org/lucent-code/commit/26489aaaa011b849b9adab7675875421dc9c506c))
+* show per-1M-token pricing in model selector dropdown ([175b803](https://github.com/lucent-org/lucent-code/commit/175b80326a37e5954352f6a74c352636cfeb20f2))
+* **skills:** add 6 built-in language-agnostic skills ([af1a43e](https://github.com/lucent-org/lucent-code/commit/af1a43e5c3c1ea63ab53ca83649b24b001fe9efe))
+* **skills:** add ClaudeCodeSource adapter — auto-loads ~/.claude/skills ([762cfd2](https://github.com/lucent-org/lucent-code/commit/762cfd20a2ae8fe0acb7346bb77017d642d47ff9))
+* **skills:** add doc, tests, commit, onboard built-in skills ([813f207](https://github.com/lucent-org/lucent-code/commit/813f2075948fe74504c4659147a13cd5e0e3c316))
+* **skills:** add doc, tests, commit, onboard, compact built-in skill files ([3aeebef](https://github.com/lucent-org/lucent-code/commit/3aeebef97b3c8892cc788b09f1d64f0a4bb97921))
+* **skills:** pull-only loading — remove SkillMatcher, surface activated skills ([ee45e3d](https://github.com/lucent-org/lucent-code/commit/ee45e3d50968861e9d171ecdaa856ebcf6cf7d3c))
+* **skills:** update InstructionsLoader — LUCENT.md filenames + [@skill](https://github.com/skill)() parser ([ab50956](https://github.com/lucent-org/lucent-code/commit/ab509567df0fc5ebedddc77420759a016564b5f7))
+* structured OpenRouter error handling for all API error codes ([d6c04c0](https://github.com/lucent-org/lucent-code/commit/d6c04c0270923f101604b3a76ea61e7567907ab5))
+* **tools:** add 4-button scoped approval UI to ToolCallCard ([be23d03](https://github.com/lucent-org/lucent-code/commit/be23d03d58a9c251a32ee92feaa8c930c6b82004))
+* **tools:** add ToolApprovalManager for scoped tool approvals ([43d1512](https://github.com/lucent-org/lucent-code/commit/43d1512d2be297f9539cebd31bd078357b69de53))
+* **tools:** add use_model tool with scoped approval and model switch ([2e69f08](https://github.com/lucent-org/lucent-code/commit/2e69f080de965db05c732af70857dc12e3b525a0))
+* **tools:** add write_file, delete_file, run_terminal_command, list_directory, create_directory ([517c6ad](https://github.com/lucent-org/lucent-code/commit/517c6ad3eb490a1a169c874d30ef34605a271096))
+* **tools:** extend toolApprovalResponse with scope field ([4a5dc4b](https://github.com/lucent-org/lucent-code/commit/4a5dc4b48110aed6049a3dad8baf100c91086de1))
+* **tools:** style scoped approval buttons in ToolCallCard ([23e0850](https://github.com/lucent-org/lucent-code/commit/23e0850dd08ddd578e9c2e10b7888e70d44647f2))
+* **tools:** wire ToolApprovalManager into MessageHandler ([871abcd](https://github.com/lucent-org/lucent-code/commit/871abcd94a77a58e3a517b417919e88770ff1e7a))
+* **webview:** collapsible skill groups with count badge and indented items ([81a72da](https://github.com/lucent-org/lucent-code/commit/81a72da5ed566407f2f160c81f32e6d769d37bb5))
+
+
+### Bug Fixes
+
+* **chat:** binary file rejection, error feedback, and case-insensitive file search ([42029d7](https://github.com/lucent-org/lucent-code/commit/42029d76258d2c616cb937d9552216d988344e9d))
+* **chat:** fix binary probe, test nesting, path.relative, and attachment dedup ([52c3a83](https://github.com/lucent-org/lucent-code/commit/52c3a83f22a0638817d7ea828e0c7592b1233070))
+* **chat:** remove dead [@test](https://github.com/test) handler, add binary/oversized file tests ([5604b9b](https://github.com/lucent-org/lucent-code/commit/5604b9bf60d3e335c5fc21c1068c31f651c9a93e))
+* **chat:** remove unnecessary as any casts in compact divider ([8430a98](https://github.com/lucent-org/lucent-code/commit/8430a98a99de45239be7768891079251ef6d970a))
+* **chat:** reset model picker state on Escape, add empty-state row ([0b45930](https://github.com/lucent-org/lucent-code/commit/0b459308d3861c395e70cc56b561f41a1d60a197))
+* **chat:** resolve TypeScript errors and improve compact robustness ([6305997](https://github.com/lucent-org/lucent-code/commit/63059973daa4885453cc5d1f017f2753941ce135))
+* **chat:** restore indent on [@terminal](https://github.com/terminal) entry in MENTION_SOURCES ([0fbc678](https://github.com/lucent-org/lucent-code/commit/0fbc67822eab79518ee265cacaf316ba7e820036))
+* **core:** fix notifications command name and context-builder test mocks ([2254c86](https://github.com/lucent-org/lucent-code/commit/2254c86b7260d0c95076008ce2ef0ae3143de940))
+* **credits:** correct balance display and type postMessage wrapper safely ([e957ac0](https://github.com/lucent-org/lucent-code/commit/e957ac0d95f90f7ffc4c045471dc31d8624c1dc6))
+* **credits:** correct usageUpdate property access in App.tsx ([c9968af](https://github.com/lucent-org/lucent-code/commit/c9968af0b01c161b052c6945d93a4d1074db5e13))
+* handle 401 by invalidating auth and prompting re-sign-in ([476c3d7](https://github.com/lucent-org/lucent-code/commit/476c3d7c1e4065280a1c58a02fe45d58876c2ca2))
+* **oauth:** handle windowId in callback path, add app_name, move status bar to right ([27954e0](https://github.com/lucent-org/lucent-code/commit/27954e05351ed003ac2951c8e5281a52d511f201))
+* **oauth:** remove PKCE (OpenRouter unsupported), consolidate auth commands, improve UX ([b5cce08](https://github.com/lucent-org/lucent-code/commit/b5cce0823eafa831d9ea5c89b83f17473baeb328))
+* raise tool loop limit to 15, force text response on final iteration ([89835be](https://github.com/lucent-org/lucent-code/commit/89835be6dabe37ac63a187e422311250bd975c2c))
+* **skills:** embed built-in skills as module imports to survive packaging ([2e9807c](https://github.com/lucent-org/lucent-code/commit/2e9807c75612ba372624ef61dad0df3360e36c30))
+* **skills:** language-neutral truncation marker, delete dead SkillMatcher ([e3670a0](https://github.com/lucent-org/lucent-code/commit/e3670a0c6243e088059b2e439c02ce7df46e3a6d))
+* **skills:** single-pass [@skill](https://github.com/skill)() extraction with anchored regex ([299c7f1](https://github.com/lucent-org/lucent-code/commit/299c7f14ea5c939ae13423a6674cf8453b980c5d))
+* **skills:** use source.type as fallback label in load(), update getSummaries test ([4d30b39](https://github.com/lucent-org/lucent-code/commit/4d30b398f3340c7e6f4ff66da9033f02fd523dd6))
+* **test:** update AdvancedFeaturesGrid test to match current card title ([14a6100](https://github.com/lucent-org/lucent-code/commit/14a610053d274ebf0c56bc2578d466a0be26890b))
+* **tools:** address code quality issues in editor-tools ([a066a24](https://github.com/lucent-org/lucent-code/commit/a066a24077a049729af6ce10bfdb7cec4b856fc5))
+* **tools:** autonomous mode bypass, session approval, useTrash on delete ([16a22d1](https://github.com/lucent-org/lucent-code/commit/16a22d1f217feafecc40fed5085a42fa8194b485))
+* **tools:** break modelChanged→setModel echo loop — use receiveModelChange for AI-initiated switches ([5aa1186](https://github.com/lucent-org/lucent-code/commit/5aa118653ea5f59795972419cdb21d1acf4fb16e))
+* **tools:** fix approval button class names, centralize ApprovalScope type, add scope tests ([fca452d](https://github.com/lucent-org/lucent-code/commit/fca452da7c7ee38d3931d7471a3d2171decf4673))
+* **tools:** thread currentModel through webview for use_model approval card ([589a6cb](https://github.com/lucent-org/lucent-code/commit/589a6cb14b1a442ee455bb26c664f5225cdf302d))
+* **tools:** validate model_id, improve use_model robustness and card types ([a0e407b](https://github.com/lucent-org/lucent-code/commit/a0e407bbce161f5201948d14dd586d9c0f494179))
+
+
+### Documentation
+
+* add all 6 developer reference pages ([872a9c7](https://github.com/lucent-org/lucent-code/commit/872a9c71ee6f7207b8cfcd861d37f856eed98ccf))
+* add all 7 user guide pages ([86bddd5](https://github.com/lucent-org/lucent-code/commit/86bddd5784d1e5541f1a5634a90e2bb31060497a))
+* add Cloudflare deployment notes and verify final build ([b7f64db](https://github.com/lucent-org/lucent-code/commit/b7f64db2fd9ae09a8f9570733d70729c84ca34e3))
+* add credits awareness design ([0eae410](https://github.com/lucent-org/lucent-code/commit/0eae410ec59b9dd5830abc64f0fb4f94d3596a62))
+* add credits awareness implementation plan ([6be04dc](https://github.com/lucent-org/lucent-code/commit/6be04dc0edae56f81fbd01c4db08c5134a21377b))
+* add Lucent Code docs site implementation plan ([3031593](https://github.com/lucent-org/lucent-code/commit/3031593bf6bd29b4a80f03e9b5ff5c08c2bd3be6))
+* add Lucent Code documentation site design ([c1993ce](https://github.com/lucent-org/lucent-code/commit/c1993ce089671d71c18d1d1180eb4f5f02a4b690))
+* add LUCENT.md, built-in skills & model switching design ([8ca3d06](https://github.com/lucent-org/lucent-code/commit/8ca3d06e225b1721659bb1f3fe7ae34c2aa4c08c))
+* add LUCENT.md, built-in skills, use_model, [@model](https://github.com/model) to feature inventory and marketing site ([e772a27](https://github.com/lucent-org/lucent-code/commit/e772a271a49b967fce0489626712015dda300f94))
+* add LUCENT.md, skills & model switching implementation plan ([ee29d23](https://github.com/lucent-org/lucent-code/commit/ee29d23a532426ca2eb52b36dd4a9effc17e6112))
+* add missing tools + scoped approval design ([12af90b](https://github.com/lucent-org/lucent-code/commit/12af90b2afa29f45d22ee4af0a03c26b6a6fab62))
+* add missing tools implementation plan ([399172f](https://github.com/lucent-org/lucent-code/commit/399172f49b626bec28370a5daf677ef003851158))
+* design doc for slash commands, /compact, and [@file](https://github.com/file) mention ([d7bbad4](https://github.com/lucent-org/lucent-code/commit/d7bbad4de528b11611952f5514d1443aa20f1873))
+* implementation plan for slash commands and [@file](https://github.com/file) mention ([ebb16d2](https://github.com/lucent-org/lucent-code/commit/ebb16d2b490978802dd979159f08b85e1e1fa3aa))
+
 ## [0.2.8](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.7...lucent-code-v0.2.8) (2026-03-22)
 
 
