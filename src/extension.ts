@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { AuthManager } from './core/auth';
 import { Settings } from './core/settings';
 import { OpenRouterClient } from './core/openrouter-client';
+import { ProviderRegistry } from './providers/provider-registry';
+import type { ILLMProvider } from './providers/llm-provider';
 import { ContextBuilder } from './core/context-builder';
 import { ChatViewProvider } from './chat/chat-provider';
 import { MessageHandler } from './chat/message-handler';
@@ -45,6 +47,23 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
   const auth = new AuthManager(context.secrets);
   const settings = new Settings();
+  const providerRegistry = new ProviderRegistry({
+    openRouterApiKey: () => auth.getApiKey(),
+    anthropicApiKey:  async () => settings.anthropicApiKey || undefined,
+    nvidiaApiKey:     async () => settings.nvidiaApiKey || undefined,
+    nvidiaBaseUrl:    settings.nvidiaBaseUrl,
+    providerOverride: settings.providerOverride,
+  });
+
+  const providerProxy: ILLMProvider = {
+    id: 'dynamic',
+    chatStream: (req, signal) => providerRegistry.resolve(req.model).chatStream(req, signal),
+    listModels: () => providerRegistry.all[0].listModels(),
+    getAccountBalance: () => providerRegistry.all[0].getAccountBalance?.() ?? Promise.resolve({ usage: 0, limit: null }),
+  };
+
+  // Legacy OpenRouterClient kept for non-streaming .chat() and .getAccountBalance() usages
+  // in authMenu and generateCommitMessage commands.
   const client = new OpenRouterClient(() => auth.getApiKey());
 
   // Initialize skill registry
@@ -226,7 +245,7 @@ export async function activate(context: vscode.ExtensionContext) {
   indexerStatusBar.show();
   context.subscriptions.push(indexerStatusBar);
 
-  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer);
+  messageHandler = new MessageHandler(providerProxy, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer);
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -292,7 +311,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   // Register inline completion provider
-  const completionProvider = new InlineCompletionProvider(client, settings);
+  const completionProvider = new InlineCompletionProvider(providerProxy, settings);
   context.subscriptions.push(
     vscode.languages.registerInlineCompletionItemProvider(
       { pattern: '**' },
