@@ -6,7 +6,7 @@ const DEFAULT_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 8000;
-const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+const RETRYABLE = new Set([500, 502, 503, 504]); // 429 handled explicitly as rate_limit (not retried)
 
 // Curated static list — NIM doesn't expose a standard /models endpoint
 const NIM_MODELS: ProviderModel[] = [
