@@ -150,6 +150,7 @@ export class AnthropicProvider implements ILLMProvider {
     const tools = request.tools?.length ? toAnthropicTools(request.tools) : undefined;
 
     const toolUseAccumulator = new Map<number, { id: string; name: string; input: string }>();
+    let messageId = '';
 
     try {
       const stream = client.messages.stream({
@@ -166,7 +167,12 @@ export class AnthropicProvider implements ILLMProvider {
       }
 
       for await (const event of stream) {
-        const chunk = fromAnthropicChunk(event as unknown as Record<string, unknown>, '', toolUseAccumulator);
+        const e = event as unknown as Record<string, unknown>;
+        // Capture message ID from the first event
+        if (e.type === 'message_start') {
+          messageId = ((e.message as Record<string, unknown>)?.id as string) ?? '';
+        }
+        const chunk = fromAnthropicChunk(e, messageId, toolUseAccumulator);
         if (chunk) yield chunk;
       }
     } catch (err) {
@@ -174,6 +180,7 @@ export class AnthropicProvider implements ILLMProvider {
       if (err instanceof Anthropic.RateLimitError)      throw new LLMError('rate_limit', err.message);
       if (err instanceof Anthropic.APIConnectionError)  throw new LLMError('unavailable', err.message);
       if (err instanceof Anthropic.BadRequestError)     throw new LLMError('bad_request', err.message);
+      if (err instanceof Anthropic.PermissionDeniedError) throw new LLMError('moderation', err.message);
       throw err;
     }
   }
