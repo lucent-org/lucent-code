@@ -5,7 +5,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ExtensionMessage, WebviewMessage, ChatMessage, Conversation, ToolCall, DiffLine } from '../shared/types';
 import { messageText } from '../core/message-text';
-import { OpenRouterClient, OpenRouterError } from '../core/openrouter-client';
+import type { ILLMProvider } from '../providers/llm-provider';
+import { LLMError } from '../providers/llm-provider';
+import type { ProviderModel } from '../providers/llm-provider';
 import { ContextBuilder } from '../core/context-builder';
 import { Settings } from '../core/settings';
 import { EditorToolExecutor, TOOL_DEFINITIONS, USE_SKILL_TOOL_DEFINITION, START_WORKTREE_TOOL_DEFINITION } from '../lsp/editor-tools';
@@ -31,10 +33,12 @@ export class MessageHandler {
     this.conversationMessages = [];
     this.currentConversation = undefined;
     this.sessionCost = 0;
+    this.activeSkills = [];
   }
 
   private readonly pendingApprovals = new Map<string, (result: { approved: boolean; scope: 'once' | 'workspace' | 'global' }) => void>();
   private _autonomousMode = false;
+  private activeSkills: Array<{ name: string; content: string }> = [];
   private _worktreeManager: WorktreeManager | null = null;
 
   private sessionCost = 0;
@@ -57,7 +61,7 @@ export class MessageHandler {
   private readonly approvalManager: ToolApprovalManager;
 
   constructor(
-    private readonly client: OpenRouterClient,
+    private readonly provider: ILLMProvider,
     private readonly contextBuilder: ContextBuilder,
     private readonly settings: Settings,
     private readonly toolExecutor?: EditorToolExecutor,
@@ -79,14 +83,9 @@ export class MessageHandler {
 
   setAutonomousMode(value: boolean): void {
     this._autonomousMode = value;
-    if (value && this._worktreeManager?.state === 'idle' && this.currentConversation) {
-      this._worktreeManager.create(this.currentConversation.id).catch((e: Error) => {
-        console.error('[WorktreeManager] Failed to create worktree:', e.message);
-      });
-    }
   }
 
-  setModelPricing(models: import('../shared/types').OpenRouterModel[]): void {
+  setModelPricing(models: ProviderModel[]): void {
     for (const m of models) {
       this.modelPricing.set(m.id, m.pricing);
     }
@@ -103,7 +102,7 @@ export class MessageHandler {
   async handleMessage(message: WebviewMessage, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     switch (message.type) {
       case 'sendMessage':
-        await this.handleSendMessage(message.content, message.images ?? [], message.model, postMessage);
+        await this.handleSendMessage(message.content, message.images ?? [], message.model, postMessage, message.skills ?? []);
         break;
       case 'cancelRequest':
         this.handleCancel();
@@ -179,6 +178,11 @@ export class MessageHandler {
       }
       case 'setAutonomousMode':
         this.setAutonomousMode(message.enabled);
+        postMessage({ type: 'autonomousModeChanged', enabled: message.enabled });
+        break;
+      case 'clearActiveSkills':
+        this.activeSkills = [];
+        postMessage({ type: 'activeSkillsChanged', skills: [] });
         break;
       case 'startWorktree': {
         const convId = this.currentConversation?.id ?? Date.now().toString();
@@ -196,7 +200,8 @@ export class MessageHandler {
           const historyText = this.conversationMessages
             .map((m) => `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`)
             .join('\n');
-          const response = await this.client.chat({
+          let summaryText = '';
+          const compactStream = this.provider.chatStream({
             model,
             messages: [
               {
@@ -205,9 +210,13 @@ export class MessageHandler {
               },
             ],
             max_tokens: 300,
+            stream: true,
           });
-          const raw = response.choices?.[0]?.message?.content;
-          summary = typeof raw === 'string' ? raw : (raw ? JSON.stringify(raw) : '[No summary generated]');
+          for await (const chunk of compactStream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) summaryText += delta;
+          }
+          summary = summaryText || '[No summary generated]';
         } catch (e: unknown) {
           summary = `[Compaction failed: ${e instanceof Error ? e.message : String(e)}]`;
         }
@@ -274,7 +283,8 @@ export class MessageHandler {
     content: string,
     images: string[],
     model: string,
-    postMessage: (msg: ExtensionMessage) => void
+    postMessage: (msg: ExtensionMessage) => void,
+    skills: Array<{ name: string; content: string }> = []
   ): Promise<void> {
     let activeModel = model;
     const context = await this.contextBuilder.buildEnrichedContext();
@@ -282,10 +292,12 @@ export class MessageHandler {
     const contextPrompt = this.contextBuilder.formatEnrichedPrompt(context, capabilities);
 
     const customInstructions = this.contextBuilder.getCustomInstructions();
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const systemMessage: ChatMessage = {
       role: 'system',
       content: [
         'You are a helpful coding assistant integrated into VSCode. You have access to the user\'s current editor context.',
+        `\n\nToday's date: ${today}`,
         customInstructions ? `\n\n## Project Instructions:\n${customInstructions}` : '',
         `\n\n${contextPrompt}`,
       ].join(''),
@@ -301,6 +313,22 @@ export class MessageHandler {
         : '';
       const advertisement = `\n\n## Available Skills\nThe following skills are available. Use the \`use_skill\` tool when relevant.${activatedNote}\n\n${skillSummaries.map((s) => `- **${s.name}**: ${s.description}`).join('\n')}`;
       systemMessage.content += advertisement;
+    }
+
+    // Update persisted active skills when new ones arrive; re-inject on every turn.
+    // This keeps the skill workflow in context across the full conversation.
+    const isSkillOpeningTurn = skills.length > 0;
+    if (isSkillOpeningTurn) {
+      this.activeSkills = skills;
+      postMessage({ type: 'activeSkillsChanged', skills: skills.map((s) => s.name) });
+    }
+    const effectiveSkills = this.activeSkills;
+    if (effectiveSkills.length > 0) {
+      const injected = effectiveSkills.map((s) => `<activated-skill name="${s.name}">\n${s.content}\n</activated-skill>`).join('\n\n');
+      const openingRules = isSkillOpeningTurn
+        ? `CRITICAL rules for your FIRST response:\n- Your first response MUST be a single warm, open-ended question asking what the user wants to build or achieve. Nothing else.\n- Do NOT mention files, tools, functions, or technical details.\n- Do NOT explore context, read files, or use any tools.\n- Do NOT print, list, or describe the skill steps.\n- Do NOT do anything except ask ONE question and wait for the user's reply.\n`
+        : `You are mid-workflow. Continue following the active skill's process based on the conversation so far.\n`;
+      systemMessage.content += `\n\n## Active Skills\n${openingRules}\n${injected}`;
     }
 
     // Handle @codebase semantic search
@@ -332,6 +360,10 @@ export class MessageHandler {
     }
 
     const baseContent = processedContent;
+    if (!baseContent && images.length === 0) {
+      postMessage({ type: 'streamEnd', cancelled: false });
+      return;
+    }
     const userContent = images.length > 0
       ? [
           { type: 'text' as const, text: baseContent },
@@ -341,12 +373,15 @@ export class MessageHandler {
     this.conversationMessages.push({ role: 'user', content: userContent });
     this.abortController = new AbortController();
 
+    // Suppress tools on the opening skill turn: models without native tool calling receive an
+    // OpenRouter-injected calling-format prompt that conflicts with skill content.
+    // On follow-up turns (isFirstTurn=false) tools are restored so the skill can use them.
     const skillTools    = this.skillRegistry      ? [USE_SKILL_TOOL_DEFINITION]       : [];
     const editorTools   = this.toolExecutor        ? TOOL_DEFINITIONS                  : [];
     const mcpTools      = this.mcpClientManager?.getTools() ?? [];
     const worktreeTools = [START_WORKTREE_TOOL_DEFINITION];
     const allTools      = [...editorTools, ...skillTools, ...mcpTools, ...worktreeTools];
-    const tools         = allTools.length > 0 ? allTools : undefined;
+    const tools         = isSkillOpeningTurn || allTools.length === 0 ? undefined : allTools;
 
     try {
       const MAX_TOOL_ITERATIONS = 15;
@@ -361,7 +396,7 @@ export class MessageHandler {
         // On the last iteration, strip tools so the model is forced to produce a text response
         const isLastIteration = iteration === MAX_TOOL_ITERATIONS - 1;
 
-        const stream = this.client.chatStream(
+        const stream = this.provider.chatStream(
           {
             model: activeModel,
             messages: [systemMessage, ...this.conversationMessages],
@@ -404,9 +439,11 @@ export class MessageHandler {
           let creditsUsed = 0;
           let creditsLimit: number | null = null;
           try {
-            const balance = await this.client.getAccountBalance();
-            creditsUsed = balance.usage;
-            creditsLimit = balance.limit;
+            const balance = await this.provider.getAccountBalance?.();
+            if (balance) {
+              creditsUsed = balance.usage;
+              creditsLimit = balance.limit;
+            }
           } catch { /* non-fatal */ }
 
           postMessage({
@@ -603,8 +640,8 @@ export class MessageHandler {
       this.onStreamEnd?.();
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        postMessage({ type: 'streamEnd' });
-      } else if (error instanceof OpenRouterError) {
+        postMessage({ type: 'streamEnd', cancelled: true });
+      } else if (error instanceof LLMError) {
         await this.handleApiError(error, postMessage);
       } else {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -628,47 +665,46 @@ export class MessageHandler {
     this.abort();
   }
 
-  private async handleApiError(error: OpenRouterError, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
+  private async handleApiError(error: LLMError, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     switch (error.code) {
-      case 401:
+      case 'auth':
         this.onAuthInvalid?.();
-        postMessage({ type: 'streamError', error: 'Authentication failed — please sign in again.' });
+        postMessage({ type: 'streamError', error: 'Authentication failed — please check your API key in settings.' });
         break;
-      case 402:
+      case 'quota':
         postMessage({ type: 'noCredits' });
-        postMessage({ type: 'streamError', error: 'Insufficient credits. Please top up your OpenRouter balance.' });
+        postMessage({ type: 'streamError', error: 'Insufficient credits. Please top up your account balance.' });
         break;
-      case 400:
+      case 'bad_request':
         postMessage({ type: 'streamError', error: `Bad request: ${error.message}` });
         break;
-      case 403: {
-        const reasons = (error.metadata as { reasons?: string[] } | undefined)?.reasons;
-        const detail = reasons?.length ? ` Reason: ${reasons.join(', ')}.` : '';
-        postMessage({ type: 'streamError', error: `Content flagged by moderation policy.${detail}` });
+      case 'moderation':
+        postMessage({ type: 'streamError', error: 'Content flagged by moderation policy.' });
         break;
-      }
-      case 408:
+      case 'timeout':
         postMessage({ type: 'streamError', error: 'Request timed out. Please try again.' });
         break;
-      case 429:
+      case 'rate_limit':
         postMessage({ type: 'streamError', error: 'Rate limit reached. Please wait a moment and try again.' });
         break;
-      case 502:
+      case 'unavailable':
+      default:
         postMessage({ type: 'streamError', error: 'The model is temporarily unavailable. Try switching to a different model.' });
         break;
-      case 503:
-        postMessage({ type: 'streamError', error: 'No provider available for this model right now. Try a different model or try again later.' });
-        break;
-      default:
-        await this.notifications.handleError(error.message);
-        postMessage({ type: 'streamError', error: error.message });
     }
   }
 
   private async handleGetModels(postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     try {
-      const models = await this.client.listModels();
-      this.setModelPricing(models);
+      const providerModels = await this.provider.listModels();
+      this.setModelPricing(providerModels);
+      const models = providerModels.map((m) => ({
+        id: m.id,
+        name: m.name,
+        context_length: m.contextLength,
+        pricing: m.pricing,
+        top_provider: m.topProvider ? { max_completion_tokens: m.topProvider.maxCompletionTokens } : undefined,
+      }));
       postMessage({ type: 'modelsLoaded', models });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch models';
@@ -732,7 +768,8 @@ export class MessageHandler {
 
   private async autoTitle(conversation: Conversation, postMessage: (msg: ExtensionMessage) => void): Promise<void> {
     try {
-      const response = await this.client.chat({
+      let titleText = '';
+      const titleStream = this.provider.chatStream({
         model: conversation.model,
         messages: [
           { role: 'system', content: 'Generate a short title (3-6 words) for this conversation. Output only the title, nothing else.' },
@@ -740,9 +777,14 @@ export class MessageHandler {
         ],
         temperature: 0.3,
         max_tokens: 20,
+        stream: true,
       });
+      for await (const chunk of titleStream) {
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) titleText += delta;
+      }
 
-      const title = messageText(response.choices[0]?.message?.content ?? '').trim();
+      const title = titleText.trim();
       if (title && this.history) {
         conversation.title = title;
         await this.history.save(conversation);

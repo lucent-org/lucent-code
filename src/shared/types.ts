@@ -104,7 +104,7 @@ export interface ChatResponse {
 
 export type ExtensionMessage =
   | { type: 'streamChunk'; content: string }
-  | { type: 'streamEnd'; usage?: ChatResponse['usage'] }
+  | { type: 'streamEnd'; usage?: ChatResponse['usage']; cancelled?: boolean }
   | { type: 'streamError'; error: string }
   | { type: 'modelsLoaded'; models: OpenRouterModel[] }
   | { type: 'modelChanged'; modelId: string }
@@ -120,6 +120,7 @@ export type ExtensionMessage =
   | { type: 'skillsLoaded'; skills: SkillSummary[] }
   | { type: 'skillContent'; name: string; content: string | null }
   | { type: 'insertSkillChip'; name: string; content: string }
+  | { type: 'activeSkillsChanged'; skills: string[] }
   | { type: 'mcpStatus'; servers: Record<string, 'connected' | 'error'> }
   | { type: 'autonomousModeChanged'; enabled: boolean }
   | { type: 'worktreeStatus'; status: 'idle' | 'creating' | 'active' | 'finishing'; branch?: string }
@@ -130,7 +131,7 @@ export type ExtensionMessage =
   | { type: 'fileAttachment'; name: string; relativePath: string; content: string; error?: string };
 
 export type WebviewMessage =
-  | { type: 'sendMessage'; content: string; images?: string[]; model: string }
+  | { type: 'sendMessage'; content: string; images?: string[]; model: string; skills?: Array<{ name: string; content: string }> }
   | { type: 'cancelRequest' }
   | { type: 'getModels' }
   | { type: 'setModel'; modelId: string }
@@ -146,6 +147,7 @@ export type WebviewMessage =
   | { type: 'getTerminalOutput' }
   | { type: 'getSkillContent'; name: string }
   | { type: 'setAutonomousMode'; enabled: boolean }
+  | { type: 'clearActiveSkills' }
   | { type: 'startWorktree' }
   | { type: 'openExternal'; url: string }
   | { type: 'compactConversation'; model: string }
