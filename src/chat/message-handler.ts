@@ -97,8 +97,12 @@ export class MessageHandler {
 
   private resolveProviderName(modelId: string): string {
     if (!this.providerResolver) return '';
-    const providerId = this.providerResolver(modelId).id;
-    return MessageHandler.PROVIDER_ID_TO_NAME[providerId] ?? '';
+    try {
+      const providerId = this.providerResolver(modelId).id;
+      return MessageHandler.PROVIDER_ID_TO_NAME[providerId] ?? '';
+    } catch {
+      return '';
+    }
   }
 
   setModelPricing(models: ProviderModel[]): void {
