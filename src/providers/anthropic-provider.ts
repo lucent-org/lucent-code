@@ -1,4 +1,7 @@
-import type { ChatMessage, ToolDefinition, ChatResponseChunk } from '../shared/types';
+import type { ChatMessage, ToolDefinition, ChatResponseChunk, ChatRequest } from '../shared/types';
+import Anthropic from '@anthropic-ai/sdk';
+import type { ILLMProvider, ProviderModel } from './llm-provider';
+import { LLMError } from './llm-provider';
 
 // OpenAI ToolDefinition → Anthropic tool format
 export function toAnthropicTools(tools: ToolDefinition[]) {
@@ -110,4 +113,68 @@ export function fromAnthropicChunk(
   }
 
   return null;
+}
+
+// Static model list — Anthropic doesn't have a standard public /models endpoint
+const ANTHROPIC_MODELS: ProviderModel[] = [
+  { id: 'claude-opus-4-6',           name: 'Claude Opus 4.6',   contextLength: 200000, pricing: { prompt: '0.015',   completion: '0.075'   } },
+  { id: 'claude-sonnet-4-6',         name: 'Claude Sonnet 4.6', contextLength: 200000, pricing: { prompt: '0.003',   completion: '0.015'   } },
+  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5',  contextLength: 200000, pricing: { prompt: '0.00025', completion: '0.00125' } },
+];
+
+export class AnthropicProvider implements ILLMProvider {
+  readonly id = 'anthropic';
+
+  constructor(private readonly getApiKey: () => Promise<string | undefined>) {}
+
+  async listModels(): Promise<ProviderModel[]> {
+    return ANTHROPIC_MODELS;
+  }
+
+  async *chatStream(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<ChatResponseChunk, void, unknown> {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) throw new LLMError('auth', 'No Anthropic API key configured. Set lucentCode.providers.anthropic.apiKey in settings.');
+
+    const client = new Anthropic({ apiKey });
+
+    // Extract system message and format with cache_control for prompt caching
+    const systemMsg = request.messages.find(m => m.role === 'system');
+    const system = systemMsg ? [{
+      type: 'text' as const,
+      text: typeof systemMsg.content === 'string' ? systemMsg.content : JSON.stringify(systemMsg.content),
+      cache_control: { type: 'ephemeral' as const },
+    }] : undefined;
+
+    const nonSystemMessages = request.messages.filter(m => m.role !== 'system');
+    const anthropicMessages = toAnthropicMessages(nonSystemMessages);
+    const tools = request.tools?.length ? toAnthropicTools(request.tools) : undefined;
+
+    const toolUseAccumulator = new Map<number, { id: string; name: string; input: string }>();
+
+    try {
+      const stream = client.messages.stream({
+        model: request.model,
+        max_tokens: request.max_tokens ?? 4096,
+        temperature: request.temperature,
+        system,
+        messages: anthropicMessages as Anthropic.MessageParam[],
+        tools: tools as Anthropic.Tool[] | undefined,
+      });
+
+      if (signal) {
+        signal.addEventListener('abort', () => stream.abort(), { once: true });
+      }
+
+      for await (const event of stream) {
+        const chunk = fromAnthropicChunk(event as unknown as Record<string, unknown>, '', toolUseAccumulator);
+        if (chunk) yield chunk;
+      }
+    } catch (err) {
+      if (err instanceof Anthropic.AuthenticationError) throw new LLMError('auth', err.message);
+      if (err instanceof Anthropic.RateLimitError)      throw new LLMError('rate_limit', err.message);
+      if (err instanceof Anthropic.APIConnectionError)  throw new LLMError('unavailable', err.message);
+      if (err instanceof Anthropic.BadRequestError)     throw new LLMError('bad_request', err.message);
+      throw err;
+    }
+  }
 }

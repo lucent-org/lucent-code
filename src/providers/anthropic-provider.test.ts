@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   toAnthropicTools,
   toAnthropicMessages,
@@ -89,5 +89,31 @@ describe('fromAnthropicChunk', () => {
     const event = { type: 'message_delta', delta: { stop_reason: 'end_turn' } };
     const chunk = fromAnthropicChunk(event, 'msg_1', null);
     expect(chunk?.choices[0].finish_reason).toBe('stop');
+  });
+});
+
+import Anthropic from '@anthropic-ai/sdk';
+import { AnthropicProvider } from './anthropic-provider';
+import { LLMError } from './llm-provider';
+
+vi.mock('@anthropic-ai/sdk');
+
+describe('AnthropicProvider', () => {
+  it('has id anthropic', () => {
+    const p = new AnthropicProvider(async () => 'key');
+    expect(p.id).toBe('anthropic');
+  });
+
+  it('listModels returns static model list with claude models', async () => {
+    const p = new AnthropicProvider(async () => 'key');
+    const models = await p.listModels();
+    expect(models.length).toBeGreaterThan(0);
+    expect(models.every(m => m.id.includes('claude'))).toBe(true);
+  });
+
+  it('throws LLMError with auth code when no API key', async () => {
+    const p = new AnthropicProvider(async () => undefined);
+    const gen = p.chatStream({ model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: 'hi' }] });
+    await expect(gen.next()).rejects.toBeInstanceOf(LLMError);
   });
 });
