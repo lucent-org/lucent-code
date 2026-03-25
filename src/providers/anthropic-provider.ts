@@ -38,7 +38,7 @@ export function toAnthropicMessages(messages: ChatMessage[]): Array<{ role: 'use
           type: 'tool_use',
           id: tc.id,
           name: tc.function.name,
-          input: JSON.parse(tc.function.arguments || '{}'),
+          input: (() => { try { return JSON.parse(tc.function.arguments || '{}'); } catch { return {}; } })(),
         });
       }
       result.push({ role: 'assistant', content });
@@ -51,7 +51,9 @@ export function toAnthropicMessages(messages: ChatMessage[]): Array<{ role: 'use
   return result;
 }
 
-// Anthropic streaming event → ChatResponseChunk (returns null for events we ignore)
+// Anthropic streaming event → ChatResponseChunk (returns null for events we ignore).
+// Pass null for toolUseAccumulator only when the request has no tools — tool streaming events
+// will be silently dropped if the accumulator is absent.
 export function fromAnthropicChunk(
   event: Record<string, unknown>,
   messageId: string,
