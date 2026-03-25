@@ -1,0 +1,222 @@
+import type { ChatRequest, ChatResponseChunk } from '../shared/types';
+import { ILLMProvider, LLMError, LLMErrorCode, ProviderModel } from './llm-provider';
+
+const BASE_URL = 'https://openrouter.ai/api/v1';
+
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 8000;
+
+function toProviderError(status: number, message: string): LLMError {
+  let code: LLMErrorCode;
+  switch (status) {
+    case 401: code = 'auth'; break;
+    case 402: code = 'quota'; break;
+    case 403: code = 'moderation'; break;
+    case 408: code = 'timeout'; break;
+    case 429: code = 'rate_limit'; break;
+    case 400: code = 'bad_request'; break;
+    default:  code = 'unavailable'; break;
+  }
+  return new LLMError(code, message);
+}
+
+function parseApiError(status: number, body: string): LLMError {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: number; message?: string; metadata?: Record<string, unknown> } };
+    const err = parsed.error;
+    if (err?.message) {
+      return toProviderError(err.code ?? status, err.message);
+    }
+  } catch { /* fall through */ }
+  return toProviderError(status, `OpenRouter API error (${status}): ${body}`);
+}
+
+export class OpenRouterProvider implements ILLMProvider {
+  readonly id = 'openrouter';
+
+  constructor(private readonly getApiKey: () => Promise<string | undefined>) {}
+
+  private async headers(): Promise<Record<string, string>> {
+    const key = await this.getApiKey();
+    if (!key) {
+      throw new Error('No API key configured. Please set your OpenRouter API key.');
+    }
+    return {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://github.com/lucentcode/lucent-code',
+      'X-Title': 'Lucent Code',
+    };
+  }
+
+  private sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+
+      let onAbort: (() => void) | undefined;
+
+      const timer = setTimeout(() => {
+        if (signal && onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
+        resolve();
+      }, ms);
+
+      if (signal) {
+        onAbort = () => {
+          clearTimeout(timer);
+          reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+    });
+  }
+
+  private async withRetry(
+    fn: () => Promise<Response>,
+    signal?: AbortSignal
+  ): Promise<Response> {
+    let lastError: Error = new Error('Retry loop exited without a recorded error');
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const response = await fn();
+
+      if (response.ok) {
+        return response;
+      }
+
+      const { status } = response;
+
+      if (!RETRYABLE_STATUS_CODES.has(status)) {
+        const body = await response.text();
+        throw parseApiError(status, body);
+      }
+
+      const body = await response.text();
+      lastError = parseApiError(status, body);
+
+      if (attempt === MAX_RETRIES) {
+        break;
+      }
+
+      let delayMs: number;
+      const retryAfterHeader = response.headers.get('Retry-After');
+      if (retryAfterHeader !== null) {
+        const retryAfterSec = parseInt(retryAfterHeader, 10);
+        delayMs = isNaN(retryAfterSec) ? RETRY_BASE_MS : retryAfterSec * 1000;
+      } else {
+        const base = Math.min(RETRY_BASE_MS * Math.pow(2, attempt), RETRY_MAX_MS);
+        const jitter = base * 0.2 * (Math.random() * 2 - 1); // ±20%
+        delayMs = Math.round(base + jitter);
+      }
+
+      await this.sleep(delayMs, signal);
+    }
+
+    throw lastError;
+  }
+
+  async listModels(): Promise<ProviderModel[]> {
+    const response = await fetch(`${BASE_URL}/models`, {
+      headers: await this.headers(),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw parseApiError(response.status, body);
+    }
+
+    const data = await response.json() as {
+      data: Array<{
+        id: string;
+        name: string;
+        context_length: number;
+        pricing: { prompt: string; completion: string };
+        top_provider?: { max_completion_tokens?: number };
+      }>;
+    };
+
+    return data.data.map((m) => ({
+      id: m.id,
+      name: m.name,
+      contextLength: m.context_length,
+      pricing: m.pricing,
+      topProvider: m.top_provider
+        ? { maxCompletionTokens: m.top_provider.max_completion_tokens }
+        : undefined,
+    }));
+  }
+
+  async *chatStream(
+    request: ChatRequest,
+    signal?: AbortSignal
+  ): AsyncGenerator<ChatResponseChunk, void, unknown> {
+    const headers = await this.headers();
+    const response = await this.withRetry(
+      () =>
+        fetch(`${BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ ...request, stream: true }),
+          signal,
+        }),
+      signal
+    );
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') return;
+
+          try {
+            const chunk = JSON.parse(data) as ChatResponseChunk;
+            if (chunk.error) {
+              throw toProviderError(chunk.error.code, chunk.error.message);
+            }
+            yield chunk;
+          } catch (e) {
+            if (e instanceof LLMError) throw e;
+            // Skip malformed chunks
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  async getAccountBalance(): Promise<{ usage: number; limit: number | null }> {
+    const headers = await this.headers();
+    const response = await fetch('https://openrouter.ai/api/v1/auth/key', { headers });
+    if (!response.ok) return { usage: 0, limit: null };
+    const data = await response.json() as { data?: { usage?: number; limit?: number | null } };
+    return {
+      usage: data.data?.usage ?? 0,
+      limit: data.data?.limit ?? null,
+    };
+  }
+}
