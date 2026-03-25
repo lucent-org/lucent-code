@@ -19,7 +19,8 @@ export default function Footer() {
         <nav class="footer__nav" aria-label="Resources links">
           <p class="footer__nav-heading">Resources</p>
           <ul role="list">
-            <li><a href="https://github.com/lucentcode/lucent-code" class="footer__link">GitHub</a></li>
+            <li><a href="https://docs.lucentcode.dev" class="footer__link">Documentation</a></li>
+            <li><a href="https://github.com/lucent-org/lucent-code" class="footer__link">GitHub</a></li>
             <li><a href="https://openrouter.ai" class="footer__link">OpenRouter</a></li>
           </ul>
         </nav>
@@ -27,7 +28,7 @@ export default function Footer() {
           <p class="footer__nav-heading">Connect</p>
           <ul role="list">
             <li><a href="#" class="footer__link">Twitter / X</a></li>
-            <li><a href="#" class="footer__link">VS Code Marketplace</a></li>
+            <li><a href="https://marketplace.visualstudio.com/items?itemName=lucentcode.lucent-code" class="footer__link">VS Code Marketplace</a></li>
           </ul>
         </nav>
       </div>
