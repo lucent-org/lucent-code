@@ -58,8 +58,11 @@ export async function activate(context: vscode.ExtensionContext) {
   const providerProxy: ILLMProvider = {
     id: 'dynamic',
     chatStream: (req, signal) => providerRegistry.resolve(req.model).chatStream(req, signal),
-    listModels: () => providerRegistry.all[0].listModels(),
-    getAccountBalance: () => providerRegistry.all[0].getAccountBalance?.() ?? Promise.resolve({ usage: 0, limit: null }),
+    listModels: () => providerRegistry.resolve(settings.chatModel).listModels(),
+    getAccountBalance: () => {
+      const provider = providerRegistry.resolve(settings.chatModel);
+      return provider.getAccountBalance?.() ?? Promise.resolve({ usage: 0, limit: null });
+    },
   };
 
   // Legacy OpenRouterClient kept for non-streaming .chat() and .getAccountBalance() usages
