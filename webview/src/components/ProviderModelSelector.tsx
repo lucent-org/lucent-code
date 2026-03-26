@@ -129,7 +129,7 @@ export function ProviderModelSelector(props: Props) {
                     onClick={() => handleModelClick(model.id)}
                   >
                     <div class="model-item-main">
-                      <span class="model-name">{model.name}</span>
+                      <span class="model-name">{model.name.replace(/\s*\(free\)\s*$/i, '')}</span>
                       <Show when={model.id === props.selectedModel}>
                         <span class="model-item__check">✓</span>
                       </Show>

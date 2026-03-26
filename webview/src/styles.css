@@ -1565,7 +1565,8 @@ body {
 .provider-item__gear:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
 
 /* Model list (Level 2) */
-.model-list-level2 { display: flex; flex-direction: column; max-height: 380px; }
+.model-list-level2 { display: flex; flex-direction: column; max-height: 380px; overflow: hidden; }
+.model-list-level2 .model-list { max-height: 220px; }
 
 .model-list-level2__back {
   display: flex;
