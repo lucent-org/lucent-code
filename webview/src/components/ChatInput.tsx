@@ -304,8 +304,14 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     );
   };
 
-  // Models with strong instruction-following that can handle multi-turn workflow skills.
+  // Models that support tool use can handle multi-turn workflow skills.
+  // Prefer explicit supported_parameters from the model metadata when available;
+  // fall back to a name-based allowlist for models that don't expose this field.
   const isWorkflowCapableModel = () => {
+    const model = props.models.find((m) => m.id === props.selectedModel);
+    if (model?.supported_parameters) {
+      return model.supported_parameters.includes('tools');
+    }
     const id = props.selectedModel.toLowerCase();
     return (
       id.includes('claude') ||
