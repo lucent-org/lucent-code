@@ -261,7 +261,69 @@ export async function activate(context: vscode.ExtensionContext) {
   indexerStatusBar.show();
   context.subscriptions.push(indexerStatusBar);
 
-  messageHandler = new MessageHandler(providerProxy, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer, (modelId) => providerRegistry.resolve(modelId));
+  messageHandler = new MessageHandler(
+    providerProxy,
+    contextBuilder,
+    settings,
+    toolExecutor,
+    history,
+    notifications,
+    terminalBuffer,
+    skillRegistry,
+    mcpClientManager,
+    indexer,
+    (modelId) => providerRegistry.resolve(modelId),
+    async (providerId: string) => {
+      // 1. Set provider override in VS Code settings
+      await vscode.workspace.getConfiguration('lucentCode.providers').update(
+        'override', providerId, vscode.ConfigurationTarget.Global
+      );
+      // 2. Load models for this provider
+      const models = await providerRegistry.getProvider(providerId).listModels();
+      // 3. Check if current model is available in new provider
+      const currentModel = settings.chatModel;
+      const available = models.some(m => m.id === currentModel);
+      let warning: string | undefined;
+      let newModelId = currentModel;
+      if (!available && models.length > 0) {
+        newModelId = models[0].id;
+        warning = `"${currentModel}" not available in ${PROVIDER_DISPLAY_NAMES[providerId] ?? providerId} — switching to ${models[0].name}`;
+        await vscode.workspace.getConfiguration('lucentCode').update(
+          'chatModel', newModelId, vscode.ConfigurationTarget.Global
+        );
+      }
+      // 4. Send updated models to webview
+      chatProvider.postMessageToWebview({
+        type: 'modelsLoaded',
+        models: models.map(m => ({
+          id: m.id,
+          name: m.name,
+          context_length: m.contextLength,
+          pricing: m.pricing,
+          top_provider: m.topProvider
+            ? { max_completion_tokens: m.topProvider.maxCompletionTokens }
+            : undefined,
+        })),
+      });
+      // 5. Send model change with optional warning
+      chatProvider.postMessageToWebview({
+        type: 'modelChanged',
+        modelId: newModelId,
+        providerName: PROVIDER_DISPLAY_NAMES[providerId] ?? providerId,
+        warning,
+      });
+      void updateProviderStatus();
+    },
+    (providerId: string) => {
+      if (providerId === 'openrouter') {
+        void vscode.commands.executeCommand('lucentCode.authMenu');
+      } else if (providerId === 'anthropic') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.anthropic');
+      } else if (providerId === 'nvidia-nim') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.nvidianim');
+      }
+    }
+  );
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -275,6 +337,21 @@ export async function activate(context: vscode.ExtensionContext) {
         if (choice === 'Sign in') auth.startOAuth();
       });
     }).catch(() => {});
+  };
+
+  const sendProvidersLoaded = async () => {
+    const providerDefs = [
+      { id: 'openrouter', name: 'OpenRouter' },
+      { id: 'anthropic',  name: 'Anthropic'  },
+      { id: 'nvidia-nim', name: 'NVIDIA NIM' },
+    ];
+    const providers = await Promise.all(
+      providerDefs.map(async p => ({
+        ...p,
+        isConfigured: await providerRegistry.isConfigured(p.id, auth),
+      }))
+    );
+    chatProvider.postMessageToWebview({ type: 'providersLoaded', providers });
   };
 
   // Set up webview message handling
@@ -298,6 +375,9 @@ export async function activate(context: vscode.ExtensionContext) {
         }
         webview.postMessage(msg);
       };
+      if (message.type === 'ready') {
+        void sendProvidersLoaded();
+      }
       await handler.handleMessage(message, postMessage);
     });
 

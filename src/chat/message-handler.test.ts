@@ -2784,3 +2784,48 @@ describe('readFileForAttachment', () => {
     }));
   });
 });
+
+describe('switchProvider', () => {
+  it('calls onSwitchProvider callback with providerId', async () => {
+    const onSwitchProvider = vi.fn();
+    const handler = new MessageHandler(
+      {} as any,
+      {} as any,
+      {} as any,
+      undefined,
+      undefined,
+      undefined as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onSwitchProvider
+    );
+    await handler.handleMessage({ type: 'switchProvider', providerId: 'anthropic' }, vi.fn());
+    expect(onSwitchProvider).toHaveBeenCalledWith('anthropic');
+  });
+});
+
+describe('openProviderSettings', () => {
+  it('calls onOpenProviderSettings callback with providerId', async () => {
+    const onOpenProviderSettings = vi.fn();
+    const handler = new MessageHandler(
+      {} as any,
+      {} as any,
+      {} as any,
+      undefined,
+      undefined,
+      undefined as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onOpenProviderSettings
+    );
+    await handler.handleMessage({ type: 'openProviderSettings', providerId: 'nvidia-nim' }, vi.fn());
+    expect(onOpenProviderSettings).toHaveBeenCalledWith('nvidia-nim');
+  });
+});

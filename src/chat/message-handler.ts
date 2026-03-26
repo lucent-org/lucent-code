@@ -75,7 +75,9 @@ export class MessageHandler {
     private readonly skillRegistry?: SkillRegistry,
     private readonly mcpClientManager?: McpClientManager,
     private readonly indexer?: Indexer,
-    private readonly providerResolver?: (modelId: string) => { id: string }
+    private readonly providerResolver?: (modelId: string) => { id: string },
+    private readonly onSwitchProvider?: (providerId: string) => void,
+    private readonly onOpenProviderSettings?: (providerId: string) => void
   ) {
     this._autonomousMode = this.settings.autonomousMode ?? false;
     const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -296,6 +298,13 @@ export class MessageHandler {
         }
         break;
       }
+      case 'switchProvider':
+        this.onSwitchProvider?.(message.providerId);
+        break;
+
+      case 'openProviderSettings':
+        this.onOpenProviderSettings?.(message.providerId);
+        break;
     }
   }
 
