@@ -201,44 +201,57 @@ export async function activate(context: vscode.ExtensionContext) {
   const terminalBuffer = new TerminalBuffer();
   const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), terminalBuffer, indexer);
 
+  const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+    'openrouter': 'OpenRouter',
+    'anthropic':  'Anthropic',
+    'nvidia-nim': 'NVIDIA NIM',
+  };
+
   let currentSessionCost = 0;
   let hasNoCredits = false;
+  let isInlineLoading = false;
 
-  // OpenRouter status bar item
-  const openRouterStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
-  openRouterStatusBar.command = 'lucentCode.authMenu';
-  context.subscriptions.push(openRouterStatusBar);
+  // Provider status bar item
+  const providerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
+  providerStatusBar.command = 'lucentCode.providerMenu';
+  context.subscriptions.push(providerStatusBar);
 
-  const updateOpenRouterStatus = async () => {
-    const isAuthed = await auth.isAuthenticated();
-    if (hasNoCredits) {
-      openRouterStatusBar.text = '$(warning) OpenRouter: No credits';
-      openRouterStatusBar.tooltip = 'No credits remaining — click to manage';
-      openRouterStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-    } else if (isAuthed) {
-      const costStr = currentSessionCost > 0 ? ` · $${currentSessionCost.toFixed(4)}` : '';
-      openRouterStatusBar.text = `$(key) OpenRouter${costStr}`;
-      openRouterStatusBar.tooltip = 'OpenRouter: Signed in — click to manage';
-      openRouterStatusBar.backgroundColor = undefined;
+  const updateProviderStatus = async () => {
+    const providerId = providerRegistry.resolve(settings.chatModel).id;
+    const providerName = PROVIDER_DISPLAY_NAMES[providerId] ?? providerId;
+    const configured = await providerRegistry.isConfigured(providerId, auth);
+
+    if (!configured) {
+      const label = providerId === 'openrouter' ? 'Not signed in' : 'No API key';
+      providerStatusBar.text = `$(warning) ${providerName}: ${label}`;
+      providerStatusBar.tooltip = `${providerName}: not configured — click to configure`;
+      providerStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    } else if (hasNoCredits && providerId === 'openrouter') {
+      providerStatusBar.text = `$(warning) OpenRouter: No credits`;
+      providerStatusBar.tooltip = 'No credits remaining — click to manage';
+      providerStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     } else {
-      openRouterStatusBar.text = '$(warning) OpenRouter: Not signed in';
-      openRouterStatusBar.tooltip = 'OpenRouter: Not signed in — click to sign in';
-      openRouterStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+      const costStr = currentSessionCost > 0 ? ` · $${currentSessionCost.toFixed(4)}` : '';
+      providerStatusBar.text = isInlineLoading
+        ? `$(loading~spin) ${providerName}${costStr}`
+        : `$(key) ${providerName}${costStr}`;
+      providerStatusBar.tooltip = `${providerName} — click to manage`;
+      providerStatusBar.backgroundColor = undefined;
     }
-    openRouterStatusBar.show();
+    providerStatusBar.show();
   };
 
   // Update status bar and reload models on auth changes
   context.subscriptions.push(
     auth.onDidChangeAuth(() => {
       hasNoCredits = false;
-      updateOpenRouterStatus();
+      updateProviderStatus();
       handler.handleMessage({ type: 'getModels' }, (msg) => chatProvider.postMessageToWebview(msg));
     })
   );
 
   // Set initial state
-  void updateOpenRouterStatus();
+  void updateProviderStatus();
 
   // Indexer status bar
   const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 88);
@@ -257,7 +270,7 @@ export async function activate(context: vscode.ExtensionContext) {
   };
   handler.onAuthInvalid = () => {
     auth.signOut().then(() => {
-      void updateOpenRouterStatus();
+      void updateProviderStatus();
       vscode.window.showWarningMessage('OpenRouter: Session expired — please sign in again.', 'Sign in').then((choice) => {
         if (choice === 'Sign in') auth.startOAuth();
       });
@@ -277,11 +290,11 @@ export async function activate(context: vscode.ExtensionContext) {
       const postMessage = (msg: ExtensionMessage) => {
         if (msg.type === 'usageUpdate') {
           currentSessionCost = msg.sessionCost;
-          void updateOpenRouterStatus();
+          void updateProviderStatus();
         }
         if (msg.type === 'noCredits') {
           hasNoCredits = true;
-          void updateOpenRouterStatus();
+          void updateProviderStatus();
         }
         webview.postMessage(msg);
       };
@@ -314,7 +327,11 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   // Register inline completion provider
-  const completionProvider = new InlineCompletionProvider(providerProxy, settings);
+  const completionProvider = new InlineCompletionProvider(
+    providerProxy,
+    settings,
+    (loading) => { isInlineLoading = loading; void updateProviderStatus(); },
+  );
   context.subscriptions.push(
     vscode.languages.registerInlineCompletionItemProvider(
       { pattern: '**' },
@@ -326,6 +343,20 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('lucentCode.triggerCompletion', () => {
       vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
+    })
+  );
+
+  // Register provider menu command (routes to the right auth/settings action per provider)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.providerMenu', async () => {
+      const providerId = providerRegistry.resolve(settings.chatModel).id;
+      if (providerId === 'openrouter') {
+        void vscode.commands.executeCommand('lucentCode.authMenu');
+      } else if (providerId === 'anthropic') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.anthropic');
+      } else if (providerId === 'nvidia-nim') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.nvidianim');
+      }
     })
   );
 
