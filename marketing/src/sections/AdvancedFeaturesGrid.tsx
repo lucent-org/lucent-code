@@ -9,8 +9,8 @@ const ADVANCED_FEATURES = [
   },
   {
     icon: '🧩',
-    title: 'Smart skills',
-    description: 'Built-in coding skills (TDD, clean commits, debugging) plus load from GitHub, npm, or Claude Code — declared in LUCENT.md.',
+    title: 'Built-in skills',
+    description: '/code-review, /refactor, /debugging, /tests, /doc, /commit, /onboard — plus load your own from GitHub, npm, or Claude Code.',
   },
   {
     icon: '🔀',
