@@ -7,7 +7,7 @@
     "build": "docusaurus build",
     "clear": "docusaurus clear",
     "serve": "docusaurus serve",
-    "deploy": "docusaurus build && wrangler deploy"
+    "deploy": "npx docusaurus build && npx wrangler deploy"
   },
   "dependencies": {
     "@docusaurus/core": "3.7.0",
