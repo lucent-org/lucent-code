@@ -11,7 +11,7 @@ export class TerminalBuffer implements vscode.Disposable {
     // extension activation, so wrap in try-catch to degrade gracefully.
     try {
       this.disposables.push(
-        vscode.window.onDidWriteTerminalData(({ terminal, data }) => {
+        (vscode.window as unknown as { onDidWriteTerminalData: (handler: (e: { terminal: vscode.Terminal; data: string }) => void) => vscode.Disposable }).onDidWriteTerminalData(({ terminal, data }) => {
           const existing = this.buffers.get(terminal) ?? [];
           const newLines = data.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
           const combined = [...existing, ...newLines].slice(-TerminalBuffer.MAX_LINES);

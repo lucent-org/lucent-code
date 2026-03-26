@@ -128,8 +128,8 @@ export class OpenRouterClient {
       throw parseApiError(response.status, body);
     }
 
-    const data = await response.json();
-    return data.data as OpenRouterModel[];
+    const data = await response.json() as { data: OpenRouterModel[] };
+    return data.data;
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
@@ -142,7 +142,7 @@ export class OpenRouterClient {
       })
     );
 
-    return response.json();
+    return response.json() as Promise<ChatResponse>;
   }
 
   async *chatStream(

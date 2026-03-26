@@ -17,11 +17,11 @@ const {
   return {
     mockExecuteCommand: vi.fn(),
     mockApplyEdit: vi.fn(() => Promise.resolve(true)),
-    mockFindFiles: vi.fn(() => Promise.resolve([])),
+    mockFindFiles: vi.fn((): Promise<{ fsPath: string }[]> => Promise.resolve([])),
     mockReadFile: vi.fn(() => Promise.resolve(new Uint8Array())),
     mockWriteFile: vi.fn(() => Promise.resolve(undefined)),
     mockDeleteFile: vi.fn(() => Promise.resolve(undefined)),
-    mockReadDirectory: vi.fn(() => Promise.resolve([])),
+    mockReadDirectory: vi.fn((): Promise<[string, number][]> => Promise.resolve([])),
     mockCreateDirectory: vi.fn(() => Promise.resolve(undefined)),
     mockCreateTerminal,
     mockSendText,

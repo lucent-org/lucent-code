@@ -159,7 +159,6 @@ describe('MessageHandler', () => {
         cursorLine: 0,
         cursorCharacter: 0,
       },
-      definitions: [],
       diagnostics: [],
     };
 
@@ -382,8 +381,8 @@ describe('MessageHandler', () => {
       );
 
       // Only one streamChunk should be posted (the one with actual content)
-      const chunkMessages = postMessage.mock.calls.filter(
-        (call: [ExtensionMessage]) => call[0].type === 'streamChunk'
+      const chunkMessages = (postMessage.mock.calls as [ExtensionMessage][]).filter(
+        (call) => call[0].type === 'streamChunk'
       );
       expect(chunkMessages).toHaveLength(1);
       expect(chunkMessages[0][0]).toEqual({ type: 'streamChunk', content: 'data' });
@@ -447,8 +446,8 @@ describe('MessageHandler', () => {
       expect(postMessage).toHaveBeenCalledWith({ type: 'streamChunk', content: 'partial' });
       expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd', cancelled: true });
       // Should NOT have posted a streamError
-      const errorMessages = postMessage.mock.calls.filter(
-        (call: [ExtensionMessage]) => call[0].type === 'streamError'
+      const errorMessages = (postMessage.mock.calls as [ExtensionMessage][]).filter(
+        (call) => call[0].type === 'streamError'
       );
       expect(errorMessages).toHaveLength(0);
     });
@@ -687,9 +686,9 @@ describe('MessageHandler', () => {
         expect.objectContaining({ type: 'showDiff' })
       );
       const call = postMessage.mock.calls.find((c: any[]) => c[0].type === 'showDiff');
-      expect(call[0].lines).toBeInstanceOf(Array);
-      expect(call[0].filename).toContain('foo.ts');
-      expect(call[0].fileUri).toBeDefined();
+      expect(call![0].lines).toBeInstanceOf(Array);
+      expect(call![0].filename).toContain('foo.ts');
+      expect(call![0].fileUri).toBeDefined();
     });
 
     it('should open file picker when no filename is provided', async () => {
@@ -712,7 +711,7 @@ describe('MessageHandler', () => {
       );
 
       const diffMsg = postMessage.mock.calls.find((c: any[]) => c[0].type === 'showDiff');
-      const fileUri = diffMsg[0].fileUri;
+      const fileUri = diffMsg![0].fileUri;
 
       // Then confirm
       await applyHandler.handleMessage(
@@ -753,8 +752,8 @@ describe('MessageHandler', () => {
       await sendPromise;
 
       expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd', cancelled: true });
-      const errorMessages = postMessage.mock.calls.filter(
-        (call: [ExtensionMessage]) => call[0].type === 'streamError'
+      const errorMessages = (postMessage.mock.calls as [ExtensionMessage][]).filter(
+        (call) => call[0].type === 'streamError'
       );
       expect(errorMessages).toHaveLength(0);
     });

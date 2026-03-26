@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockShowErrorMessage, mockShowWarningMessage, mockShowInformationMessage, mockExecuteCommand } = vi.hoisted(() => ({
-  mockShowErrorMessage: vi.fn(() => Promise.resolve(undefined)),
-  mockShowWarningMessage: vi.fn(() => Promise.resolve(undefined)),
-  mockShowInformationMessage: vi.fn(() => Promise.resolve(undefined)),
+  mockShowErrorMessage: vi.fn((): Promise<string | undefined> => Promise.resolve(undefined)),
+  mockShowWarningMessage: vi.fn((): Promise<string | undefined> => Promise.resolve(undefined)),
+  mockShowInformationMessage: vi.fn((): Promise<string | undefined> => Promise.resolve(undefined)),
   mockExecuteCommand: vi.fn(),
 }));
 

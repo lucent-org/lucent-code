@@ -23,7 +23,7 @@ export class Indexer {
   private readonly vectorStore = new VectorStore();
   private workspaceRoot = '';
   private dbPath = '';
-  private watcher?: vscode.Disposable;
+  private watcher?: vscode.FileSystemWatcher;
 
   constructor(private readonly getApiKey: () => string | undefined | Promise<string | undefined>) {}
 
@@ -82,7 +82,7 @@ export class Indexer {
   }
 
   async searchAsync(query: string, topK: number): Promise<SearchResult[]> {
-    const [queryEmbedding] = await this.embedChunks([{ content: query, startLine: 0, endLine: 0 }]);
+    const [queryEmbedding] = await this.embedChunks([{ content: query }]);
     return this.vectorStore.search(queryEmbedding, topK);
   }
 
