@@ -18,6 +18,11 @@ const ADVANCED_FEATURES = [
     description: 'Type @model to pick a different model inline, or let the AI call use_model when the task needs stronger reasoning.',
   },
   {
+    icon: '🏠',
+    title: 'Native provider support',
+    description: 'Connect directly to Anthropic or NVIDIA NIM for the latest model features, without routing through a middleman.',
+  },
+  {
     icon: '🔌',
     title: 'MCP support',
     description: 'Connect external tools via Model Context Protocol for extended capabilities.',
