@@ -136,7 +136,13 @@ export function ProviderModelSelector(props: Props) {
                     </div>
                     <Show when={model.pricing}>
                       <div class="model-pricing">
-                        ${model.pricing.prompt} / ${model.pricing.completion}
+                        {(() => {
+                          const isFree = parseFloat(model.pricing.prompt) === 0 && parseFloat(model.pricing.completion) === 0;
+                          if (isFree) return 'free';
+                          const p = (parseFloat(model.pricing.prompt) * 1_000_000).toFixed(2);
+                          const c = (parseFloat(model.pricing.completion) * 1_000_000).toFixed(2);
+                          return `$${p} · $${c} /1M`;
+                        })()}
                       </div>
                     </Show>
                   </button>
