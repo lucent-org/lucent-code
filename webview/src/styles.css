@@ -333,6 +333,13 @@ body {
   opacity: 0.8;
 }
 
+.model-item:hover .model-reasoning-badge,
+.model-item--selected .model-reasoning-badge {
+  background: color-mix(in srgb, var(--accent-fg) 20%, transparent);
+  color: var(--accent-fg);
+  border-color: color-mix(in srgb, var(--accent-fg) 50%, transparent);
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
