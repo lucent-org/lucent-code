@@ -2,32 +2,37 @@ import { describe, it, expect } from 'vitest';
 import type { ExtensionMessage, WebviewMessage } from './types';
 
 describe('ExtensionMessage types', () => {
-  it('includes providersLoaded', () => {
+  it('providersLoaded carries provider array', () => {
     const msg: ExtensionMessage = {
       type: 'providersLoaded',
       providers: [{ id: 'anthropic', name: 'Anthropic', isConfigured: true }],
     };
-    expect(msg.type).toBe('providersLoaded');
+    expect((msg as Extract<typeof msg, { type: 'providersLoaded' }>).providers[0].isConfigured).toBe(true);
   });
 
-  it('modelChanged includes optional warning', () => {
-    const msg: ExtensionMessage = {
+  it('modelChanged accepts optional warning', () => {
+    const withWarning: ExtensionMessage = {
       type: 'modelChanged',
       modelId: 'claude-sonnet-4-6',
       warning: 'Model not available',
     };
-    expect(msg.type).toBe('modelChanged');
+    const withoutWarning: ExtensionMessage = {
+      type: 'modelChanged',
+      modelId: 'claude-sonnet-4-6',
+    };
+    expect((withWarning as Extract<typeof withWarning, { type: 'modelChanged' }>).warning).toBe('Model not available');
+    expect((withoutWarning as Extract<typeof withoutWarning, { type: 'modelChanged' }>).warning).toBeUndefined();
   });
 });
 
 describe('WebviewMessage types', () => {
-  it('includes switchProvider', () => {
+  it('switchProvider carries providerId', () => {
     const msg: WebviewMessage = { type: 'switchProvider', providerId: 'anthropic' };
-    expect(msg.type).toBe('switchProvider');
+    expect((msg as Extract<typeof msg, { type: 'switchProvider' }>).providerId).toBe('anthropic');
   });
 
-  it('includes openProviderSettings', () => {
+  it('openProviderSettings carries providerId', () => {
     const msg: WebviewMessage = { type: 'openProviderSettings', providerId: 'nvidia-nim' };
-    expect(msg.type).toBe('openProviderSettings');
+    expect((msg as Extract<typeof msg, { type: 'openProviderSettings' }>).providerId).toBe('nvidia-nim');
   });
 });
