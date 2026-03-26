@@ -235,6 +235,47 @@ describe('InlineCompletionProvider', () => {
     expect(mockLLMProvider.chatStream).not.toHaveBeenCalled();
   });
 
+  describe('onLoadingChange callback', () => {
+    beforeEach(() => {
+      vi.mocked(vscodeModule.workspace.getConfiguration).mockImplementation((section?: string) => ({
+        get: (key: string, defaultValue?: unknown) => {
+          const vals: Record<string, unknown> = {
+            'completions.model': 'test/model',
+            'completions.triggerMode': 'manual',
+            'completions.debounceMs': 0,
+            'completions.maxContextLines': 100,
+            'chat.model': 'fallback/model',
+            'chat.temperature': 0.7,
+            'chat.maxTokens': 4096,
+          };
+          return vals[`${section}.${key}`] ?? vals[key] ?? defaultValue;
+        },
+      } as any));
+    });
+
+    it('calls onLoadingChange(true) when completion starts', async () => {
+      const onLoadingChange = vi.fn();
+      const manualSettings = new Settings();
+      const provider = new InlineCompletionProvider(mockLLMProvider, manualSettings, onLoadingChange);
+      vi.mocked(mockLLMProvider.chatStream).mockReturnValue(
+        mockCompletionStream('completed code')
+      );
+      await provider.provideInlineCompletionItems(mockDocument, mockPosition, {} as any, mockToken);
+      expect(onLoadingChange).toHaveBeenCalledWith(true);
+    });
+
+    it('calls onLoadingChange(false) when completion ends', async () => {
+      const onLoadingChange = vi.fn();
+      const manualSettings = new Settings();
+      const provider = new InlineCompletionProvider(mockLLMProvider, manualSettings, onLoadingChange);
+      vi.mocked(mockLLMProvider.chatStream).mockReturnValue(
+        mockCompletionStream('completed code')
+      );
+      await provider.provideInlineCompletionItems(mockDocument, mockPosition, {} as any, mockToken);
+      expect(onLoadingChange).toHaveBeenLastCalledWith(false);
+    });
+  });
+
   it('should return empty when no model configured', async () => {
     // Override settings mock to return empty model
     vi.mocked(vscodeModule.workspace.getConfiguration).mockReturnValue({
