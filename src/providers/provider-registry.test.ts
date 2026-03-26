@@ -62,3 +62,51 @@ describe('ProviderRegistry.all', () => {
     expect(ids).toContain('nvidia-nim');
   });
 });
+
+describe('getProvider', () => {
+  const registry = new ProviderRegistry(mockSettings);
+
+  it('returns anthropic provider for id anthropic', () => {
+    const p = registry.getProvider('anthropic');
+    expect(p.id).toBe('anthropic');
+  });
+
+  it('returns nvidia-nim provider for id nvidia-nim', () => {
+    const p = registry.getProvider('nvidia-nim');
+    expect(p.id).toBe('nvidia-nim');
+  });
+
+  it('returns openrouter provider for unknown id', () => {
+    const p = registry.getProvider('unknown');
+    expect(p.id).toBe('openrouter');
+  });
+});
+
+describe('isConfigured', () => {
+  const registry = new ProviderRegistry(mockSettings);
+
+  it('returns true for anthropic when key is set', async () => {
+    const result = await registry.isConfigured('anthropic');
+    expect(result).toBe(true);
+  });
+
+  it('returns false for anthropic when key is empty', async () => {
+    const emptyRegistry = new ProviderRegistry({
+      ...mockSettings,
+      anthropicApiKey: async () => undefined,
+    });
+    const result = await emptyRegistry.isConfigured('anthropic');
+    expect(result).toBe(false);
+  });
+
+  it('returns openrouter configured status from auth', async () => {
+    const mockAuth = { isAuthenticated: async () => true };
+    const result = await registry.isConfigured('openrouter', mockAuth);
+    expect(result).toBe(true);
+  });
+
+  it('returns false for openrouter when no auth provided', async () => {
+    const result = await registry.isConfigured('openrouter');
+    expect(result).toBe(false);
+  });
+});
