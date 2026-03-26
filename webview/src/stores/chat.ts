@@ -39,6 +39,9 @@ function createChatStore() {
     })()
   );
   const [selectedModelProvider, setSelectedModelProvider] = createSignal<string>('');
+  const [providers, setProviders] = createSignal<Array<{ id: string; name: string; isConfigured: boolean }>>([]);
+  const [activeProviderId, setActiveProviderId] = createSignal<string>('openrouter');
+  const [providerWarning, setProviderWarning] = createSignal<string>('');
   const [isStreaming, setIsStreaming] = createSignal(false);
   const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
@@ -257,12 +260,28 @@ function createChatStore() {
     vscode.postMessage({ type: 'setModel', modelId });
   }
 
+  function handleProvidersLoaded(providerList: Array<{ id: string; name: string; isConfigured: boolean }>) {
+    setProviders(providerList);
+  }
+
   // Called when the extension notifies us of a model change it already applied (e.g. use_model tool).
   // Does NOT post setModel back — the extension is the source of truth for this change.
-  function receiveModelChange(modelId: string, providerName?: string) {
+  function receiveModelChange(modelId: string, providerName?: string, warning?: string) {
     setSelectedModel(modelId);
     setSelectedModelProvider(providerName ?? '');
+    setProviderWarning(warning ?? '');
+    if (warning) setTimeout(() => setProviderWarning(''), 5000);
     vscode.setState({ ...(vscode.getState() as object ?? {}), selectedModel: modelId });
+  }
+
+  function switchProvider(providerId: string) {
+    setActiveProviderId(providerId);
+    setProviderWarning('');
+    vscode.postMessage({ type: 'switchProvider', providerId });
+  }
+
+  function openProviderSettings(providerId: string) {
+    vscode.postMessage({ type: 'openProviderSettings', providerId });
   }
 
   function handleConversationList(list: ConversationSummary[]) {
@@ -345,12 +364,18 @@ function createChatStore() {
     models,
     selectedModel,
     selectedModelProvider,
+    providers,
+    activeProviderId,
+    providerWarning,
     isStreaming,
     sendMessage,
     cancelRequest,
     newChat,
     selectModel,
     receiveModelChange,
+    handleProvidersLoaded,
+    switchProvider,
+    openProviderSettings,
     handleStreamChunk,
     handleStreamEnd,
     handleStreamError,

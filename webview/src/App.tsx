@@ -29,7 +29,10 @@ const App: Component = () => {
           chatStore.handleModelsLoaded(message.models);
           break;
         case 'modelChanged':
-          chatStore.receiveModelChange(message.modelId, message.providerName);
+          chatStore.receiveModelChange(message.modelId, message.providerName, message.warning);
+          break;
+        case 'providersLoaded':
+          chatStore.handleProvidersLoaded(message.providers);
           break;
         case 'conversationList':
           chatStore.handleConversationList(message.conversations);
