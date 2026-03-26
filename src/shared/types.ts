@@ -107,7 +107,7 @@ export type ExtensionMessage =
   | { type: 'streamEnd'; usage?: ChatResponse['usage']; cancelled?: boolean }
   | { type: 'streamError'; error: string }
   | { type: 'modelsLoaded'; models: OpenRouterModel[] }
-  | { type: 'modelChanged'; modelId: string; providerName?: string }
+  | { type: 'modelChanged'; modelId: string; providerName?: string; warning?: string }
   | { type: 'contextUpdate'; context: CodeContext }
   | { type: 'conversationList'; conversations: ConversationSummary[] }
   | { type: 'conversationLoaded'; conversation: Conversation }
@@ -127,6 +127,7 @@ export type ExtensionMessage =
   | { type: 'usageUpdate'; lastMessageCost: number; lastMessageTokens: number; sessionCost: number; creditsUsed: number; creditsLimit: number | null }
   | { type: 'noCredits' }
   | { type: 'conversationCompacted'; summary: string }
+  | { type: 'providersLoaded'; providers: Array<{ id: string; name: string; isConfigured: boolean }> }
   | { type: 'fileList'; files: { name: string; relativePath: string }[] }
   | { type: 'fileAttachment'; name: string; relativePath: string; content: string; error?: string };
 
@@ -152,7 +153,9 @@ export type WebviewMessage =
   | { type: 'openExternal'; url: string }
   | { type: 'compactConversation'; model: string }
   | { type: 'listFiles'; query: string }
-  | { type: 'readFileForAttachment'; relativePath: string };
+  | { type: 'readFileForAttachment'; relativePath: string }
+  | { type: 'switchProvider'; providerId: string }
+  | { type: 'openProviderSettings'; providerId: string };
 
 // ---- Diff types ----
 
