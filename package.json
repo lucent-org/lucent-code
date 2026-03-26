@@ -2,7 +2,7 @@
   "name": "lucent-code",
   "displayName": "Lucent Code",
   "description": "LSP-powered AI assistant for VS Code. Chat with any model via OpenRouter, Anthropic, or NVIDIA NIM. Built-in skills, inline completions, git worktrees, and MCP support.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "lucentcode",
   "license": "MIT",
   "repository": {
@@ -269,7 +269,12 @@
         "lucentCode.providers.override": {
           "type": "string",
           "default": "",
-          "enum": ["", "anthropic", "nvidia-nim", "openrouter"],
+          "enum": [
+            "",
+            "anthropic",
+            "nvidia-nim",
+            "openrouter"
+          ],
           "enumDescriptions": [
             "Auto-detect from model ID (recommended)",
             "Always use Anthropic directly",

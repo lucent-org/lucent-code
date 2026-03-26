@@ -1,5 +1,71 @@
 # Changelog
 
+## [0.4.0](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.3.0...lucent-code-v0.4.0) (2026-03-26)
+
+
+### Features
+
+* **extension:** wire ProviderRegistry into MessageHandler via dynamic proxy ([73bf428](https://github.com/lucent-org/lucent-code/commit/73bf428a349c399318390e3b9250a3a5b453ec2a))
+* Provider UI consolidation — two-level selector, multi-provider support, skill UX fixes ([791d394](https://github.com/lucent-org/lucent-code/commit/791d394ce803774ad9b42393f8684e2c12a3a844))
+* **providers:** add Anthropic message/tool translation helpers ([740d7b7](https://github.com/lucent-org/lucent-code/commit/740d7b72c33ccdd45b0b0e00cbdc5c90bdad8cae))
+* **providers:** add AnthropicProvider with streaming and tool translation ([4b46976](https://github.com/lucent-org/lucent-code/commit/4b46976042e88285d9c8f73b086e8d2dcce6cf94))
+* **providers:** add getProvider() and isConfigured() to ProviderRegistry ([f06a65c](https://github.com/lucent-org/lucent-code/commit/f06a65cf5504e7fb119f8340bda3d87a423aad1b))
+* **providers:** add ILLMProvider interface and LLMError ([b43b0cb](https://github.com/lucent-org/lucent-code/commit/b43b0cbd63bf3db867ff4bebcccc7f019d7f317a))
+* **providers:** add NvidiaNimProvider with OpenAI-compatible streaming ([d627fd7](https://github.com/lucent-org/lucent-code/commit/d627fd78bfe8208dae3841f22deb7d6ff2afacc0))
+* **providers:** add OpenRouterProvider implementing ILLMProvider ([5ad7d63](https://github.com/lucent-org/lucent-code/commit/5ad7d6365eca903b2bf68f50447a94e0205963c7))
+* **providers:** add ProviderRegistry with auto-detect and override ([bd8f333](https://github.com/lucent-org/lucent-code/commit/bd8f33331b2d5d37f07bc550b7044d69ffb1b3a9))
+* **providers:** handle switchProvider and openProviderSettings; send providersLoaded on ready ([684d24d](https://github.com/lucent-org/lucent-code/commit/684d24d99f327e06569cf841b03e069836462e26))
+* **settings:** add provider API key and override configuration ([9c8fe3b](https://github.com/lucent-org/lucent-code/commit/9c8fe3babd4e9c4a05ecdfecbb3a0996f04220b0))
+* **skills:** filter by supported_parameters.tools instead of model name allowlist ([5e1bef4](https://github.com/lucent-org/lucent-code/commit/5e1bef4eaab4ad24d80f413890f7a50d7ace067e))
+* **statusbar:** merge dual status bar items into single dynamic provider item ([29ac27e](https://github.com/lucent-org/lucent-code/commit/29ac27eb6917bd117d63e12f41bfd722778fbbbc))
+* **store:** add provider signals, switchProvider, openProviderSettings; wire in App.tsx ([72cb7c2](https://github.com/lucent-org/lucent-code/commit/72cb7c2eb7622d5bbaa93838ae5df3b84711a726))
+* **types:** add providersLoaded, switchProvider, openProviderSettings message types ([2833e07](https://github.com/lucent-org/lucent-code/commit/2833e072cc35a2ca6012d1fc2efb2dd50ed33a03))
+* **ui:** add ProviderModelSelector with two-level provider+model picker ([23d35e7](https://github.com/lucent-org/lucent-code/commit/23d35e792f9d9611f1dc3ecf3edc1015e548b89a))
+* **webview:** show provider badge next to model name ([84d9b16](https://github.com/lucent-org/lucent-code/commit/84d9b16eb377e41bff5a63d37b4bf530e1e9cd13))
+
+
+### Bug Fixes
+
+* **docs-site:** npm install before build in deploy script ([030a379](https://github.com/lucent-org/lucent-code/commit/030a3791b67b1f1aff2b3a34726fc94542f00135))
+* **docs-site:** use npx for docusaurus and wrangler in deploy script ([f8b5e06](https://github.com/lucent-org/lucent-code/commit/f8b5e0630c21f718f31e5f3d0a90060835cc4f68))
+* **handler:** restore worktree auto-create and default error notification ([65d0f26](https://github.com/lucent-org/lucent-code/commit/65d0f26a74f5b2faa71b299c73988569c91f574c))
+* **marketing:** replace placeholder links and update copy ([f05c057](https://github.com/lucent-org/lucent-code/commit/f05c057b5ab35d71924421d37746e2e3a906e692))
+* post-merge followups (Nemotron cleanup, marketing links, docs-site wrangler) ([4093e2f](https://github.com/lucent-org/lucent-code/commit/4093e2f73053b16be87d59e1696c41c22f67e892))
+* **providers:** add optional metadata to LLMError, thread through OpenRouterProvider ([12cc54d](https://github.com/lucent-org/lucent-code/commit/12cc54da36032fe4f27cef30ba323415d14b5ff2))
+* **providers:** capture real messageId from stream, add PermissionDeniedError mapping ([0ffb68c](https://github.com/lucent-org/lucent-code/commit/0ffb68c0dd7c7b4e429ff7a333d24288250c9cee))
+* **providers:** fix 429 dead code in NvidiaNimProvider — remove from RETRYABLE set ([52216a0](https://github.com/lucent-org/lucent-code/commit/52216a056f85bdc9dd0270ccf9d6d7caca013427))
+* **providers:** guard JSON.parse in toAnthropicMessages, document null accumulator behavior ([572c0e7](https://github.com/lucent-org/lucent-code/commit/572c0e7e97f7f19cfbc5a69d133e21ab92f086db))
+* **providers:** guard resolveProviderName against resolver exceptions ([4a79913](https://github.com/lucent-org/lucent-code/commit/4a79913305043650a1132df86e76237cbaab284d))
+* **providers:** live override update and async callback safety in switchProvider ([a400160](https://github.com/lucent-org/lucent-code/commit/a400160aab5164a9ffcaf4df06f38ccf5fd0feee))
+* **providers:** route listModels and getAccountBalance through active provider ([7f3027b](https://github.com/lucent-org/lucent-code/commit/7f3027b7342dd4f77643cd50b74143179f200c0e))
+* **skills:** remove Nemotron workarounds from skill injection ([19258d5](https://github.com/lucent-org/lucent-code/commit/19258d5ed4e24e5683774ceacbbadf56d882d8e3))
+* **store:** prevent warning timer race condition in receiveModelChange ([93feaf4](https://github.com/lucent-org/lucent-code/commit/93feaf44a9093f541ead7f170d43c999f0460a59))
+* **types:** resolve all TypeScript compile errors ([0339dfd](https://github.com/lucent-org/lucent-code/commit/0339dfdf9578bd810dbaa1343778f87649bcb69e))
+* **ui:** fix model-item--selected CSS class and remove unused selectedModelProvider prop ([761dff8](https://github.com/lucent-org/lucent-code/commit/761dff8650a7c431c3530a4060d99deddd07185f))
+* **ui:** format model prices as per-million-token in ProviderModelSelector ([da59871](https://github.com/lucent-org/lucent-code/commit/da59871b9091354ddc6b73226969f0ac1a22d89d))
+* **ui:** keep thinking badge visible on hovered/selected model items ([8753418](https://github.com/lucent-org/lucent-code/commit/8753418fb2cf55c608fed1cb5d8d2a477607f7b5))
+* **ui:** show skill badges in YOU message; block skill-only send on all models ([9e678a5](https://github.com/lucent-org/lucent-code/commit/9e678a5927bff40dcb78b39afa5387279fc2842b))
+* **ui:** strip redundant (free) suffix from model names, tighten level-2 list height ([af39d74](https://github.com/lucent-org/lucent-code/commit/af39d74befbf4d971037ad3ae3aafea6147e5f1b))
+
+
+### Refactoring
+
+* **completions:** replace status bar item with onLoadingChange callback ([6218399](https://github.com/lucent-org/lucent-code/commit/621839963b27b2976b57adfd89034d24d564173c))
+* **handler:** swap OpenRouterClient for ILLMProvider ([a02157c](https://github.com/lucent-org/lucent-code/commit/a02157c1514419126fad24e8efe9b40584ad2024))
+* update InlineProvider and tests to use ILLMProvider ([d426f27](https://github.com/lucent-org/lucent-code/commit/d426f27844c178a0c4726e7dd00335aa63f925d8))
+
+
+### Documentation
+
+* add LLM provider abstraction design ([764f5ce](https://github.com/lucent-org/lucent-code/commit/764f5ce752812d0ee124a78f3c6fc12e61bd06fa))
+* add LLM provider abstraction implementation plan ([9231cb6](https://github.com/lucent-org/lucent-code/commit/9231cb66f9e28873f5a4628490095502bbae57f9))
+* add provider UI consolidation design doc ([65894e7](https://github.com/lucent-org/lucent-code/commit/65894e795374eb747e70bfa40cebcb66072de46a))
+* add provider UI consolidation implementation plan ([0af7bf0](https://github.com/lucent-org/lucent-code/commit/0af7bf035a37618a0deb7b7aa19633315d996770))
+* fix skills list in marketing and add quick-reference table to docs ([ac3ae9f](https://github.com/lucent-org/lucent-code/commit/ac3ae9f3163588a0c8886fad01736727f0ab994b))
+* update marketing and docs for multi-provider support ([743e426](https://github.com/lucent-org/lucent-code/commit/743e426ff1a78b74a85cc5f2848976e88c2080d8))
+* update README and marketplace metadata for multi-provider support ([0631377](https://github.com/lucent-org/lucent-code/commit/0631377a2e9774a225baa75fc5dd25d2d30f27b7))
+* update README and marketplace metadata for multi-provider support ([cf28d44](https://github.com/lucent-org/lucent-code/commit/cf28d4401963201119f30669ceff5315459270d5))
+
 ## [0.3.0](https://github.com/lucent-org/lucent-code/compare/lucent-code-v0.2.8...lucent-code-v0.3.0) (2026-03-25)
 
 
