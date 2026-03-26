@@ -278,6 +278,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await vscode.workspace.getConfiguration('lucentCode.providers').update(
         'override', providerId, vscode.ConfigurationTarget.Global
       );
+      providerRegistry.setOverride(providerId);
       // 2. Load models for this provider
       const models = await providerRegistry.getProvider(providerId).listModels();
       // 3. Check if current model is available in new provider

@@ -15,7 +15,7 @@ export class ProviderRegistry {
   private readonly openRouter: OpenRouterProvider;
   private readonly anthropic:  AnthropicProvider;
   private readonly nvidianim:  NvidiaNimProvider;
-  private readonly override:   string;
+  private override:   string;
   private readonly settings:   ProviderSettings;
 
   constructor(settings: ProviderSettings) {
@@ -35,6 +35,10 @@ export class ProviderRegistry {
     if (id.startsWith('claude-') || id.startsWith('anthropic/')) return this.anthropic;
     if (id.startsWith('nvidia/')  || id.startsWith('nv-'))        return this.nvidianim;
     return this.openRouter;
+  }
+
+  setOverride(id: string): void {
+    this.override = id;
   }
 
   get all(): ILLMProvider[] {

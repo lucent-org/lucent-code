@@ -53,6 +53,24 @@ describe('ProviderRegistry.resolve with override', () => {
   });
 });
 
+describe('setOverride', () => {
+  it('changes which provider is resolved after calling setOverride', () => {
+    const registry = new ProviderRegistry(mockSettings);
+
+    // Default: no override, claude model → anthropic
+    const before = registry.resolve('claude-sonnet-4-6');
+    expect(before.id).toBe('anthropic');
+
+    // Set override to nvidia-nim
+    registry.setOverride('nvidia-nim');
+    const after = registry.resolve('claude-sonnet-4-6');
+    expect(after.id).toBe('nvidia-nim');
+
+    // Reset for other tests
+    registry.setOverride('');
+  });
+});
+
 describe('ProviderRegistry.all', () => {
   it('returns all three providers', () => {
     const registry = new ProviderRegistry(mockSettings);

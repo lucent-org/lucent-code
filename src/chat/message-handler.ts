@@ -76,7 +76,7 @@ export class MessageHandler {
     private readonly mcpClientManager?: McpClientManager,
     private readonly indexer?: Indexer,
     private readonly providerResolver?: (modelId: string) => { id: string },
-    private readonly onSwitchProvider?: (providerId: string) => void,
+    private readonly onSwitchProvider?: (providerId: string) => void | Promise<void>,
     private readonly onOpenProviderSettings?: (providerId: string) => void
   ) {
     this._autonomousMode = this.settings.autonomousMode ?? false;
@@ -299,7 +299,7 @@ export class MessageHandler {
         break;
       }
       case 'switchProvider':
-        this.onSwitchProvider?.(message.providerId);
+        await this.onSwitchProvider?.(message.providerId);
         break;
 
       case 'openProviderSettings':
