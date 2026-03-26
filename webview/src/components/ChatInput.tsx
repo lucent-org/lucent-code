@@ -1,5 +1,6 @@
 import { Component, createSignal, createEffect, createMemo, Show, For } from 'solid-js';
-import ModelSelector from './ModelSelector';
+import { ProviderModelSelector } from './ProviderModelSelector';
+import type { ProviderInfo } from './ProviderModelSelector';
 import type { OpenRouterModel } from '@shared';
 import { getVsCodeApi } from '../utils/vscode-api';
 
@@ -54,7 +55,13 @@ interface ChatInputProps {
   models: OpenRouterModel[];
   selectedModel: string;
   selectedModelProvider?: string;
+  selectedModelName: string;
   onSelectModel: (modelId: string) => void;
+  providers: ProviderInfo[];
+  activeProviderId: string;
+  providerWarning: string;
+  onSelectProvider: (id: string) => void;
+  onOpenProviderSettings: (id: string) => void;
   messages: { role: string; content: string }[];
   noCredits?: boolean;
   fileList?: { name: string; relativePath: string }[];
@@ -725,12 +732,17 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             title="Browse skills (or type / in the input)"
             disabled={props.isStreaming || props.skills.length === 0 || !!props.noCredits}
           >/…</button>
-          <ModelSelector
-            models={props.models}
+          <ProviderModelSelector
+            providers={props.providers}
+            activeProviderId={props.activeProviderId}
             selectedModel={props.selectedModel}
-            onSelect={props.onSelectModel}
+            selectedModelName={props.selectedModelName}
             contextFillPct={contextFillPct()}
-            providerName={props.selectedModelProvider}
+            providerWarning={props.providerWarning}
+            models={props.models}
+            onSelectProvider={props.onSelectProvider}
+            onOpenProviderSettings={props.onOpenProviderSettings}
+            onSelectModel={props.onSelectModel}
           />
         </div>
         <Show

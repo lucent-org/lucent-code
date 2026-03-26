@@ -313,7 +313,13 @@ const App: Component = () => {
         models={chatStore.models()}
         selectedModel={chatStore.selectedModel()}
         selectedModelProvider={chatStore.selectedModelProvider()}
+        selectedModelName={chatStore.models().find(m => m.id === chatStore.selectedModel())?.name ?? chatStore.selectedModel()}
         onSelectModel={chatStore.selectModel}
+        providers={chatStore.providers()}
+        activeProviderId={chatStore.activeProviderId()}
+        providerWarning={chatStore.providerWarning()}
+        onSelectProvider={chatStore.switchProvider}
+        onOpenProviderSettings={chatStore.openProviderSettings}
         messages={chatStore.messages()}
         noCredits={chatStore.noCredits()}
         fileList={chatStore.fileList()}
