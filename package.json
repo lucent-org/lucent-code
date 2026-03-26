@@ -1,7 +1,7 @@
 {
   "name": "lucent-code",
   "displayName": "Lucent Code",
-  "description": "The only VS Code AI that uses your language server — not text search. Chat, completions, and code intelligence in one.",
+  "description": "LSP-powered AI assistant for VS Code. Chat with any model via OpenRouter, Anthropic, or NVIDIA NIM. Built-in skills, inline completions, git worktrees, and MCP support.",
   "version": "0.3.0",
   "publisher": "lucentcode",
   "license": "MIT",
@@ -16,12 +16,17 @@
     "code-intelligence",
     "completions",
     "openrouter",
+    "anthropic",
+    "claude",
+    "nvidia-nim",
     "inline-completions",
     "semantic",
-    "all-in-one",
-    "chat-assistant",
+    "skills",
+    "mcp",
+    "git-worktrees",
     "copilot-alternative",
-    "language-server"
+    "language-server",
+    "multi-provider"
   ],
   "galleryBanner": {
     "color": "#0d0d1a",
