@@ -8,7 +8,7 @@ describe('AdvancedFeaturesGrid', () => {
   it('renders all 4 advanced feature cards', () => {
     render(() => <AdvancedFeaturesGrid />);
     expect(screen.getByText('Inline completions')).toBeInTheDocument();
-    expect(screen.getByText('Smart skills')).toBeInTheDocument();
+    expect(screen.getByText('Built-in skills')).toBeInTheDocument();
     expect(screen.getByText('MCP support')).toBeInTheDocument();
     expect(screen.getByText('Git worktrees')).toBeInTheDocument();
   });
