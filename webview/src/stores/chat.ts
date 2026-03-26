@@ -57,6 +57,8 @@ function createChatStore() {
   const [pendingFileAttachment, setPendingFileAttachment] = createSignal<{ name: string; relativePath: string; content: string } | null>(null);
   const [pendingFileAttachmentError, setPendingFileAttachmentError] = createSignal<{ relativePath: string; error: string } | null>(null);
 
+  let warningTimer: ReturnType<typeof setTimeout> | undefined;
+
   function handleFileList(files: { name: string; relativePath: string }[]) {
     setFileList(files);
   }
@@ -270,7 +272,8 @@ function createChatStore() {
     setSelectedModel(modelId);
     setSelectedModelProvider(providerName ?? '');
     setProviderWarning(warning ?? '');
-    if (warning) setTimeout(() => setProviderWarning(''), 5000);
+    clearTimeout(warningTimer);
+    if (warning) warningTimer = setTimeout(() => setProviderWarning(''), 5000);
     vscode.setState({ ...(vscode.getState() as object ?? {}), selectedModel: modelId });
   }
 
