@@ -12,6 +12,7 @@ vitest.config.ts
 scripts/**
 marketing/**
 docs/**
+docs-site/**
 .github/**
 .playwright-mcp/**
 .lucent/**
