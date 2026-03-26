@@ -6,7 +6,8 @@
     "start": "docusaurus start",
     "build": "docusaurus build",
     "clear": "docusaurus clear",
-    "serve": "docusaurus serve"
+    "serve": "docusaurus serve",
+    "deploy": "docusaurus build && wrangler deploy"
   },
   "dependencies": {
     "@docusaurus/core": "3.7.0",

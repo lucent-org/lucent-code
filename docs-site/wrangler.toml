@@ -1,0 +1,7 @@
+name = "lucent-code-docs"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "./build"
+html_handling = "auto-trailing-slash"
+not_found_handling = "single-page-application"
