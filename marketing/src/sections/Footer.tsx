@@ -12,8 +12,8 @@ export default function Footer() {
           <ul role="list">
             <li><a href="#features" class="footer__link">Features</a></li>
             <li><a href="#demo" class="footer__link">How it works</a></li>
-            <li><a href="#" class="footer__link">Changelog</a></li>
-            <li><a href="#" class="footer__link">Roadmap</a></li>
+            <li><a href="https://github.com/lucent-org/lucent-code/releases" class="footer__link">Changelog</a></li>
+            <li><a href="https://github.com/lucent-org/lucent-code/issues" class="footer__link">Roadmap</a></li>
           </ul>
         </nav>
         <nav class="footer__nav" aria-label="Resources links">
@@ -27,8 +27,8 @@ export default function Footer() {
         <nav class="footer__nav" aria-label="Connect links">
           <p class="footer__nav-heading">Connect</p>
           <ul role="list">
-            <li><a href="#" class="footer__link">Twitter / X</a></li>
             <li><a href="https://marketplace.visualstudio.com/items?itemName=lucentcode.lucent-code" class="footer__link">VS Code Marketplace</a></li>
+            <li><a href="https://github.com/lucent-org/lucent-code/discussions" class="footer__link">Discussions</a></li>
           </ul>
         </nav>
       </div>
@@ -36,7 +36,7 @@ export default function Footer() {
         <div class="container footer__bottom-inner">
           <p class="footer__copyright">© {year} Lucent Code · MIT License</p>
           <p class="footer__legal">
-            <a href="#" class="footer__link">Privacy</a>
+            <a href="https://github.com/lucent-org/lucent-code/blob/main/LICENSE" class="footer__link">License</a>
           </p>
         </div>
       </div>

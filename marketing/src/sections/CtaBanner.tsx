@@ -16,7 +16,7 @@ export default function CtaBanner(props: Props) {
           Install for VS Code ›
         </Button>
         <p class="cta-banner__trust">
-          No credit card required · Free tier via OpenRouter · Open source
+          No credit card required · Free tier available · Open source
         </p>
       </div>
     </section>
