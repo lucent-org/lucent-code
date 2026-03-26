@@ -1773,7 +1773,7 @@ describe('MessageHandler', () => {
       expect(userMsg.content).toContain('write some tdd tests');
     });
 
-    it('does not send tools to API when skills are active', async () => {
+    it('sends tools to API when skills are active', async () => {
       const skillContent = 'Brainstorming workflow content.';
       mockSkillRegistry.get.mockImplementation((name: string) => {
         if (name === 'brainstorming') return { name: 'brainstorming', description: 'Brainstorm ideas', content: skillContent, source: 'local' };
@@ -1791,9 +1791,8 @@ describe('MessageHandler', () => {
       );
 
       const callArgs = mockClient.chatStream.mock.calls[0][0];
-      // tools must be undefined when skills are active — prevents OpenRouter's function-calling
-      // prompt injection from conflicting with skill content on models like Nemotron
-      expect(callArgs.tools).toBeUndefined();
+      // tools are always sent — skills only run on tool-capable models
+      expect(callArgs.tools).toBeDefined();
     });
 
     it('posts skillsLoaded when registry has skills on ready', async () => {

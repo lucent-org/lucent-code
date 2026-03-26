@@ -346,18 +346,14 @@ export class MessageHandler {
 
     // Update persisted active skills when new ones arrive; re-inject on every turn.
     // This keeps the skill workflow in context across the full conversation.
-    const isSkillOpeningTurn = skills.length > 0;
-    if (isSkillOpeningTurn) {
+    if (skills.length > 0) {
       this.activeSkills = skills;
       postMessage({ type: 'activeSkillsChanged', skills: skills.map((s) => s.name) });
     }
     const effectiveSkills = this.activeSkills;
     if (effectiveSkills.length > 0) {
       const injected = effectiveSkills.map((s) => `<activated-skill name="${s.name}">\n${s.content}\n</activated-skill>`).join('\n\n');
-      const openingRules = isSkillOpeningTurn
-        ? `CRITICAL rules for your FIRST response:\n- Your first response MUST be a single warm, open-ended question asking what the user wants to build or achieve. Nothing else.\n- Do NOT mention files, tools, functions, or technical details.\n- Do NOT explore context, read files, or use any tools.\n- Do NOT print, list, or describe the skill steps.\n- Do NOT do anything except ask ONE question and wait for the user's reply.\n`
-        : `You are mid-workflow. Continue following the active skill's process based on the conversation so far.\n`;
-      systemMessage.content += `\n\n## Active Skills\n${openingRules}\n${injected}`;
+      systemMessage.content += `\n\n## Active Skills\n${injected}`;
     }
 
     // Handle @codebase semantic search
@@ -402,15 +398,12 @@ export class MessageHandler {
     this.conversationMessages.push({ role: 'user', content: userContent });
     this.abortController = new AbortController();
 
-    // Suppress tools on the opening skill turn: models without native tool calling receive an
-    // OpenRouter-injected calling-format prompt that conflicts with skill content.
-    // On follow-up turns (isFirstTurn=false) tools are restored so the skill can use them.
     const skillTools    = this.skillRegistry      ? [USE_SKILL_TOOL_DEFINITION]       : [];
     const editorTools   = this.toolExecutor        ? TOOL_DEFINITIONS                  : [];
     const mcpTools      = this.mcpClientManager?.getTools() ?? [];
     const worktreeTools = [START_WORKTREE_TOOL_DEFINITION];
     const allTools      = [...editorTools, ...skillTools, ...mcpTools, ...worktreeTools];
-    const tools         = isSkillOpeningTurn || allTools.length === 0 ? undefined : allTools;
+    const tools         = allTools.length === 0 ? undefined : allTools;
 
     try {
       const MAX_TOOL_ITERATIONS = 15;
