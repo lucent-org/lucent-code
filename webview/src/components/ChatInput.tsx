@@ -468,9 +468,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     const textParts = textFiles.map((a) => `\`\`\`${a.name}\n${a.data}\n\`\`\``);
     const fullContent = [terminalPart, ...textParts, input().trim()].filter(Boolean).join('\n\n');
 
-    // Workflow skills (Claude model) require user text so the model has intent to work from.
+    // Skills always need user text — the skill workflow needs an intent to work from.
     const nonCompactSkills = skillChips().filter((c) => c.name !== 'compact');
-    if (isWorkflowCapableModel() && nonCompactSkills.length > 0 && !fullContent && images.length === 0) return;
+    if (nonCompactSkills.length > 0 && !fullContent && images.length === 0) return;
 
     if (!fullContent && images.length === 0 && skillChips().length === 0) return;
 
@@ -756,7 +756,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={!!props.noCredits || !props.selectedModel || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0) || (isWorkflowCapableModel() && skillChips().some((c) => c.name !== 'compact') && !input().trim() && attachments().filter((a) => !a.error).length === 0)}
+              disabled={!!props.noCredits || !props.selectedModel || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0) || (skillChips().some((c) => c.name !== 'compact') && !input().trim() && attachments().filter((a) => !a.error).length === 0)}
             >
               Send
             </button>

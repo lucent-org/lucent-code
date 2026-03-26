@@ -1279,6 +1279,25 @@ body {
   cursor: not-allowed;
 }
 
+/* Skill chips in user messages */
+.message-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.message-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--accent-fg, var(--accent));
+}
+
 /* Image thumbnails in chat history */
 .message-images {
   display: flex;

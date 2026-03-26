@@ -7,6 +7,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_approval' | 'system';
   content: string;
   images?: string[];           // base64 data URLs for thumbnail display
+  skills?: string[];           // skill names used in this message (display only)
   isStreaming?: boolean;
   cost?: number;
   tokens?: number;
@@ -108,7 +109,8 @@ function createChatStore() {
     const model = selectedModel();
     if (!model) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content, images: images.length ? images : undefined }]);
+    const skillNames = skills.map((s) => s.name);
+    setMessages((prev) => [...prev, { role: 'user', content, images: images.length ? images : undefined, skills: skillNames.length ? skillNames : undefined }]);
     setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
     setIsStreaming(true);
 
