@@ -8,6 +8,25 @@ description: Slash commands that guide the AI with structured prompts — code r
 
 **Skills** are structured prompt templates that guide the AI to perform a specific task with consistent, high-quality output. Invoke them with a `/` slash command.
 
+## Built-in Skill Reference
+
+| Command | What it does |
+|---|---|
+| `/code-review` | Structured review: correctness → design → style |
+| `/refactor` | Safe refactoring with explicit Before/After blocks |
+| `/debugging` | Root-cause analysis: symptom → hypothesis → fix |
+| `/tests` | Unit tests covering happy path, edges, and errors |
+| `/doc` | JSDoc / docstring for the selected function |
+| `/documentation` | Full documentation section with usage and reference |
+| `/commit` | Conventional Commits message from staged changes |
+| `/clean-commits` | Squash/reword suggestions for a clean merge history |
+| `/onboard` | Onboarding guide for new contributors |
+| `/compact` | Summarise conversation to free context window |
+
+> **Note:** Skills that use tool calls internally (like `/code-review`) require a model with tool-use support. They are hidden automatically when a model without `tools` in `supported_parameters` is selected.
+
+---
+
 ## Invoking a Skill
 
 1. Click in the chat input

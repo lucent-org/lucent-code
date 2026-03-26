@@ -245,6 +245,33 @@
           "type": "boolean",
           "default": false,
           "description": "When enabled, all tool calls (editor tools and MCP tools) run without approval prompts."
+        },
+        "lucentCode.providers.anthropic.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Anthropic API key for direct Claude access (prompt caching, native tool calling). Get one at [console.anthropic.com](https://console.anthropic.com)."
+        },
+        "lucentCode.providers.nvidianim.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "NVIDIA NIM API key. Get one at build.nvidia.com."
+        },
+        "lucentCode.providers.nvidianim.baseUrl": {
+          "type": "string",
+          "default": "https://integrate.api.nvidia.com/v1",
+          "description": "NVIDIA NIM API base URL."
+        },
+        "lucentCode.providers.override": {
+          "type": "string",
+          "default": "",
+          "enum": ["", "anthropic", "nvidia-nim", "openrouter"],
+          "enumDescriptions": [
+            "Auto-detect from model ID (recommended)",
+            "Always use Anthropic directly",
+            "Always use NVIDIA NIM",
+            "Always use OpenRouter"
+          ],
+          "description": "Force a specific LLM provider. Leave empty for auto-detection based on model ID."
         }
       }
     },
@@ -336,6 +363,7 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "diff": "^8.0.3"
   }

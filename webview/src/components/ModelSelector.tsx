@@ -6,6 +6,7 @@ interface ModelSelectorProps {
   selectedModel: string;
   onSelect: (modelId: string) => void;
   contextFillPct?: number;  // 0-100, undefined = hide
+  providerName?: string;    // e.g. 'Anthropic', 'OpenRouter', 'NVIDIA NIM'
 }
 
 const ModelSelector: Component<ModelSelectorProps> = (props) => {
@@ -45,6 +46,9 @@ const ModelSelector: Component<ModelSelectorProps> = (props) => {
     <div class="model-selector">
       <button class="model-selector-toggle" onClick={() => setIsOpen(!isOpen())}>
         {selectedModelName()}
+        <Show when={props.providerName}>
+          <span class="model-provider-badge">{props.providerName}</span>
+        </Show>
         <Show when={selectedIsReasoning()}>
           <span class="model-reasoning-badge" title="Reasoning model — thinks before responding">thinking</span>
         </Show>

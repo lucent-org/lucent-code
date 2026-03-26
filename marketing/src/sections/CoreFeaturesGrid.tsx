@@ -10,9 +10,9 @@ const CORE_FEATURES = [
   },
   {
     icon: '🔄',
-    title: 'Any model via OpenRouter',
-    description: 'Switch between Claude, GPT-4o, Gemini, Mistral, Llama, and more with a single API key. No vendor lock-in.',
-    badge: 'Multi-model',
+    title: 'Any model, any provider',
+    description: 'Use OpenRouter for breadth (500+ models), Anthropic natively for the latest Claude features, or NVIDIA NIM for direct GPU inference — switch providers in one click.',
+    badge: 'Multi-provider',
   },
   {
     icon: '💬',

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockExecuteCommand, mockGetDiagnostics } = vi.hoisted(() => ({
   mockExecuteCommand: vi.fn(),
-  mockGetDiagnostics: vi.fn(() => []),
+  mockGetDiagnostics: vi.fn((): unknown[] => []),
 }));
 
 vi.mock('vscode', () => ({

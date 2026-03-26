@@ -1,17 +1,25 @@
 ---
 sidebar_position: 1
 title: Getting Started
-description: Install Lucent Code, connect your OpenRouter account, and start your first AI-assisted coding session.
+description: Install Lucent Code, connect a provider, and start your first AI-assisted coding session.
 ---
 
 # Getting Started
 
-Lucent Code is a VS Code extension that brings AI-assisted coding to your editor via [OpenRouter](https://openrouter.ai) — a unified API giving you access to hundreds of models from Anthropic, Google, OpenAI, Meta, and more.
+Lucent Code is a VS Code extension that brings AI-assisted coding to your editor. It supports three AI providers — pick whichever fits your workflow:
+
+| Provider | Best for | Sign-up |
+|---|---|---|
+| **OpenRouter** | 500+ models, free tier, single key | [openrouter.ai](https://openrouter.ai) |
+| **Anthropic** | Latest Claude, native features | [console.anthropic.com](https://console.anthropic.com) |
+| **NVIDIA NIM** | Nemotron and NVIDIA GPU models | [build.nvidia.com](https://build.nvidia.com) |
+
+You can configure multiple providers and switch between them at any time.
 
 ## Requirements
 
 - VS Code 1.85 or later
-- An [OpenRouter](https://openrouter.ai) account (free tier available)
+- An API key from at least one provider above
 
 ## Install the Extension
 
@@ -21,38 +29,65 @@ Lucent Code is a VS Code extension that brings AI-assisted coding to your editor
    ext install lucentcode.lucent-code
    ```
    Or search **Lucent Code** in the Extensions sidebar.
-
 3. Click **Install**.
 
-## Get an OpenRouter API Key
+## Connect a Provider
 
-1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
-2. Click **Create Key**
-3. Copy the key — it starts with `sk-or-v1-`
+### OpenRouter (recommended to start)
 
-OpenRouter offers a free tier with access to many models. You only pay for what you use on paid models.
+OpenRouter gives you access to hundreds of models with a single key and has a free tier.
 
-## Set Your API Key
+1. Go to [openrouter.ai/keys](https://openrouter.ai/keys) and create a key
+2. Open the Command Palette (`Ctrl+Shift+P`) and run **Lucent Code: Sign In** (OAuth) or **Lucent Code: Set API Key**
+3. Paste your key
 
-After installing, VS Code will prompt you to enter your API key automatically. If you miss the prompt:
+### Anthropic (for best Claude experience)
 
-1. Open the Command Palette (`Ctrl+Shift+P`)
-2. Run **Lucent Code: Set API Key**
-3. Paste your key and press Enter
+Use Anthropic's native API to get the latest Claude models with full feature support.
 
-Your key is stored securely in VS Code's encrypted secret storage — it never leaves your machine in plaintext.
+1. Get an API key at [console.anthropic.com](https://console.anthropic.com)
+2. Open VS Code settings (`Ctrl+,`), search `lucentCode`
+3. Set `lucentCode.providers.anthropic.apiKey`
+
+### NVIDIA NIM (for Nemotron models)
+
+1. Get an API key at [build.nvidia.com](https://build.nvidia.com)
+2. Open VS Code settings, set `lucentCode.providers.nvidianim.apiKey`
+
+Your keys are stored in VS Code's encrypted secret storage — they never leave your machine in plaintext.
 
 ## Open the Chat Panel
 
 - Click the **Lucent Code icon** in the Activity Bar (left sidebar)
-- Or press `Ctrl+Shift+L` to focus the chat panel
+- Or press `Ctrl+Shift+L`
 - Or run **Lucent Code: Open Chat** from the Command Palette
 
-## Select a Model
+## Select a Provider and Model
 
-Click the model name button at the **bottom of the chat panel** to open the model picker. Type to search. Each model shows its price per million tokens. Start with a free model if you're just exploring.
+Click the **provider · model** button at the bottom of the chat panel. A two-level picker opens:
+1. **Level 1** — choose a provider (shows which are configured)
+2. **Level 2** — search and select a model from that provider
 
-See [Model Selection](./model-selection) for guidance on which model to choose.
+Each model shows its price per million tokens. Start with a free model if you're just exploring.
+
+See [Model Selection](./model-selection) for provider guidance and model recommendations.
+
+## Start Chatting
+
+Type a message and press **Enter**. The extension automatically includes:
+- The file you're currently editing
+- Your cursor position and any selected text
+- Open editor tabs
+- Active diagnostics (errors/warnings)
+
+Try: *"Explain what this file does"* or *"Refactor this function to use async/await"*.
+
+## Next Steps
+
+- [Model Selection](./model-selection) — providers, picking the right model, pricing
+- [Chat Interface](./chat-interface) — keyboard shortcuts, history, exporting
+- [Skills & Commands](./skills-and-commands) — slash commands like `/code-review`
+- [Autonomous Mode](./autonomous-mode) — let the AI make edits directly
 
 ## Start Chatting
 

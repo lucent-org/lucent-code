@@ -1,5 +1,6 @@
 import { Component, createSignal, createEffect, createMemo, Show, For } from 'solid-js';
-import ModelSelector from './ModelSelector';
+import { ProviderModelSelector } from './ProviderModelSelector';
+import type { ProviderInfo } from './ProviderModelSelector';
 import type { OpenRouterModel } from '@shared';
 import { getVsCodeApi } from '../utils/vscode-api';
 
@@ -43,7 +44,7 @@ function isAcceptedFile(file: File): boolean {
 }
 
 interface ChatInputProps {
-  onSend: (content: string, images: string[]) => void;
+  onSend: (content: string, images: string[], skills: Array<{ name: string; content: string }>) => void;
   onCancel: () => void;
   isStreaming: boolean;
   onResolveMention: (type: string) => Promise<string | null>;
@@ -53,7 +54,13 @@ interface ChatInputProps {
   onPendingChipConsumed?: () => void;
   models: OpenRouterModel[];
   selectedModel: string;
+  selectedModelName: string;
   onSelectModel: (modelId: string) => void;
+  providers: ProviderInfo[];
+  activeProviderId: string;
+  providerWarning: string;
+  onSelectProvider: (id: string) => void;
+  onOpenProviderSettings: (id: string) => void;
   messages: { role: string; content: string }[];
   noCredits?: boolean;
   fileList?: { name: string; relativePath: string }[];
@@ -268,7 +275,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     }
     setShowMentions(false);
 
-    // Detect / trigger for skills
+    // Detect / trigger for skills — available for all models, filtered by model in dropdown
     const lastSlash = value.lastIndexOf('/');
     if (lastSlash !== -1 && (lastSlash === 0 || value[lastSlash - 1] === ' ')) {
       const afterSlash = value.slice(lastSlash + 1);
@@ -297,8 +304,35 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     );
   };
 
-  const filteredSkills = () =>
-    props.skills.filter((s) => s.name.toLowerCase().includes(skillFilter()));
+  // Models that support tool use can handle multi-turn workflow skills.
+  // Prefer explicit supported_parameters from the model metadata when available;
+  // fall back to a name-based allowlist for models that don't expose this field.
+  const isWorkflowCapableModel = () => {
+    const model = props.models.find((m) => m.id === props.selectedModel);
+    if (model?.supported_parameters) {
+      return model.supported_parameters.includes('tools');
+    }
+    const id = props.selectedModel.toLowerCase();
+    return (
+      id.includes('claude') ||
+      id.includes('anthropic') ||
+      id.includes('gpt-4') ||
+      id.includes('gemini-1.5') ||
+      id.includes('gemini-2') ||
+      id.includes('o1') ||
+      id.includes('o3')
+    );
+  };
+
+  // Claude-source and marketplace skills use multi-turn workflows — workflow-capable models only.
+  // Builtin, local, github, npm skills are simple prompt additions — any model.
+  const filteredSkills = () => {
+    const claudeOnly = !isWorkflowCapableModel();
+    return props.skills.filter((s) => {
+      if (claudeOnly && (s.source === 'claude' || s.source === 'marketplace')) return false;
+      return s.name.toLowerCase().includes(skillFilter());
+    });
+  };
 
   const groupedSkills = () => {
     const skills = filteredSkills();
@@ -431,15 +465,16 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
     const terminal = terminalContent();
     const terminalPart = terminal ? `<terminal output>\n${terminal}\n</terminal output>` : null;
-    const skillBlocks = skillChips()
-      .map((c) => `<skill name="${c.name}">\n${c.content}\n</skill>`)
-      .join('\n\n');
     const textParts = textFiles.map((a) => `\`\`\`${a.name}\n${a.data}\n\`\`\``);
-    const fullContent = [skillBlocks || null, terminalPart, ...textParts, input().trim()].filter(Boolean).join('\n\n');
+    const fullContent = [terminalPart, ...textParts, input().trim()].filter(Boolean).join('\n\n');
 
-    if (!fullContent && images.length === 0) return;
+    // Skills always need user text — the skill workflow needs an intent to work from.
+    const nonCompactSkills = skillChips().filter((c) => c.name !== 'compact');
+    if (nonCompactSkills.length > 0 && !fullContent && images.length === 0) return;
 
-    props.onSend(fullContent, images);
+    if (!fullContent && images.length === 0 && skillChips().length === 0) return;
+
+    props.onSend(fullContent, images, skillChips().map((c) => ({ name: c.name, content: c.content })));
     setInput('');
     setAttachments([]);
     setTerminalContent(null);
@@ -666,7 +701,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           value={input()}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about your code..."
+          placeholder={skillChips().some((c) => c.name !== 'compact') ? "Describe what you'd like to work on..." : "Ask about your code..."}
           rows={3}
           disabled={props.isStreaming || isResolvingMention() || !!props.noCredits}
         />
@@ -702,11 +737,17 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             title="Browse skills (or type / in the input)"
             disabled={props.isStreaming || props.skills.length === 0 || !!props.noCredits}
           >/…</button>
-          <ModelSelector
-            models={props.models}
+          <ProviderModelSelector
+            providers={props.providers}
+            activeProviderId={props.activeProviderId}
             selectedModel={props.selectedModel}
-            onSelect={props.onSelectModel}
+            selectedModelName={props.selectedModelName}
             contextFillPct={contextFillPct()}
+            providerWarning={props.providerWarning}
+            models={props.models}
+            onSelectProvider={props.onSelectProvider}
+            onOpenProviderSettings={props.onOpenProviderSettings}
+            onSelectModel={props.onSelectModel}
           />
         </div>
         <Show
@@ -715,7 +756,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <button
               class="send-button"
               onClick={handleSend}
-              disabled={!!props.noCredits || !props.selectedModel || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0)}
+              disabled={!!props.noCredits || !props.selectedModel || isResolvingMention() || (!input().trim() && attachments().filter((a) => !a.error).length === 0 && terminalContent() === null && skillChips().length === 0) || (skillChips().some((c) => c.name !== 'compact') && !input().trim() && attachments().filter((a) => !a.error).length === 0)}
             >
               Send
             </button>

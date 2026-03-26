@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { AuthManager } from './core/auth';
 import { Settings } from './core/settings';
 import { OpenRouterClient } from './core/openrouter-client';
+import { ProviderRegistry } from './providers/provider-registry';
+import type { ILLMProvider } from './providers/llm-provider';
 import { ContextBuilder } from './core/context-builder';
 import { ChatViewProvider } from './chat/chat-provider';
 import { MessageHandler } from './chat/message-handler';
@@ -45,6 +47,26 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize core modules
   const auth = new AuthManager(context.secrets);
   const settings = new Settings();
+  const providerRegistry = new ProviderRegistry({
+    openRouterApiKey: () => auth.getApiKey(),
+    anthropicApiKey:  async () => settings.anthropicApiKey || undefined,
+    nvidiaApiKey:     async () => settings.nvidiaApiKey || undefined,
+    nvidiaBaseUrl:    settings.nvidiaBaseUrl,
+    providerOverride: settings.providerOverride,
+  });
+
+  const providerProxy: ILLMProvider = {
+    id: 'dynamic',
+    chatStream: (req, signal) => providerRegistry.resolve(req.model).chatStream(req, signal),
+    listModels: () => providerRegistry.resolve(settings.chatModel).listModels(),
+    getAccountBalance: () => {
+      const provider = providerRegistry.resolve(settings.chatModel);
+      return provider.getAccountBalance?.() ?? Promise.resolve({ usage: 0, limit: null });
+    },
+  };
+
+  // Legacy OpenRouterClient kept for non-streaming .chat() and .getAccountBalance() usages
+  // in authMenu and generateCommitMessage commands.
   const client = new OpenRouterClient(() => auth.getApiKey());
 
   // Initialize skill registry
@@ -179,44 +201,57 @@ export async function activate(context: vscode.ExtensionContext) {
   const terminalBuffer = new TerminalBuffer();
   const toolExecutor = new EditorToolExecutor(() => auth.getTavilyApiKey(), terminalBuffer, indexer);
 
+  const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+    'openrouter': 'OpenRouter',
+    'anthropic':  'Anthropic',
+    'nvidia-nim': 'NVIDIA NIM',
+  };
+
   let currentSessionCost = 0;
   let hasNoCredits = false;
+  let isInlineLoading = false;
 
-  // OpenRouter status bar item
-  const openRouterStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
-  openRouterStatusBar.command = 'lucentCode.authMenu';
-  context.subscriptions.push(openRouterStatusBar);
+  // Provider status bar item
+  const providerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
+  providerStatusBar.command = 'lucentCode.providerMenu';
+  context.subscriptions.push(providerStatusBar);
 
-  const updateOpenRouterStatus = async () => {
-    const isAuthed = await auth.isAuthenticated();
-    if (hasNoCredits) {
-      openRouterStatusBar.text = '$(warning) OpenRouter: No credits';
-      openRouterStatusBar.tooltip = 'No credits remaining — click to manage';
-      openRouterStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-    } else if (isAuthed) {
-      const costStr = currentSessionCost > 0 ? ` · $${currentSessionCost.toFixed(4)}` : '';
-      openRouterStatusBar.text = `$(key) OpenRouter${costStr}`;
-      openRouterStatusBar.tooltip = 'OpenRouter: Signed in — click to manage';
-      openRouterStatusBar.backgroundColor = undefined;
+  const updateProviderStatus = async () => {
+    const providerId = providerRegistry.resolve(settings.chatModel).id;
+    const providerName = PROVIDER_DISPLAY_NAMES[providerId] ?? providerId;
+    const configured = await providerRegistry.isConfigured(providerId, auth);
+
+    if (!configured) {
+      const label = providerId === 'openrouter' ? 'Not signed in' : 'No API key';
+      providerStatusBar.text = `$(warning) ${providerName}: ${label}`;
+      providerStatusBar.tooltip = `${providerName}: not configured — click to configure`;
+      providerStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+    } else if (hasNoCredits && providerId === 'openrouter') {
+      providerStatusBar.text = `$(warning) OpenRouter: No credits`;
+      providerStatusBar.tooltip = 'No credits remaining — click to manage';
+      providerStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     } else {
-      openRouterStatusBar.text = '$(warning) OpenRouter: Not signed in';
-      openRouterStatusBar.tooltip = 'OpenRouter: Not signed in — click to sign in';
-      openRouterStatusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+      const costStr = currentSessionCost > 0 ? ` · $${currentSessionCost.toFixed(4)}` : '';
+      providerStatusBar.text = isInlineLoading
+        ? `$(loading~spin) ${providerName}${costStr}`
+        : `$(key) ${providerName}${costStr}`;
+      providerStatusBar.tooltip = `${providerName} — click to manage`;
+      providerStatusBar.backgroundColor = undefined;
     }
-    openRouterStatusBar.show();
+    providerStatusBar.show();
   };
 
   // Update status bar and reload models on auth changes
   context.subscriptions.push(
     auth.onDidChangeAuth(() => {
       hasNoCredits = false;
-      updateOpenRouterStatus();
+      updateProviderStatus();
       handler.handleMessage({ type: 'getModels' }, (msg) => chatProvider.postMessageToWebview(msg));
     })
   );
 
   // Set initial state
-  void updateOpenRouterStatus();
+  void updateProviderStatus();
 
   // Indexer status bar
   const indexerStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 88);
@@ -226,7 +261,70 @@ export async function activate(context: vscode.ExtensionContext) {
   indexerStatusBar.show();
   context.subscriptions.push(indexerStatusBar);
 
-  messageHandler = new MessageHandler(client, contextBuilder, settings, toolExecutor, history, notifications, terminalBuffer, skillRegistry, mcpClientManager, indexer);
+  messageHandler = new MessageHandler(
+    providerProxy,
+    contextBuilder,
+    settings,
+    toolExecutor,
+    history,
+    notifications,
+    terminalBuffer,
+    skillRegistry,
+    mcpClientManager,
+    indexer,
+    (modelId) => providerRegistry.resolve(modelId),
+    async (providerId: string) => {
+      // 1. Set provider override in VS Code settings
+      await vscode.workspace.getConfiguration('lucentCode.providers').update(
+        'override', providerId, vscode.ConfigurationTarget.Global
+      );
+      providerRegistry.setOverride(providerId);
+      // 2. Load models for this provider
+      const models = await providerRegistry.getProvider(providerId).listModels();
+      // 3. Check if current model is available in new provider
+      const currentModel = settings.chatModel;
+      const available = models.some(m => m.id === currentModel);
+      let warning: string | undefined;
+      let newModelId = currentModel;
+      if (!available && models.length > 0) {
+        newModelId = models[0].id;
+        warning = `"${currentModel}" not available in ${PROVIDER_DISPLAY_NAMES[providerId] ?? providerId} — switching to ${models[0].name}`;
+        await vscode.workspace.getConfiguration('lucentCode').update(
+          'chatModel', newModelId, vscode.ConfigurationTarget.Global
+        );
+      }
+      // 4. Send updated models to webview
+      chatProvider.postMessageToWebview({
+        type: 'modelsLoaded',
+        models: models.map(m => ({
+          id: m.id,
+          name: m.name,
+          context_length: m.contextLength,
+          pricing: m.pricing,
+          top_provider: m.topProvider
+            ? { max_completion_tokens: m.topProvider.maxCompletionTokens }
+            : undefined,
+        })),
+      });
+      // 5. Send model change with optional warning
+      chatProvider.postMessageToWebview({
+        type: 'modelChanged',
+        modelId: newModelId,
+        providerName: PROVIDER_DISPLAY_NAMES[providerId] ?? providerId,
+        warning,
+      });
+      void updateProviderStatus();
+    },
+    (providerId: string) => {
+      if (providerId === 'openrouter') {
+        void vscode.commands.executeCommand('lucentCode.authMenu');
+      } else if (providerId === 'anthropic') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.anthropic');
+      } else if (providerId === 'nvidia-nim') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.nvidianim');
+      }
+    }
+  );
   const handler = messageHandler;
   handler.onStreamEnd = () => {
     if (!chatProvider.isVisible) {
@@ -235,11 +333,26 @@ export async function activate(context: vscode.ExtensionContext) {
   };
   handler.onAuthInvalid = () => {
     auth.signOut().then(() => {
-      void updateOpenRouterStatus();
+      void updateProviderStatus();
       vscode.window.showWarningMessage('OpenRouter: Session expired — please sign in again.', 'Sign in').then((choice) => {
         if (choice === 'Sign in') auth.startOAuth();
       });
     }).catch(() => {});
+  };
+
+  const sendProvidersLoaded = async () => {
+    const providerDefs = [
+      { id: 'openrouter', name: 'OpenRouter' },
+      { id: 'anthropic',  name: 'Anthropic'  },
+      { id: 'nvidia-nim', name: 'NVIDIA NIM' },
+    ];
+    const providers = await Promise.all(
+      providerDefs.map(async p => ({
+        ...p,
+        isConfigured: await providerRegistry.isConfigured(p.id, auth),
+      }))
+    );
+    chatProvider.postMessageToWebview({ type: 'providersLoaded', providers });
   };
 
   // Set up webview message handling
@@ -255,14 +368,17 @@ export async function activate(context: vscode.ExtensionContext) {
       const postMessage = (msg: ExtensionMessage) => {
         if (msg.type === 'usageUpdate') {
           currentSessionCost = msg.sessionCost;
-          void updateOpenRouterStatus();
+          void updateProviderStatus();
         }
         if (msg.type === 'noCredits') {
           hasNoCredits = true;
-          void updateOpenRouterStatus();
+          void updateProviderStatus();
         }
         webview.postMessage(msg);
       };
+      if (message.type === 'ready') {
+        void sendProvidersLoaded();
+      }
       await handler.handleMessage(message, postMessage);
     });
 
@@ -292,7 +408,11 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   // Register inline completion provider
-  const completionProvider = new InlineCompletionProvider(client, settings);
+  const completionProvider = new InlineCompletionProvider(
+    providerProxy,
+    settings,
+    (loading) => { isInlineLoading = loading; void updateProviderStatus(); },
+  );
   context.subscriptions.push(
     vscode.languages.registerInlineCompletionItemProvider(
       { pattern: '**' },
@@ -304,6 +424,20 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('lucentCode.triggerCompletion', () => {
       vscode.commands.executeCommand('editor.action.inlineSuggest.trigger');
+    })
+  );
+
+  // Register provider menu command (routes to the right auth/settings action per provider)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('lucentCode.providerMenu', async () => {
+      const providerId = providerRegistry.resolve(settings.chatModel).id;
+      if (providerId === 'openrouter') {
+        void vscode.commands.executeCommand('lucentCode.authMenu');
+      } else if (providerId === 'anthropic') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.anthropic');
+      } else if (providerId === 'nvidia-nim') {
+        void vscode.commands.executeCommand('workbench.action.openSettings', 'lucentCode.providers.nvidianim');
+      }
     })
   );
 

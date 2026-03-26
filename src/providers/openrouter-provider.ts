@@ -1,35 +1,37 @@
-import type { OpenRouterModel, ChatRequest, ChatResponse, ChatResponseChunk } from '../shared/types';
+import type { ChatRequest, ChatResponseChunk } from '../shared/types';
+import { ILLMProvider, LLMError, LLMErrorCode, ProviderModel } from './llm-provider';
 
 const BASE_URL = 'https://openrouter.ai/api/v1';
-
-export class OpenRouterError extends Error {
-  constructor(
-    public readonly code: number,
-    message: string,
-    public readonly metadata?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = 'OpenRouterError';
-  }
-}
 
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 1000;
 const RETRY_MAX_MS = 8000;
 
-function parseApiError(status: number, body: string): OpenRouterError {
+function toProviderError(status: number, message: string, metadata?: Record<string, unknown>): LLMError {
+  if (status === 401) return new LLMError('auth', message, metadata);
+  if (status === 402) return new LLMError('quota', message, metadata);
+  if (status === 403) return new LLMError('moderation', message, metadata);
+  if (status === 408) return new LLMError('timeout', message, metadata);
+  if (status === 429) return new LLMError('rate_limit', message, metadata);
+  if (status === 400) return new LLMError('bad_request', message, metadata);
+  return new LLMError('unavailable', message, metadata);
+}
+
+function parseApiError(status: number, body: string): LLMError {
   try {
     const parsed = JSON.parse(body) as { error?: { code?: number; message?: string; metadata?: Record<string, unknown> } };
     const err = parsed.error;
     if (err?.message) {
-      return new OpenRouterError(err.code ?? status, err.message, err.metadata);
+      return toProviderError(status, err.message, err.metadata);
     }
   } catch { /* fall through */ }
-  return new OpenRouterError(status, `OpenRouter API error (${status}): ${body}`);
+  return toProviderError(status, `OpenRouter API error (${status}): ${body}`);
 }
 
-export class OpenRouterClient {
+export class OpenRouterProvider implements ILLMProvider {
+  readonly id = 'openrouter';
+
   constructor(private readonly getApiKey: () => Promise<string | undefined>) {}
 
   private async headers(): Promise<Record<string, string>> {
@@ -87,12 +89,10 @@ export class OpenRouterClient {
       const { status } = response;
 
       if (!RETRYABLE_STATUS_CODES.has(status)) {
-        // Non-retryable client error — throw immediately
         const body = await response.text();
         throw parseApiError(status, body);
       }
 
-      // It's a retryable status — record the error
       const body = await response.text();
       lastError = parseApiError(status, body);
 
@@ -100,7 +100,6 @@ export class OpenRouterClient {
         break;
       }
 
-      // Determine delay
       let delayMs: number;
       const retryAfterHeader = response.headers.get('Retry-After');
       if (retryAfterHeader !== null) {
@@ -118,7 +117,7 @@ export class OpenRouterClient {
     throw lastError;
   }
 
-  async listModels(): Promise<OpenRouterModel[]> {
+  async listModels(): Promise<ProviderModel[]> {
     const response = await fetch(`${BASE_URL}/models`, {
       headers: await this.headers(),
     });
@@ -128,21 +127,25 @@ export class OpenRouterClient {
       throw parseApiError(response.status, body);
     }
 
-    const data = await response.json() as { data: OpenRouterModel[] };
-    return data.data;
-  }
+    const data = await response.json() as {
+      data: Array<{
+        id: string;
+        name: string;
+        context_length: number;
+        pricing: { prompt: string; completion: string };
+        top_provider?: { max_completion_tokens?: number };
+      }>;
+    };
 
-  async chat(request: ChatRequest): Promise<ChatResponse> {
-    const headers = await this.headers();
-    const response = await this.withRetry(() =>
-      fetch(`${BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ ...request, stream: false }),
-      })
-    );
-
-    return response.json() as Promise<ChatResponse>;
+    return data.data.map((m) => ({
+      id: m.id,
+      name: m.name,
+      contextLength: m.context_length,
+      pricing: m.pricing,
+      topProvider: m.top_provider
+        ? { maxCompletionTokens: m.top_provider.max_completion_tokens }
+        : undefined,
+    }));
   }
 
   async *chatStream(
@@ -188,15 +191,11 @@ export class OpenRouterClient {
           try {
             const chunk = JSON.parse(data) as ChatResponseChunk;
             if (chunk.error) {
-              throw new OpenRouterError(
-                chunk.error.code,
-                chunk.error.message,
-                chunk.error.metadata
-              );
+              throw toProviderError(chunk.error.code, chunk.error.message, chunk.error.metadata);
             }
             yield chunk;
           } catch (e) {
-            if (e instanceof OpenRouterError) throw e;
+            if (e instanceof LLMError) throw e;
             // Skip malformed chunks
           }
         }

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { OpenRouterClient } from '../core/openrouter-client';
+import type { ILLMProvider } from '../providers/llm-provider';
 import { Settings } from '../core/settings';
 import { TriggerConfig } from './trigger-config';
 import { buildCompletionPrompt } from './prompt-builder';
@@ -7,17 +7,12 @@ import { messageText } from '../core/message-text';
 
 export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
   private readonly triggerConfig = new TriggerConfig();
-  private readonly statusBarItem: vscode.StatusBarItem;
 
   constructor(
-    private readonly client: OpenRouterClient,
-    private readonly settings: Settings
-  ) {
-    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    this.statusBarItem.text = '$(sparkle) OpenRouter';
-    this.statusBarItem.tooltip = 'OpenRouter Inline Completions';
-    this.statusBarItem.show();
-  }
+    private readonly client: ILLMProvider,
+    private readonly settings: Settings,
+    private readonly onLoadingChange?: (loading: boolean) => void
+  ) {}
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
@@ -59,38 +54,48 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
       return emptyResult;
     }
 
-    this.statusBarItem.text = '$(loading~spin) OpenRouter';
+    this.onLoadingChange?.(true);
 
     try {
-      const response = await this.client.chat({
+      const stream = this.client.chatStream({
         model,
         messages: prompt.messages,
         temperature: 0.2,
         max_tokens: 256,
+        stream: true,
       });
 
+      let fullContent = '';
+      for await (const chunk of stream) {
+        if (token.isCancellationRequested) {
+          this.onLoadingChange?.(false);
+          return emptyResult;
+        }
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) fullContent += delta;
+      }
+
       if (token.isCancellationRequested) {
-        this.statusBarItem.text = '$(sparkle) OpenRouter';
+        this.onLoadingChange?.(false);
         return emptyResult;
       }
 
-      const completionText = messageText(response.choices[0]?.message?.content ?? '').trim();
+      const completionText = messageText(fullContent).trim();
       if (!completionText) {
-        this.statusBarItem.text = '$(sparkle) OpenRouter';
+        this.onLoadingChange?.(false);
         return emptyResult;
       }
 
-      this.statusBarItem.text = '$(sparkle) OpenRouter';
+      this.onLoadingChange?.(false);
       const item = new vscode.InlineCompletionItem(completionText);
       return new vscode.InlineCompletionList([item]);
     } catch {
-      this.statusBarItem.text = '$(sparkle) OpenRouter';
+      this.onLoadingChange?.(false);
       return emptyResult;
     }
   }
 
   dispose(): void {
     this.triggerConfig.dispose();
-    this.statusBarItem.dispose();
   }
 }

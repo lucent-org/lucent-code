@@ -20,7 +20,7 @@ const App: Component = () => {
           chatStore.handleStreamChunk(message.content);
           break;
         case 'streamEnd':
-          chatStore.handleStreamEnd();
+          chatStore.handleStreamEnd(message.cancelled);
           break;
         case 'streamError':
           chatStore.handleStreamError(message.error);
@@ -29,7 +29,10 @@ const App: Component = () => {
           chatStore.handleModelsLoaded(message.models);
           break;
         case 'modelChanged':
-          chatStore.receiveModelChange(message.modelId);
+          chatStore.receiveModelChange(message.modelId, message.providerName, message.warning);
+          break;
+        case 'providersLoaded':
+          chatStore.handleProvidersLoaded(message.providers);
           break;
         case 'conversationList':
           chatStore.handleConversationList(message.conversations);
@@ -65,6 +68,9 @@ const App: Component = () => {
         }
         case 'skillsLoaded':
           chatStore.handleSkillsLoaded(message.skills);
+          break;
+        case 'activeSkillsChanged':
+          chatStore.handleActiveSkillsChanged(message.skills);
           break;
         case 'insertSkillChip':
           chatStore.setPendingSkillChip({ name: message.name, content: message.content });
@@ -113,8 +119,8 @@ const App: Component = () => {
     });
   });
 
-  const handleSend = (content: string, images: string[] = []) => {
-    chatStore.sendMessage(content, images);
+  const handleSend = (content: string, images: string[] = [], skills: Array<{ name: string; content: string }> = []) => {
+    chatStore.sendMessage(content, images, skills);
   };
 
   const handleResolveMention = (type: string): Promise<string | null> => {
@@ -196,10 +202,26 @@ const App: Component = () => {
         <button
           class={`autonomous-button ${chatStore.autonomousMode() ? 'active' : ''}`}
           onClick={() => vscode.postMessage({ type: 'setAutonomousMode', enabled: !chatStore.autonomousMode() })}
-          title="Autonomous mode — all tools run without approval"
+          title={chatStore.autonomousMode() ? 'Autonomous mode on — click to disable' : 'Autonomous mode off — click to enable'}
         >
-          ⊙
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <Show when={chatStore.autonomousMode()} fallback={
+              <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+            }>
+              <circle cx="8" cy="8" r="5.5" fill="currentColor"/>
+            </Show>
+          </svg>
         </button>
+        <Show when={chatStore.activeSkillNames().length > 0}>
+          <div class="active-skill-badge" title={`Active skill: ${chatStore.activeSkillNames().join(', ')}`}>
+            ⚡ {chatStore.activeSkillNames().join(', ')}
+            <button
+              class="active-skill-badge__dismiss"
+              onClick={() => { chatStore.handleActiveSkillsChanged([]); vscode.postMessage({ type: 'clearActiveSkills' }); }}
+              title="Deactivate skill"
+            >×</button>
+          </div>
+        </Show>
         <Show when={chatStore.worktreeStatus() !== 'idle'}>
           <button
             class={`worktree-badge worktree-badge--${chatStore.worktreeStatus()}`}
@@ -290,7 +312,13 @@ const App: Component = () => {
         onPendingChipConsumed={() => chatStore.setPendingSkillChip(null)}
         models={chatStore.models()}
         selectedModel={chatStore.selectedModel()}
+        selectedModelName={chatStore.models().find(m => m.id === chatStore.selectedModel())?.name ?? chatStore.selectedModel()}
         onSelectModel={chatStore.selectModel}
+        providers={chatStore.providers()}
+        activeProviderId={chatStore.activeProviderId()}
+        providerWarning={chatStore.providerWarning()}
+        onSelectProvider={chatStore.switchProvider}
+        onOpenProviderSettings={chatStore.openProviderSettings}
         messages={chatStore.messages()}
         noCredits={chatStore.noCredits()}
         fileList={chatStore.fileList()}

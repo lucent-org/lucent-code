@@ -54,10 +54,11 @@ vi.mock('vscode', () => ({
 
 import * as vscode from 'vscode';
 import { MessageHandler } from './message-handler';
-import type { OpenRouterClient } from '../core/openrouter-client';
+import type { ILLMProvider } from '../providers/llm-provider';
 import type { ContextBuilder } from '../core/context-builder';
 import type { Settings } from '../core/settings';
 import type { ExtensionMessage, CodeContext, OpenRouterModel, Conversation, ConversationSummary } from '../shared/types';
+import type { ProviderModel } from '../providers/llm-provider';
 import type { ConversationHistory } from './history';
 import type { EditorToolExecutor } from '../lsp/editor-tools';
 import type { NotificationService } from '../core/notifications';
@@ -112,9 +113,10 @@ async function* createToolCallStream(
 describe('MessageHandler', () => {
   let handler: MessageHandler;
   let mockClient: {
+    id: string;
     chatStream: ReturnType<typeof vi.fn>;
-    chat: ReturnType<typeof vi.fn>;
     listModels: ReturnType<typeof vi.fn>;
+    getAccountBalance: ReturnType<typeof vi.fn>;
   };
   let mockContextBuilder: {
     buildContext: ReturnType<typeof vi.fn>;
@@ -133,7 +135,8 @@ describe('MessageHandler', () => {
   let postMessage: ReturnType<typeof vi.fn>;
   let mockContext: CodeContext;
   let mockEnrichedContext: CodeContext;
-  let mockModels: OpenRouterModel[];
+  let mockModels: ProviderModel[];
+  let expectedMappedModels: OpenRouterModel[];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -156,7 +159,6 @@ describe('MessageHandler', () => {
         cursorLine: 0,
         cursorCharacter: 0,
       },
-      definitions: [],
       diagnostics: [],
     };
 
@@ -164,15 +166,26 @@ describe('MessageHandler', () => {
       {
         id: 'anthropic/claude-sonnet-4',
         name: 'Claude Sonnet 4',
-        context_length: 200000,
+        contextLength: 200000,
         pricing: { prompt: '0.000003', completion: '0.000015' },
       },
     ];
 
+    expectedMappedModels = [
+      {
+        id: 'anthropic/claude-sonnet-4',
+        name: 'Claude Sonnet 4',
+        context_length: 200000,
+        pricing: { prompt: '0.000003', completion: '0.000015' },
+        top_provider: undefined,
+      },
+    ];
+
     mockClient = {
+      id: 'openrouter',
       chatStream: vi.fn(),
-      chat: vi.fn(),
       listModels: vi.fn().mockResolvedValue(mockModels),
+      getAccountBalance: vi.fn(),
     };
 
     mockContextBuilder = {
@@ -194,7 +207,7 @@ describe('MessageHandler', () => {
     postMessage = vi.fn();
 
     handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings
     );
@@ -244,7 +257,7 @@ describe('MessageHandler', () => {
       expect(mockClient.listModels).toHaveBeenCalledOnce();
       expect(postMessage).toHaveBeenCalledWith({
         type: 'modelsLoaded',
-        models: mockModels,
+        models: expectedMappedModels,
       });
     });
 
@@ -271,6 +284,7 @@ describe('MessageHandler', () => {
       expect(postMessage).toHaveBeenCalledWith({
         type: 'modelChanged',
         modelId: 'anthropic/claude-sonnet-4',
+        providerName: '',
       });
     });
   });
@@ -282,7 +296,7 @@ describe('MessageHandler', () => {
       expect(mockClient.listModels).toHaveBeenCalledOnce();
       expect(postMessage).toHaveBeenCalledWith({
         type: 'modelsLoaded',
-        models: mockModels,
+        models: expectedMappedModels,
       });
       expect(mockContextBuilder.buildEnrichedContext).toHaveBeenCalled();
       expect(postMessage).toHaveBeenCalledWith({
@@ -367,8 +381,8 @@ describe('MessageHandler', () => {
       );
 
       // Only one streamChunk should be posted (the one with actual content)
-      const chunkMessages = postMessage.mock.calls.filter(
-        (call: [ExtensionMessage]) => call[0].type === 'streamChunk'
+      const chunkMessages = (postMessage.mock.calls as [ExtensionMessage][]).filter(
+        (call) => call[0].type === 'streamChunk'
       );
       expect(chunkMessages).toHaveLength(1);
       expect(chunkMessages[0][0]).toEqual({ type: 'streamChunk', content: 'data' });
@@ -430,10 +444,10 @@ describe('MessageHandler', () => {
 
       // Should have gotten the partial chunk and then streamEnd (not streamError)
       expect(postMessage).toHaveBeenCalledWith({ type: 'streamChunk', content: 'partial' });
-      expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd' });
+      expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd', cancelled: true });
       // Should NOT have posted a streamError
-      const errorMessages = postMessage.mock.calls.filter(
-        (call: [ExtensionMessage]) => call[0].type === 'streamError'
+      const errorMessages = (postMessage.mock.calls as [ExtensionMessage][]).filter(
+        (call) => call[0].type === 'streamError'
       );
       expect(errorMessages).toHaveLength(0);
     });
@@ -487,7 +501,7 @@ describe('MessageHandler', () => {
       };
 
       handlerWithHistory = new MessageHandler(
-        mockClient as unknown as OpenRouterClient,
+        mockClient as unknown as ILLMProvider,
         mockContextBuilder as unknown as ContextBuilder,
         mockSettings as unknown as Settings,
         undefined,
@@ -577,12 +591,16 @@ describe('MessageHandler', () => {
     });
 
     it('strips ContentPart[] to plain text when auto-titling', async () => {
-      // Arrange: chatStream returns stop so the stream completes and triggers autoTitle
+      // Arrange: first chatStream call returns the main response, second call is for autoTitle
+      let callCount = 0;
       mockClient.chatStream.mockImplementation(async function* () {
-        yield { choices: [{ delta: { content: 'response' }, finish_reason: 'stop' }] };
-      });
-      mockClient.chat.mockResolvedValue({
-        choices: [{ message: { content: 'A title', role: 'assistant' }, finish_reason: 'stop' }],
+        callCount++;
+        if (callCount === 1) {
+          yield { choices: [{ delta: { content: 'response' }, finish_reason: 'stop' }] };
+        } else {
+          // autoTitle stream
+          yield { choices: [{ delta: { content: 'A title' }, finish_reason: 'stop' }] };
+        }
       });
 
       const imgUrl = 'data:image/png;base64,abc123';
@@ -593,9 +611,9 @@ describe('MessageHandler', () => {
         postMessage
       );
 
-      // Assert: autoTitle was called (client.chat was called)
-      expect(mockClient.chat).toHaveBeenCalled();
-      const autoTitleCall = mockClient.chat.mock.calls[0][0];
+      // Assert: autoTitle was called (chatStream was called twice)
+      expect(mockClient.chatStream).toHaveBeenCalledTimes(2);
+      const autoTitleCall = mockClient.chatStream.mock.calls[1][0];
       const userMsg = autoTitleCall.messages.find((m: any) => m.role === 'user');
       expect(typeof userMsg.content).toBe('string');
       expect(userMsg.content).toBe('describe this image');
@@ -644,7 +662,7 @@ describe('MessageHandler', () => {
     beforeEach(() => {
       postMessage = vi.fn();
       applyHandler = new MessageHandler(
-        mockClient as unknown as OpenRouterClient,
+        mockClient as unknown as ILLMProvider,
         mockContextBuilder as unknown as ContextBuilder,
         mockSettings as unknown as Settings,
       );
@@ -668,9 +686,9 @@ describe('MessageHandler', () => {
         expect.objectContaining({ type: 'showDiff' })
       );
       const call = postMessage.mock.calls.find((c: any[]) => c[0].type === 'showDiff');
-      expect(call[0].lines).toBeInstanceOf(Array);
-      expect(call[0].filename).toContain('foo.ts');
-      expect(call[0].fileUri).toBeDefined();
+      expect(call![0].lines).toBeInstanceOf(Array);
+      expect(call![0].filename).toContain('foo.ts');
+      expect(call![0].fileUri).toBeDefined();
     });
 
     it('should open file picker when no filename is provided', async () => {
@@ -693,7 +711,7 @@ describe('MessageHandler', () => {
       );
 
       const diffMsg = postMessage.mock.calls.find((c: any[]) => c[0].type === 'showDiff');
-      const fileUri = diffMsg[0].fileUri;
+      const fileUri = diffMsg![0].fileUri;
 
       // Then confirm
       await applyHandler.handleMessage(
@@ -733,9 +751,9 @@ describe('MessageHandler', () => {
 
       await sendPromise;
 
-      expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd' });
-      const errorMessages = postMessage.mock.calls.filter(
-        (call: [ExtensionMessage]) => call[0].type === 'streamError'
+      expect(postMessage).toHaveBeenCalledWith({ type: 'streamEnd', cancelled: true });
+      const errorMessages = (postMessage.mock.calls as [ExtensionMessage][]).filter(
+        (call) => call[0].type === 'streamError'
       );
       expect(errorMessages).toHaveLength(0);
     });
@@ -803,7 +821,7 @@ describe('MessageHandler', () => {
     beforeEach(() => {
       mockToolExecutor = { execute: vi.fn() };
       handler = new MessageHandler(
-        mockClient as unknown as OpenRouterClient,
+        mockClient as unknown as ILLMProvider,
         mockContextBuilder as unknown as ContextBuilder,
         mockSettings as unknown as Settings,
         mockToolExecutor as unknown as EditorToolExecutor,
@@ -866,7 +884,7 @@ describe('MessageHandler', () => {
     beforeEach(() => {
       mockToolExecutor = { execute: vi.fn() };
       handler = new MessageHandler(
-        mockClient as unknown as OpenRouterClient,
+        mockClient as unknown as ILLMProvider,
         mockContextBuilder as unknown as ContextBuilder,
         mockSettings as unknown as Settings,
         mockToolExecutor as unknown as EditorToolExecutor,
@@ -1514,7 +1532,7 @@ describe('MessageHandler', () => {
       mockToolExecutor = { execute: vi.fn().mockResolvedValue({ success: true, message: 'formatted' }) };
       mockNotifications = { handleError: vi.fn() };
       toolHandler = new MessageHandler(
-        mockClient as unknown as OpenRouterClient,
+        mockClient as unknown as ILLMProvider,
         mockContextBuilder as unknown as ContextBuilder,
         mockSettings as unknown as Settings,
         mockToolExecutor as unknown as EditorToolExecutor,
@@ -1622,7 +1640,7 @@ describe('MessageHandler', () => {
       };
 
       skillHandler = new MessageHandler(
-        mockClient as unknown as OpenRouterClient,
+        mockClient as unknown as ILLMProvider,
         mockContextBuilder as unknown as ContextBuilder,
         mockSettings as unknown as Settings,
         undefined,
@@ -1755,6 +1773,29 @@ describe('MessageHandler', () => {
       expect(userMsg.content).toContain('write some tdd tests');
     });
 
+    it('does not send tools to API when skills are active', async () => {
+      const skillContent = 'Brainstorming workflow content.';
+      mockSkillRegistry.get.mockImplementation((name: string) => {
+        if (name === 'brainstorming') return { name: 'brainstorming', description: 'Brainstorm ideas', content: skillContent, source: 'local' };
+        return undefined;
+      });
+      mockClient.chatStream.mockReturnValue(
+        createMockStream([
+          { choices: [{ delta: { content: 'Hello!' }, finish_reason: 'stop' }] },
+        ])
+      );
+
+      await skillHandler.handleMessage(
+        { type: 'sendMessage', content: 'Hi', model: 'test-model', skills: [{ name: 'brainstorming', content: skillContent }] },
+        postMessage
+      );
+
+      const callArgs = mockClient.chatStream.mock.calls[0][0];
+      // tools must be undefined when skills are active — prevents OpenRouter's function-calling
+      // prompt injection from conflicting with skill content on models like Nemotron
+      expect(callArgs.tools).toBeUndefined();
+    });
+
     it('posts skillsLoaded when registry has skills on ready', async () => {
       mockContextBuilder.buildEnrichedContext.mockResolvedValue(mockEnrichedContext);
       mockClient.listModels.mockResolvedValue(mockModels);
@@ -1860,7 +1901,7 @@ describe('MessageHandler — MCP tool routing', () => {
         yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
       })()),
       listModels: vi.fn().mockResolvedValue([]),
-    } as unknown as OpenRouterClient;
+    } as unknown as ILLMProvider;
 
     const mockContext = {
       buildEnrichedContext: vi.fn().mockResolvedValue({}),
@@ -1894,7 +1935,7 @@ describe('MessageHandler — MCP tool routing', () => {
         })();
       }),
       listModels: vi.fn().mockResolvedValue([]),
-    } as unknown as OpenRouterClient;
+    } as unknown as ILLMProvider;
 
     const mockContext = {
       buildEnrichedContext: vi.fn().mockResolvedValue({}),
@@ -1930,7 +1971,7 @@ describe('MessageHandler — MCP tool routing', () => {
         })();
       }),
       listModels: vi.fn().mockResolvedValue([]),
-    } as unknown as OpenRouterClient;
+    } as unknown as ILLMProvider;
 
     const mockContext = {
       buildEnrichedContext: vi.fn().mockResolvedValue({}),
@@ -1959,9 +2000,10 @@ describe('worktree integration', () => {
   let postMessages: ExtensionMessage[];
 
   const mockClient = {
+    id: 'openrouter' as const,
     chatStream: vi.fn(),
-    chat: vi.fn(),
     listModels: vi.fn().mockResolvedValue([]),
+    getAccountBalance: vi.fn(),
   };
 
   const mockContextBuilder = {
@@ -2007,7 +2049,7 @@ describe('worktree integration', () => {
 
   it('start_worktree tool call invokes worktreeManager.create() without approval gate', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       mockToolExecutor as unknown as EditorToolExecutor,
@@ -2045,7 +2087,7 @@ describe('worktree integration', () => {
     mockWorktreeManager.remapUri.mockImplementation((u: string) => u.replace('file:///workspace', 'file:///workspace/.worktrees/lucent-123'));
 
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       mockToolExecutor as unknown as EditorToolExecutor,
@@ -2088,7 +2130,7 @@ describe('worktree integration', () => {
   it('no active worktree: uri args pass through unchanged', async () => {
     // state remains 'idle' — no remapping
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       mockToolExecutor as unknown as EditorToolExecutor,
@@ -2129,7 +2171,7 @@ describe('worktree integration', () => {
 
   it('startWorktree WebviewMessage triggers worktreeManager.create()', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
     );
@@ -2145,7 +2187,7 @@ describe('worktree integration', () => {
     mockWorktreeManager.finishSession.mockResolvedValue(undefined);
 
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
     );
@@ -2156,41 +2198,19 @@ describe('worktree integration', () => {
     expect(mockWorktreeManager.finishSession).toHaveBeenCalled();
   });
 
-  it('setAutonomousMode(true) triggers worktreeManager.create() when a current conversation exists', async () => {
-    const mockHistory = {
-      create: vi.fn().mockResolvedValue({ id: 'conv-auto-1', title: 'New conversation', model: 'gpt-4', messages: [], createdAt: '', updatedAt: '' }),
-      save: vi.fn().mockResolvedValue(undefined),
-      load: vi.fn(),
-      list: vi.fn().mockResolvedValue([]),
-      delete: vi.fn(),
-      exportAsJson: vi.fn(),
-      exportAsMarkdown: vi.fn(),
-    };
-
+  it('setAutonomousMode echoes autonomousModeChanged back to webview', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
-      undefined,
-      mockHistory as unknown as import('./history').ConversationHistory,
     );
-    handler.setWorktreeManager(mockWorktreeManager as any);
+    const messages: ExtensionMessage[] = [];
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, (m) => messages.push(m));
+    expect(messages).toContainEqual({ type: 'autonomousModeChanged', enabled: true });
 
-    // Send a message first so currentConversation gets set
-    mockClient.chatStream.mockReturnValueOnce(
-      createMockStream([
-        { choices: [{ delta: { content: 'hi' }, finish_reason: 'stop' }] },
-      ])
-    );
-    await handler.handleMessage(
-      { type: 'sendMessage', content: 'hello', model: 'gpt-4' },
-      () => {}
-    );
-
-    // Now enable autonomous mode — should trigger create() because currentConversation is set
-    await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, () => {});
-
-    expect(mockWorktreeManager.create).toHaveBeenCalledOnce();
+    messages.length = 0;
+    await handler.handleMessage({ type: 'setAutonomousMode', enabled: false }, (m) => messages.push(m));
+    expect(messages).toContainEqual({ type: 'autonomousModeChanged', enabled: false });
   });
 });
 
@@ -2200,9 +2220,10 @@ describe('autonomous mode', () => {
   let postMessages: ExtensionMessage[];
 
   const mockClient = {
+    id: 'openrouter' as const,
     chatStream: vi.fn(),
-    chat: vi.fn(),
     listModels: vi.fn().mockResolvedValue([]),
+    getAccountBalance: vi.fn(),
   };
 
   const mockContextBuilder = {
@@ -2241,19 +2262,19 @@ describe('autonomous mode', () => {
 
   it('setAutonomousMode message updates _autonomousMode', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       undefined, undefined, undefined, undefined, undefined,
       mcpManager,
     );
     await handler.handleMessage({ type: 'setAutonomousMode', enabled: true }, (m) => postMessages.push(m));
-    expect(postMessages.length).toBe(0);
+    expect(postMessages).toContainEqual({ type: 'autonomousModeChanged', enabled: true });
   });
 
   it('MCP tool call, autonomous mode off → requestToolApproval called', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       undefined, undefined, undefined, undefined, undefined,
@@ -2282,7 +2303,7 @@ describe('autonomous mode', () => {
 
   it('MCP tool call, autonomous mode on → callTool runs directly, no approval', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       undefined, undefined, undefined, undefined, undefined,
@@ -2306,7 +2327,7 @@ describe('autonomous mode', () => {
 
   it('gated editor tool, autonomous mode on → executes directly, no approval', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       mockToolExecutor as unknown as EditorToolExecutor,
@@ -2331,7 +2352,7 @@ describe('autonomous mode', () => {
 
   it('approval-gated editor tool (write_file), autonomous mode on → executes directly, no approval', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       mockToolExecutor as unknown as EditorToolExecutor,
@@ -2357,9 +2378,10 @@ describe('autonomous mode', () => {
 
 describe('@codebase mention', () => {
   const mockClient = {
+    id: 'openrouter' as const,
     chatStream: vi.fn(),
-    chat: vi.fn(),
     listModels: vi.fn().mockResolvedValue([]),
+    getAccountBalance: vi.fn(),
   };
 
   const mockContextBuilder = {
@@ -2398,7 +2420,7 @@ describe('@codebase mention', () => {
     };
 
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       undefined, undefined, undefined, undefined, undefined, undefined,
@@ -2425,7 +2447,7 @@ describe('@codebase mention', () => {
     };
 
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
       undefined, undefined, undefined, undefined, undefined, undefined,
@@ -2444,7 +2466,7 @@ describe('@codebase mention', () => {
 
   it('does not crash when indexer is undefined', async () => {
     const handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings,
     );
@@ -2466,9 +2488,10 @@ describe('@codebase mention', () => {
 describe('compactConversation', () => {
   let handler: MessageHandler;
   let mockClient: {
+    id: string;
     chatStream: ReturnType<typeof vi.fn>;
-    chat: ReturnType<typeof vi.fn>;
     listModels: ReturnType<typeof vi.fn>;
+    getAccountBalance: ReturnType<typeof vi.fn>;
   };
   let mockContextBuilder: {
     buildContext: ReturnType<typeof vi.fn>;
@@ -2490,9 +2513,10 @@ describe('compactConversation', () => {
     vi.clearAllMocks();
 
     mockClient = {
+      id: 'openrouter',
       chatStream: vi.fn(),
-      chat: vi.fn(),
       listModels: vi.fn().mockResolvedValue([]),
+      getAccountBalance: vi.fn(),
     };
 
     mockContextBuilder = {
@@ -2514,15 +2538,15 @@ describe('compactConversation', () => {
     postMessage = vi.fn();
 
     handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings
     );
   });
 
-  it('calls client.chat with a summarization prompt and replaces conversation, then posts conversationCompacted', async () => {
+  it('calls chatStream with a summarization prompt and replaces conversation, then posts conversationCompacted', async () => {
     // Populate conversationMessages with one turn
-    mockClient.chatStream.mockReturnValue(
+    mockClient.chatStream.mockReturnValueOnce(
       (async function* () {
         yield { choices: [{ delta: { content: 'Hello' } }] };
       })()
@@ -2533,17 +2557,20 @@ describe('compactConversation', () => {
     );
     postMessage.mockClear();
 
-    // Now compact
-    mockClient.chat = vi.fn().mockResolvedValue({
-      choices: [{ message: { content: 'We discussed basic arithmetic.' } }],
-    });
+    // Now compact — chatStream is called again for summarization
+    mockClient.chatStream.mockReturnValueOnce(
+      (async function* () {
+        yield { choices: [{ delta: { content: 'We discussed basic arithmetic.' }, finish_reason: 'stop' }] };
+      })()
+    );
 
     await handler.handleMessage(
       { type: 'compactConversation', model: 'test-model' },
       postMessage
     );
 
-    expect(mockClient.chat).toHaveBeenCalledOnce();
+    // chatStream was called once for sendMessage and once for compactConversation
+    expect(mockClient.chatStream).toHaveBeenCalledTimes(2);
     expect(postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'conversationCompacted', summary: 'We discussed basic arithmetic.' })
     );
@@ -2571,8 +2598,12 @@ describe('compactConversation', () => {
     expect(streamCall.messages).toHaveLength(3);
   });
 
-  it('posts conversationCompacted with fallback message if chat call fails', async () => {
-    mockClient.chat = vi.fn().mockRejectedValue(new Error('API error'));
+  it('posts conversationCompacted with fallback message if chatStream call fails', async () => {
+    mockClient.chatStream.mockReturnValueOnce(
+      (async function* () {
+        throw new Error('API error');
+      })()
+    );
 
     await handler.handleMessage(
       { type: 'compactConversation', model: 'test-model' },
@@ -2596,9 +2627,10 @@ describe('listFiles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const mockClient = {
+      id: 'openrouter',
       chatStream: vi.fn(),
-      chat: vi.fn(),
       listModels: vi.fn().mockResolvedValue([]),
+      getAccountBalance: vi.fn(),
     };
     const mockContextBuilder = {
       buildContext: vi.fn().mockReturnValue({}),
@@ -2616,7 +2648,7 @@ describe('listFiles', () => {
     };
     postMessage = vi.fn();
     handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings
     );
@@ -2657,9 +2689,10 @@ describe('readFileForAttachment', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const mockClient = {
+      id: 'openrouter',
       chatStream: vi.fn(),
-      chat: vi.fn(),
       listModels: vi.fn().mockResolvedValue([]),
+      getAccountBalance: vi.fn(),
     };
     const mockContextBuilder = {
       buildContext: vi.fn().mockReturnValue({}),
@@ -2677,7 +2710,7 @@ describe('readFileForAttachment', () => {
     };
     postMessage = vi.fn();
     handler = new MessageHandler(
-      mockClient as unknown as OpenRouterClient,
+      mockClient as unknown as ILLMProvider,
       mockContextBuilder as unknown as ContextBuilder,
       mockSettings as unknown as Settings
     );
@@ -2749,5 +2782,50 @@ describe('readFileForAttachment', () => {
       type: 'fileAttachment',
       error: expect.stringContaining('5 MB'),
     }));
+  });
+});
+
+describe('switchProvider', () => {
+  it('calls onSwitchProvider callback with providerId', async () => {
+    const onSwitchProvider = vi.fn();
+    const handler = new MessageHandler(
+      {} as any,
+      {} as any,
+      {} as any,
+      undefined,
+      undefined,
+      undefined as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onSwitchProvider
+    );
+    await handler.handleMessage({ type: 'switchProvider', providerId: 'anthropic' }, vi.fn());
+    expect(onSwitchProvider).toHaveBeenCalledWith('anthropic');
+  });
+});
+
+describe('openProviderSettings', () => {
+  it('calls onOpenProviderSettings callback with providerId', async () => {
+    const onOpenProviderSettings = vi.fn();
+    const handler = new MessageHandler(
+      {} as any,
+      {} as any,
+      {} as any,
+      undefined,
+      undefined,
+      undefined as any,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      onOpenProviderSettings
+    );
+    await handler.handleMessage({ type: 'openProviderSettings', providerId: 'nvidia-nim' }, vi.fn());
+    expect(onOpenProviderSettings).toHaveBeenCalledWith('nvidia-nim');
   });
 });

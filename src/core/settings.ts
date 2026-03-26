@@ -52,6 +52,22 @@ export class Settings {
     return this.config.get<boolean>('chat.autonomousMode', false);
   }
 
+  get anthropicApiKey(): string {
+    return this.config.get<string>('providers.anthropic.apiKey', '');
+  }
+
+  get nvidiaApiKey(): string {
+    return this.config.get<string>('providers.nvidianim.apiKey', '');
+  }
+
+  get nvidiaBaseUrl(): string {
+    return this.config.get<string>('providers.nvidianim.baseUrl', '');
+  }
+
+  get providerOverride(): string {
+    return this.config.get<string>('providers.override', '');
+  }
+
   async setChatModel(modelId: string): Promise<void> {
     await this.config.update('chat.model', modelId, vscode.ConfigurationTarget.Global);
   }

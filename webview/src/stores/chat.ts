@@ -7,6 +7,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_approval' | 'system';
   content: string;
   images?: string[];           // base64 data URLs for thumbnail display
+  skills?: string[];           // skill names used in this message (display only)
   isStreaming?: boolean;
   cost?: number;
   tokens?: number;
@@ -38,6 +39,10 @@ function createChatStore() {
       return saved?.selectedModel ?? '';
     })()
   );
+  const [selectedModelProvider, setSelectedModelProvider] = createSignal<string>('');
+  const [providers, setProviders] = createSignal<Array<{ id: string; name: string; isConfigured: boolean }>>([]);
+  const [activeProviderId, setActiveProviderId] = createSignal<string>('openrouter');
+  const [providerWarning, setProviderWarning] = createSignal<string>('');
   const [isStreaming, setIsStreaming] = createSignal(false);
   const [conversations, setConversations] = createSignal<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = createSignal<string>('');
@@ -45,12 +50,15 @@ function createChatStore() {
   const [diffState, setDiffState] = createSignal<DiffState | null>(null);
   const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description: string }[]>([]);
   const [pendingSkillChip, setPendingSkillChip] = createSignal<{ name: string; content: string } | null>(null);
+  const [activeSkillNames, setActiveSkillNames] = createSignal<string[]>([]);
   const [autonomousMode, setAutonomousModeSignal] = createSignal(false);
   const [worktreeStatus, setWorktreeStatus] = createSignal<'idle' | 'creating' | 'active' | 'finishing'>('idle');
   const [noCredits, setNoCredits] = createSignal(false);
   const [fileList, setFileList] = createSignal<{ name: string; relativePath: string }[]>([]);
   const [pendingFileAttachment, setPendingFileAttachment] = createSignal<{ name: string; relativePath: string; content: string } | null>(null);
   const [pendingFileAttachmentError, setPendingFileAttachmentError] = createSignal<{ relativePath: string; error: string } | null>(null);
+
+  let warningTimer: ReturnType<typeof setTimeout> | undefined;
 
   function handleFileList(files: { name: string; relativePath: string }[]) {
     setFileList(files);
@@ -94,18 +102,19 @@ function createChatStore() {
     }
   }
 
-  function sendMessage(content: string, images: string[] = []) {
-    if (!content.trim() && images.length === 0) return;
+  function sendMessage(content: string, images: string[] = [], skills: Array<{ name: string; content: string }> = []) {
+    if (!content.trim() && images.length === 0 && skills.length === 0) return;
     if (isStreaming()) return;
 
     const model = selectedModel();
     if (!model) return;
 
-    setMessages((prev) => [...prev, { role: 'user', content, images: images.length ? images : undefined }]);
+    const skillNames = skills.map((s) => s.name);
+    setMessages((prev) => [...prev, { role: 'user', content, images: images.length ? images : undefined, skills: skillNames.length ? skillNames : undefined }]);
     setMessages((prev) => [...prev, { role: 'assistant', content: '', isStreaming: true }]);
     setIsStreaming(true);
 
-    vscode.postMessage({ type: 'sendMessage', content, images: images.length ? images : undefined, model });
+    vscode.postMessage({ type: 'sendMessage', content, images: images.length ? images : undefined, model, skills: skills.length ? skills : undefined });
   }
 
   function cancelRequest() {
@@ -117,8 +126,13 @@ function createChatStore() {
     setCurrentConversationId('');
     setShowConversationList(false);
     setNoCredits(false);
+    setActiveSkillNames([]);
     vscode.setState({ ...(vscode.getState() as object ?? {}), lastConversationId: undefined });
     vscode.postMessage({ type: 'newChat' });
+  }
+
+  function handleActiveSkillsChanged(skills: string[]) {
+    setActiveSkillNames(skills);
   }
 
   function handleStreamChunk(content: string) {
@@ -132,13 +146,18 @@ function createChatStore() {
     });
   }
 
-  function handleStreamEnd() {
+  function handleStreamEnd(cancelled?: boolean) {
     setIsStreaming(false);
     setMessages((prev) => {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last && last.role === 'assistant') {
-        const content = last.content || '_(No response received. The model may not support this request or ran out of credits.)_';
+        let content = last.content;
+        if (!content) {
+          content = cancelled
+            ? '_(Stopped.)_'
+            : '_(No response received. The model may not support this request or ran out of credits.)_';
+        }
         updated[updated.length - 1] = { ...last, content, isStreaming: false };
       }
       return updated;
@@ -245,11 +264,29 @@ function createChatStore() {
     vscode.postMessage({ type: 'setModel', modelId });
   }
 
+  function handleProvidersLoaded(providerList: Array<{ id: string; name: string; isConfigured: boolean }>) {
+    setProviders(providerList);
+  }
+
   // Called when the extension notifies us of a model change it already applied (e.g. use_model tool).
   // Does NOT post setModel back — the extension is the source of truth for this change.
-  function receiveModelChange(modelId: string) {
+  function receiveModelChange(modelId: string, providerName?: string, warning?: string) {
     setSelectedModel(modelId);
+    setSelectedModelProvider(providerName ?? '');
+    setProviderWarning(warning ?? '');
+    clearTimeout(warningTimer);
+    if (warning) warningTimer = setTimeout(() => setProviderWarning(''), 5000);
     vscode.setState({ ...(vscode.getState() as object ?? {}), selectedModel: modelId });
+  }
+
+  function switchProvider(providerId: string) {
+    setActiveProviderId(providerId);
+    setProviderWarning('');
+    vscode.postMessage({ type: 'switchProvider', providerId });
+  }
+
+  function openProviderSettings(providerId: string) {
+    vscode.postMessage({ type: 'openProviderSettings', providerId });
   }
 
   function handleConversationList(list: ConversationSummary[]) {
@@ -331,12 +368,19 @@ function createChatStore() {
     messages,
     models,
     selectedModel,
+    selectedModelProvider,
+    providers,
+    activeProviderId,
+    providerWarning,
     isStreaming,
     sendMessage,
     cancelRequest,
     newChat,
     selectModel,
     receiveModelChange,
+    handleProvidersLoaded,
+    switchProvider,
+    openProviderSettings,
     handleStreamChunk,
     handleStreamEnd,
     handleStreamError,
@@ -360,6 +404,8 @@ function createChatStore() {
     handleSkillsLoaded,
     pendingSkillChip,
     setPendingSkillChip,
+    activeSkillNames,
+    handleActiveSkillsChanged,
     autonomousMode,
     setAutonomousModeFromMessage,
     worktreeStatus,
