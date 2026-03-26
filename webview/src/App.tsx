@@ -312,7 +312,6 @@ const App: Component = () => {
         onPendingChipConsumed={() => chatStore.setPendingSkillChip(null)}
         models={chatStore.models()}
         selectedModel={chatStore.selectedModel()}
-        selectedModelProvider={chatStore.selectedModelProvider()}
         selectedModelName={chatStore.models().find(m => m.id === chatStore.selectedModel())?.name ?? chatStore.selectedModel()}
         onSelectModel={chatStore.selectModel}
         providers={chatStore.providers()}

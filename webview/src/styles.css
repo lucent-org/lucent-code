@@ -294,7 +294,7 @@ body {
   color: var(--accent-fg);
 }
 
-.model-item.selected {
+.model-item--selected {
   background: var(--accent);
   color: var(--accent-fg);
 }
@@ -317,7 +317,7 @@ body {
 }
 
 .model-item:hover .model-pricing,
-.model-item.selected .model-pricing {
+.model-item--selected .model-pricing {
   color: var(--accent-fg);
   opacity: 0.8;
 }
@@ -328,7 +328,7 @@ body {
 }
 
 .model-item:hover .model-id,
-.model-item.selected .model-id {
+.model-item--selected .model-id {
   color: var(--accent-fg);
   opacity: 0.8;
 }

@@ -54,7 +54,6 @@ interface ChatInputProps {
   onPendingChipConsumed?: () => void;
   models: OpenRouterModel[];
   selectedModel: string;
-  selectedModelProvider?: string;
   selectedModelName: string;
   onSelectModel: (modelId: string) => void;
   providers: ProviderInfo[];
