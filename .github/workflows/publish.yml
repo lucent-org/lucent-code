@@ -1,8 +1,10 @@
 name: Publish
 
+# Manual re-publish of a tag that already has a release. The automatic publish is
+# the publish job in release-please.yml. This workflow has no `release` trigger:
+# release-please now creates releases with the release bot App's token, so a
+# `release: published` trigger here would publish every version twice.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -16,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || github.event.inputs.tag || 'main' }}
+          ref: ${{ github.event.inputs.tag || 'main' }}
 
       - uses: actions/setup-node@v4
         with:
@@ -40,9 +42,3 @@ jobs:
 
       - name: Publish to Marketplace
         run: npx vsce publish --pat ${{ secrets.VSCE_PAT }}
-
-      - name: Upload VSIX to GitHub Release
-        if: github.event_name == 'release'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ github.event.release.tag_name }} *.vsix
