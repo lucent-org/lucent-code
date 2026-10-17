@@ -9,3 +9,6 @@ package-lock.json
 .playwright-mcp/
 docs/regression-screenshots/
 docs/regression-report-*.md
+
+# Coverage report written by vitest in CI
+coverage/
