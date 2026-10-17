@@ -1,5 +1,7 @@
 # Lucent Code
 
+[![codecov](https://codecov.io/gh/lucent-org/lucent-code/graph/badge.svg)](https://codecov.io/gh/lucent-org/lucent-code)
+
 ### Write code in a new light.
 
 Lucent Code is the AI coding assistant that understands your codebase the same way VS Code does — through your language server, not file search.
